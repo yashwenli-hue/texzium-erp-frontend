@@ -4,7 +4,7 @@ interface FieldWrapProps {
   label: string;
   required?: boolean;
   error?: string;
-  children: ReactNode;
+  children?: ReactNode;
 }
 
 export function FieldWrap({ label, required, error, children }: FieldWrapProps) {

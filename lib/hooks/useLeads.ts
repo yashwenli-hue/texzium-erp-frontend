@@ -4,7 +4,7 @@ import { useCallback, useMemo, useState } from "react";
 import { useRepository } from "../repository/RepositoryProvider";
 import { useAsyncList } from "./useAsyncList";
 import { CreateLeadInput } from "../repository/interfaces";
-import { LeadStage } from "../types/domain";
+import { LeadStatus } from "../types/domain";
 import { FilterMap, SortState } from "../types/common";
 import { LeadSortField } from "../repository/interfaces";
 
@@ -33,9 +33,33 @@ export function useLeads() {
     [repo, refetch]
   );
 
-  const updateStage = useCallback(
-    async (id: string, stage: LeadStage) => {
-      await repo.leads.updateStage(id, stage);
+  const updateStatus = useCallback(
+    async (id: string, status: LeadStatus) => {
+      await repo.leads.updateStatus(id, status);
+      refetch();
+    },
+    [repo, refetch]
+  );
+
+  const assignLead = useCallback(
+    async (id: string, assignedToId: string, assignedToName: string) => {
+      await repo.leads.assign(id, assignedToId, assignedToName);
+      refetch();
+    },
+    [repo, refetch]
+  );
+
+  const qualifyLead = useCallback(
+    async (id: string) => {
+      await repo.leads.qualify(id);
+      refetch();
+    },
+    [repo, refetch]
+  );
+
+  const rejectLead = useCallback(
+    async (id: string, reason?: string) => {
+      await repo.leads.reject(id, reason);
       refetch();
     },
     [repo, refetch]
@@ -53,7 +77,10 @@ export function useLeads() {
     sort,
     setSort,
     createLead,
-    updateStage,
+    updateStatus,
+    assignLead,
+    qualifyLead,
+    rejectLead,
     refetch,
   };
 }
@@ -87,5 +114,48 @@ export function useLeadDetail(id: string | undefined) {
     [id, repo, refetch, refetchTimeline]
   );
 
-  return { lead, timeline: timeline ?? [], loading, error, appendActivity, refetch };
+  const assignLead = useCallback(
+    async (assignedToId: string, assignedToName: string) => {
+      if (!id) return;
+      await repo.leads.assign(id, assignedToId, assignedToName);
+      refetch();
+      refetchTimeline();
+    },
+    [id, repo, refetch, refetchTimeline]
+  );
+
+  const qualifyLead = useCallback(async () => {
+    if (!id) return;
+    await repo.leads.qualify(id);
+    refetch();
+    refetchTimeline();
+  }, [id, repo, refetch, refetchTimeline]);
+
+  const rejectLead = useCallback(
+    async (reason?: string) => {
+      if (!id) return;
+      await repo.leads.reject(id, reason);
+      refetch();
+      refetchTimeline();
+    },
+    [id, repo, refetch, refetchTimeline]
+  );
+
+  return {
+    lead,
+    timeline: timeline ?? [],
+    loading,
+    error,
+    appendActivity,
+    assignLead,
+    qualifyLead,
+    rejectLead,
+    refetch,
+  };
+}
+
+export function useLeadSources() {
+  const repo = useRepository();
+  const { data, loading } = useAsyncList(() => repo.leadSources.list(), [repo]);
+  return { sources: data ?? [], loading };
 }

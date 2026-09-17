@@ -3,62 +3,79 @@
 import { useRouter } from "next/navigation";
 import { PageHeader, DesignNote } from "../../components/ui/PageHeader";
 import { StatCard, StatRow, Panel } from "../../components/ui/Card";
-import { KanbanBoard } from "../../components/kanban/KanbanBoard";
+import { KanbanBoard, KanbanColumnConfig } from "../../components/kanban/KanbanBoard";
+import { Icon } from "../../components/ui/Icon";
 import { useLeads } from "../../lib/hooks/useLeads";
-import { LeadStage } from "../../lib/types/domain";
-import { formatInr } from "../../lib/format";
+import { Lead, LeadStatus, LEAD_BOARD_STATUSES } from "../../lib/types/domain";
+import { formatRelative } from "../../lib/format";
 
-const PIPELINE_STAGES: { key: LeadStage; label: string }[] = [
-  { key: "New", label: "New" },
-  { key: "Contacted", label: "Contacted" },
-  { key: "Qualified", label: "Qualified" },
-  { key: "Proposal", label: "Proposal" },
-  { key: "Negotiation", label: "Negotiation" },
-  { key: "Won", label: "Won" },
-];
+const BOARD_COLUMNS: KanbanColumnConfig<LeadStatus>[] = LEAD_BOARD_STATUSES.map((status) => ({
+  key: status,
+  label: status,
+}));
 
 export default function PipelinePage() {
   const router = useRouter();
-  const { leads, updateStage } = useLeads();
+  const { leads, updateStatus } = useLeads();
 
-  const openLeads = leads.filter((l) => l.stage !== "Lost");
-  const totalOpenValue = openLeads
-    .filter((l) => l.stage !== "Won")
-    .reduce((s, l) => s + l.value, 0);
-  const avgDeal = openLeads.length ? Math.round(openLeads.reduce((s, l) => s + l.value, 0) / openLeads.length) : 0;
-  const wonCount = leads.filter((l) => l.stage === "Won").length;
-  const winRate = leads.length ? Math.round((wonCount / leads.length) * 100) : 0;
+  const boardLeads = leads.filter((l) => LEAD_BOARD_STATUSES.includes(l.status));
+  const newCount = leads.filter((l) => l.status === "New").length;
+  const contactedCount = leads.filter((l) => l.status === "Contacted").length;
+  const qualifiedCount = leads.filter((l) => l.status === "Qualified").length;
+  const rejectedCount = leads.filter((l) => l.status === "Rejected").length;
+  const qualificationRate = leads.length ? Math.round((qualifiedCount / leads.length) * 100) : 0;
+
+  function renderCard(lead: Lead) {
+    return (
+      <>
+        <div className="co">{lead.customerName}</div>
+        <div className="amt" style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)" }}>{lead.sourceName}</div>
+        <div className="ppl">
+          <Icon name="user" size={14} /> {lead.assignedToName ?? "Unassigned"}
+        </div>
+        <div className="days">
+          <span className="tag n" style={{ fontSize: 10.5, padding: "2px 8px" }}>
+            {formatRelative(lead.lastActivityAt)}
+          </span>
+        </div>
+      </>
+    );
+  }
 
   return (
     <div className="page">
       <PageHeader
-        eyebrow="RevenueOS · Lead Pipeline"
+        eyebrow="RevenueOS · Pipeline · Lead Pipeline"
         title="Lead Pipeline"
-        subtitle="Visual, stage-by-stage view of every open deal in motion."
+        subtitle="Pre-qualification board — move a lead from New to Contacted here; Qualify or Reject from its detail page."
       />
 
       <StatRow>
-        <StatCard label="Open Pipeline" value={formatInr(totalOpenValue)} note={`${openLeads.length} active deals`} />
-        <StatCard label="Avg Deal Size" value={formatInr(avgDeal)} note="across all stages" />
-        <StatCard label="Win Rate" value={`${winRate}%`} note="of all leads" />
-        <StatCard label="Total Leads" value={String(leads.length)} note="in the system" />
+        <StatCard label="New" value={String(newCount)} note="not yet contacted" />
+        <StatCard label="Contacted" value={String(contactedCount)} note="in progress" />
+        <StatCard label="Qualification Rate" value={`${qualificationRate}%`} note={`${qualifiedCount} of ${leads.length} leads`} />
+        <StatCard label="Rejected" value={String(rejectedCount)} note="did not qualify" />
       </StatRow>
 
       <div style={{ marginTop: 16 }}>
-        <Panel title="Pipeline Board">
+        <Panel title="Pre-Qualification Board">
           <KanbanBoard
-            stages={PIPELINE_STAGES}
-            leads={openLeads}
-            onMove={(id, stage) => updateStage(id, stage)}
+            columns={BOARD_COLUMNS}
+            items={boardLeads}
+            getStage={(l) => l.status}
+            renderCard={renderCard}
+            gridColumns={2}
+            onMove={(id, status) => updateStatus(id, status)}
             onCardClick={(id) => router.push(`/leads/${id}`)}
           />
         </Panel>
       </div>
 
       <DesignNote>
-        <b>Design note.</b> Drag any card to a different column to change its stage — the board and
-        every count updates immediately. On a touch device without drag support, use the &quot;Move
-        to…&quot; selector at the bottom of each card instead; it performs the same stage change.
+        <b>Design note.</b> Only New and Contacted are drag targets here — Qualify and Reject are
+        permission-gated backend actions, so they live as explicit confirmations on the lead&apos;s
+        detail page rather than a casual drag on this board. Qualified leads move straight to the
+        Opportunities pipeline.
       </DesignNote>
     </div>
   );

@@ -2,6 +2,7 @@ import { EntityStore } from "./entityStore";
 import {
   Lead,
   LeadTimelineEntry,
+  LeadSourceRecord,
   Customer,
   Contact,
   Activity,
@@ -14,6 +15,7 @@ import {
 import {
   SEED_LEADS,
   SEED_LEAD_TIMELINE,
+  SEED_LEAD_SOURCES,
   SEED_CUSTOMERS,
   SEED_CONTACTS,
   SEED_ACTIVITIES,
@@ -39,6 +41,7 @@ import {
 export const db = {
   leads: new EntityStore<Lead>(SEED_LEADS),
   leadTimeline: new EntityStore<LeadTimelineEntry>(SEED_LEAD_TIMELINE),
+  leadSources: new EntityStore<LeadSourceRecord>(SEED_LEAD_SOURCES),
   customers: new EntityStore<Customer>(SEED_CUSTOMERS),
   contacts: new EntityStore<Contact>(SEED_CONTACTS),
   activities: new EntityStore<Activity>(SEED_ACTIVITIES),

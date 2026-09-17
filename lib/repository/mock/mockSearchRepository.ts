@@ -15,7 +15,7 @@ export class MockSearchRepository implements ISearchRepository {
       return delay({ leads: [], customers: [], contacts: [], quotations: [], notes: [] });
     }
     const leads = db.leads.getAll().filter((l) =>
-      [l.name, l.industry, l.city].some((f) => f.toLowerCase().includes(q))
+      [l.customerName, l.companyName ?? "", l.sourceName].some((f) => f.toLowerCase().includes(q))
     );
     const customers = db.customers.getAll().filter((c) =>
       [c.name, c.industry, c.city].some((f) => f.toLowerCase().includes(q))

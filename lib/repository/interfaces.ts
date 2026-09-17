@@ -1,7 +1,8 @@
 import { ListQuery, Page, ID } from "../types/common";
 import {
   Lead,
-  LeadStage,
+  LeadStatus,
+  LeadSourceRecord,
   LeadTimelineEntry,
   Customer,
   Contact,
@@ -27,34 +28,46 @@ import {
  * ============================================================================
  */
 
-export type LeadSortField = "name" | "value" | "lastActivityAt" | "createdAt";
+export type LeadSortField = "customerName" | "lastActivityAt" | "createdAt";
 export type CustomerSortField = "name" | "lifetimeValue" | "customerSince";
 export type ContactSortField = "name" | "lastContactedAt";
-export type OpportunitySortField = "amount" | "probability" | "expectedCloseAt";
+export type OpportunitySortField = "expectedValue" | "probability" | "expectedCloseDate";
 export type QuotationSortField = "amount" | "validUntil" | "createdAt";
 export type TaskSortField = "dueAt" | "priority" | "createdAt";
 
+// Mirrors the VERIFIED CreateLeadDto field-for-field. No deal value, owner,
+// industry or city here — those either don't exist on Lead (backend) or are
+// set later through a dedicated action (Assign), not at creation.
 export interface CreateLeadInput {
-  name: string;
-  industry: string;
-  city: string;
-  source: string;
-  value: number;
-  ownerName: string;
+  customerName: string;
+  companyName?: string;
+  email?: string;
   phone: string;
-  email: string;
+  alternatePhone?: string;
+  sourceId: ID;
 }
 
 export interface ILeadRepository {
   list(query?: ListQuery<LeadSortField>): Promise<Page<Lead>>;
   getById(id: ID): Promise<Lead | null>;
   create(input: CreateLeadInput): Promise<Lead>;
-  updateStage(id: ID, stage: LeadStage): Promise<Lead>;
+  /** Lightweight status movement (New/Contacted) — mirrors the lead-status module. */
+  updateStatus(id: ID, status: LeadStatus): Promise<Lead>;
+  /** VERIFIED: AssignLeadDto { leadId, assignedToId } — writes PRE_SALES_ASSIGNED. */
+  assign(id: ID, assignedToId: ID, assignedToName: string): Promise<Lead>;
+  /** VERIFIED: PATCH /:id/qualify — writes LEAD_QUALIFIED. Gated by leads.qualify. */
+  qualify(id: ID): Promise<Lead>;
+  /** VERIFIED: PATCH /:id/reject — writes LEAD_REJECTED. Gated by leads.reject. */
+  reject(id: ID, reason?: string): Promise<Lead>;
   getTimeline(leadId: ID): Promise<LeadTimelineEntry[]>;
   appendTimelineEntry(
     leadId: ID,
     entry: Omit<LeadTimelineEntry, "id" | "leadId">
   ): Promise<LeadTimelineEntry>;
+}
+
+export interface ILeadSourceRepository {
+  list(): Promise<LeadSourceRecord[]>;
 }
 
 export interface CreateCustomerInput {
@@ -134,20 +147,28 @@ export interface INoteRepository {
   listByRelated(linkedId: ID): Promise<Note[]>;
 }
 
+// Mirrors the VERIFIED CreateOpportunityDto. No customerName/stage input —
+// customer is derived from the linked lead, and new opportunities always
+// start at "Qualified" (a lead must already be qualified to spawn one).
 export interface CreateOpportunityInput {
-  name: string;
-  customerName: string;
-  customerId?: ID;
-  stage: OpportunityStage;
-  amount: number;
+  leadId: ID;
+  title: string;
+  expectedValue: number;
   probability: number;
-  expectedCloseAt: string;
-  ownerName: string;
+  expectedCloseDate: string;
 }
 
 export interface IOpportunityRepository {
   list(query?: ListQuery<OpportunitySortField>): Promise<Page<Opportunity>>;
+  getById(id: ID): Promise<Opportunity | null>;
   create(input: CreateOpportunityInput): Promise<Opportunity>;
+  /**
+   * UI-ONLY for now: no backend PATCH route for opportunity stage is
+   * confirmed yet (docs/backend-ui-contract.md §2 lists only POST/GET for
+   * Opportunities). Kept mock-only so the Stage detail page and stepper are
+   * ready to wire up the instant a real endpoint is confirmed.
+   */
+  updateStage(id: ID, stage: OpportunityStage): Promise<Opportunity>;
 }
 
 export interface CreateQuotationInput {
@@ -188,6 +209,7 @@ export interface ISearchRepository {
 /** The full set of repositories the app needs. Provided via RepositoryProvider. */
 export interface RevenueOSRepository {
   leads: ILeadRepository;
+  leadSources: ILeadSourceRepository;
   customers: ICustomerRepository;
   contacts: IContactRepository;
   activities: IActivityRepository;

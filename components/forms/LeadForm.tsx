@@ -6,9 +6,14 @@ import { TextField, SelectField, FieldRow } from "../ui/FormField";
 import { Button } from "../ui/Button";
 import { useToast } from "../ui/Toast";
 import { CreateLeadInput } from "../../lib/repository/interfaces";
+import { useLeadSources } from "../../lib/hooks/useLeads";
 
-const SOURCES = ["Website", "Referral", "Meta Ads", "LinkedIn", "IndiaMart", "Manual"];
-
+/**
+ * Field-for-field mirror of the VERIFIED CreateLeadDto — no industry/city/
+ * deal-value/owner inputs here. Deal value lives on the Opportunity (created
+ * later, once the lead is qualified); owner is set via the separate Assign
+ * action. See docs/backend-ui-contract.md §3.
+ */
 export function LeadForm({
   onClose,
   onSubmit,
@@ -17,26 +22,24 @@ export function LeadForm({
   onSubmit: (input: CreateLeadInput) => Promise<unknown>;
 }) {
   const toast = useToast();
-  const [name, setName] = useState("");
-  const [industry, setIndustry] = useState("");
-  const [city, setCity] = useState("");
-  const [source, setSource] = useState(SOURCES[0]);
-  const [value, setValue] = useState("");
-  const [ownerName, setOwnerName] = useState("");
+  const { sources, loading: sourcesLoading } = useLeadSources();
+  const [customerName, setCustomerName] = useState("");
+  const [companyName, setCompanyName] = useState("");
+  const [sourceId, setSourceId] = useState("");
   const [phone, setPhone] = useState("");
+  const [alternatePhone, setAlternatePhone] = useState("");
   const [email, setEmail] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
 
+  const effectiveSourceId = sourceId || sources[0]?.id || "";
+
   function validate(): boolean {
     const e: Record<string, string> = {};
-    if (!name.trim()) e.name = "Company / lead name is required";
+    if (!customerName.trim()) e.customerName = "Lead / customer name is required";
     if (!phone.trim()) e.phone = "Phone number is required";
-    if (!email.trim()) e.email = "Email is required";
-    else if (!/^\S+@\S+\.\S+$/.test(email)) e.email = "Enter a valid email address";
-    if (!value.trim() || isNaN(Number(value)) || Number(value) <= 0)
-      e.value = "Enter a valid deal value greater than 0";
-    if (!ownerName.trim()) e.ownerName = "Assign an owner";
+    if (email.trim() && !/^\S+@\S+\.\S+$/.test(email)) e.email = "Enter a valid email address";
+    if (!effectiveSourceId) e.sourceId = "Select a lead source";
     setErrors(e);
     return Object.keys(e).length === 0;
   }
@@ -46,16 +49,14 @@ export function LeadForm({
     setSubmitting(true);
     try {
       await onSubmit({
-        name: name.trim(),
-        industry: industry.trim() || "Not specified",
-        city: city.trim() || "Not specified",
-        source,
-        value: Number(value),
-        ownerName: ownerName.trim(),
+        customerName: customerName.trim(),
+        companyName: companyName.trim() || undefined,
+        email: email.trim() || undefined,
         phone: phone.trim(),
-        email: email.trim(),
+        alternatePhone: alternatePhone.trim() || undefined,
+        sourceId: effectiveSourceId,
       });
-      toast.show(`Lead "${name.trim()}" created`, "check");
+      toast.show(`Lead "${customerName.trim()}" created`, "check");
       onClose();
     } catch (err) {
       setErrors({ form: "Something went wrong creating the lead. Please try again." });
@@ -80,46 +81,34 @@ export function LeadForm({
       }
     >
       <TextField
-        label="Company / Lead Name"
+        label="Customer / Lead Name"
         required
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        error={errors.name}
+        value={customerName}
+        onChange={(e) => setCustomerName(e.target.value)}
+        error={errors.customerName}
         placeholder="e.g. Sterling Pumps"
       />
-      <FieldRow>
-        <TextField label="Industry" value={industry} onChange={(e) => setIndustry(e.target.value)} placeholder="e.g. Manufacturing" />
-        <TextField label="City" value={city} onChange={(e) => setCity(e.target.value)} placeholder="e.g. Pune" />
-      </FieldRow>
+      <TextField
+        label="Company Name"
+        value={companyName}
+        onChange={(e) => setCompanyName(e.target.value)}
+        placeholder="e.g. Sterling Pumps Pvt Ltd (optional)"
+      />
       <FieldRow>
         <SelectField
           label="Source"
-          value={source}
-          onChange={(e) => setSource(e.target.value)}
-          options={SOURCES.map((s) => ({ value: s, label: s }))}
-        />
-        <TextField
-          label="Deal Value (₹)"
           required
-          type="number"
-          min={0}
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          error={errors.value}
-          placeholder="e.g. 1840000"
+          value={effectiveSourceId}
+          onChange={(e) => setSourceId(e.target.value)}
+          error={errors.sourceId}
+          disabled={sourcesLoading}
+          options={sources.map((s) => ({ value: s.id, label: s.name }))}
         />
+        <TextField label="Alternate Phone" value={alternatePhone} onChange={(e) => setAlternatePhone(e.target.value)} placeholder="+91 … (optional)" />
       </FieldRow>
-      <TextField
-        label="Owner"
-        required
-        value={ownerName}
-        onChange={(e) => setOwnerName(e.target.value)}
-        error={errors.ownerName}
-        placeholder="e.g. Rohit M."
-      />
       <FieldRow>
         <TextField label="Phone" required value={phone} onChange={(e) => setPhone(e.target.value)} error={errors.phone} placeholder="+91 …" />
-        <TextField label="Email" required value={email} onChange={(e) => setEmail(e.target.value)} error={errors.email} placeholder="name@company.com" />
+        <TextField label="Email" value={email} onChange={(e) => setEmail(e.target.value)} error={errors.email} placeholder="name@company.com (optional)" />
       </FieldRow>
       {errors.form && <p style={{ color: "var(--bad)", fontSize: 12.5 }}>{errors.form}</p>}
     </Modal>

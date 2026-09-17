@@ -1,43 +1,52 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Modal } from "../ui/Modal";
 import { TextField, SelectField, FieldRow } from "../ui/FormField";
 import { Button } from "../ui/Button";
 import { useToast } from "../ui/Toast";
 import { CreateOpportunityInput } from "../../lib/repository/interfaces";
-import { OpportunityStage } from "../../lib/types/domain";
+import { useLeads } from "../../lib/hooks/useLeads";
 
-const STAGES: OpportunityStage[] = ["Qualified", "Proposal", "Negotiation", "Won", "Lost"];
-
+/**
+ * Field-for-field mirror of the VERIFIED CreateOpportunityDto: leadId,
+ * title, expectedValue, probability, expectedCloseDate. No free-text
+ * customer name and no stage input — customer is derived from the selected
+ * lead, and every new opportunity starts at "Qualified" (a lead must
+ * already be qualified before it can become one). See contract §7.
+ */
 export function OpportunityForm({
   onClose,
   onSubmit,
+  defaultLeadId,
 }: {
   onClose: () => void;
   onSubmit: (input: CreateOpportunityInput) => Promise<unknown>;
+  defaultLeadId?: string;
 }) {
   const toast = useToast();
-  const [name, setName] = useState("");
-  const [customerName, setCustomerName] = useState("");
-  const [stage, setStage] = useState<OpportunityStage>("Qualified");
-  const [amount, setAmount] = useState("");
+  const { leads, loading: leadsLoading } = useLeads();
+  const qualifiedLeads = useMemo(() => leads.filter((l) => l.status === "Qualified"), [leads]);
+
+  const [leadId, setLeadId] = useState(defaultLeadId ?? "");
+  const [title, setTitle] = useState("");
+  const [expectedValue, setExpectedValue] = useState("");
   const [probability, setProbability] = useState("35");
-  const [expectedCloseAt, setExpectedCloseAt] = useState("");
-  const [ownerName, setOwnerName] = useState("");
+  const [expectedCloseDate, setExpectedCloseDate] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
 
+  const effectiveLeadId = leadId || defaultLeadId || qualifiedLeads[0]?.id || "";
+
   function validate(): boolean {
     const e: Record<string, string> = {};
-    if (!name.trim()) e.name = "Opportunity name is required";
-    if (!customerName.trim()) e.customerName = "Customer name is required";
-    if (!amount.trim() || isNaN(Number(amount)) || Number(amount) <= 0)
-      e.amount = "Enter a valid amount greater than 0";
+    if (!effectiveLeadId) e.leadId = "Select a qualified lead";
+    if (!title.trim()) e.title = "Opportunity title is required";
+    if (!expectedValue.trim() || isNaN(Number(expectedValue)) || Number(expectedValue) <= 0)
+      e.expectedValue = "Enter a valid amount greater than 0";
     if (isNaN(Number(probability)) || Number(probability) < 0 || Number(probability) > 100)
       e.probability = "Probability must be between 0 and 100";
-    if (!expectedCloseAt) e.expectedCloseAt = "Expected close date is required";
-    if (!ownerName.trim()) e.ownerName = "Assign an owner";
+    if (!expectedCloseDate) e.expectedCloseDate = "Expected close date is required";
     setErrors(e);
     return Object.keys(e).length === 0;
   }
@@ -47,18 +56,16 @@ export function OpportunityForm({
     setSubmitting(true);
     try {
       await onSubmit({
-        name: name.trim(),
-        customerName: customerName.trim(),
-        stage,
-        amount: Number(amount),
+        leadId: effectiveLeadId,
+        title: title.trim(),
+        expectedValue: Number(expectedValue),
         probability: Number(probability),
-        expectedCloseAt: new Date(expectedCloseAt).toISOString(),
-        ownerName: ownerName.trim(),
+        expectedCloseDate: new Date(expectedCloseDate).toISOString(),
       });
-      toast.show(`Opportunity "${name.trim()}" created`, "check");
+      toast.show(`Opportunity "${title.trim()}" created`, "check");
       onClose();
-    } catch {
-      setErrors({ form: "Something went wrong creating the opportunity. Please try again." });
+    } catch (err) {
+      setErrors({ form: err instanceof Error ? err.message : "Something went wrong creating the opportunity. Please try again." });
     } finally {
       setSubmitting(false);
     }
@@ -77,19 +84,29 @@ export function OpportunityForm({
         </>
       }
     >
-      <TextField label="Opportunity Name" required value={name} onChange={(e) => setName(e.target.value)} error={errors.name} placeholder="e.g. Hydraulic Systems Upgrade" />
-      <FieldRow>
-        <TextField label="Customer" required value={customerName} onChange={(e) => setCustomerName(e.target.value)} error={errors.customerName} placeholder="e.g. Sterling Pumps" />
-        <SelectField label="Stage" value={stage} onChange={(e) => setStage(e.target.value as OpportunityStage)} options={STAGES.map((s) => ({ value: s, label: s }))} />
-      </FieldRow>
-      <FieldRow>
-        <TextField label="Amount (₹)" required type="number" min={0} value={amount} onChange={(e) => setAmount(e.target.value)} error={errors.amount} placeholder="e.g. 1840000" />
-        <TextField label="Probability (%)" required type="number" min={0} max={100} value={probability} onChange={(e) => setProbability(e.target.value)} error={errors.probability} />
-      </FieldRow>
-      <FieldRow>
-        <TextField label="Expected Close Date" required type="date" value={expectedCloseAt} onChange={(e) => setExpectedCloseAt(e.target.value)} error={errors.expectedCloseAt} />
-        <TextField label="Owner" required value={ownerName} onChange={(e) => setOwnerName(e.target.value)} error={errors.ownerName} placeholder="e.g. Rohit M." />
-      </FieldRow>
+      {!leadsLoading && qualifiedLeads.length === 0 ? (
+        <p style={{ fontSize: 13.5, color: "var(--muted)" }}>
+          No qualified leads yet. Qualify a lead first — an opportunity can only be created from one.
+        </p>
+      ) : (
+        <>
+          <SelectField
+            label="Qualified Lead"
+            required
+            value={effectiveLeadId}
+            onChange={(e) => setLeadId(e.target.value)}
+            error={errors.leadId}
+            disabled={!!defaultLeadId || leadsLoading}
+            options={qualifiedLeads.map((l) => ({ value: l.id, label: l.companyName ? `${l.customerName} (${l.companyName})` : l.customerName }))}
+          />
+          <TextField label="Opportunity Title" required value={title} onChange={(e) => setTitle(e.target.value)} error={errors.title} placeholder="e.g. Hydraulic Systems Upgrade" />
+          <FieldRow>
+            <TextField label="Expected Value (₹)" required type="number" min={0} value={expectedValue} onChange={(e) => setExpectedValue(e.target.value)} error={errors.expectedValue} placeholder="e.g. 1840000" />
+            <TextField label="Probability (%)" required type="number" min={0} max={100} value={probability} onChange={(e) => setProbability(e.target.value)} error={errors.probability} />
+          </FieldRow>
+          <TextField label="Expected Close Date" required type="date" value={expectedCloseDate} onChange={(e) => setExpectedCloseDate(e.target.value)} error={errors.expectedCloseDate} />
+        </>
+      )}
       {errors.form && <p style={{ color: "var(--bad)", fontSize: 12.5 }}>{errors.form}</p>}
     </Modal>
   );

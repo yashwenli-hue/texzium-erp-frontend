@@ -5,7 +5,7 @@ const PALETTE = ["#6366F1", "#F59E0B", "#0EA5E9", "#EC4899", "#84CC16", "#94A3B8
 
 export function SourceBreakdown({ leads }: { leads: Lead[] }) {
   const counts = new Map<string, number>();
-  leads.forEach((l) => counts.set(l.source, (counts.get(l.source) ?? 0) + 1));
+  leads.forEach((l) => counts.set(l.sourceName, (counts.get(l.sourceName) ?? 0) + 1));
   const entries = [...counts.entries()].sort((a, b) => b[1] - a[1]);
 
   if (entries.length === 0) {

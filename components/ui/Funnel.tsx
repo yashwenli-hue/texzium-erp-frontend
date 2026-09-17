@@ -1,26 +1,25 @@
-import { Lead, LeadStage } from "../../lib/types/domain";
+import { Lead } from "../../lib/types/domain";
 import { Icon } from "./Icon";
 
-const FUNNEL_STAGES: LeadStage[] = ["New", "Contacted", "Qualified", "Proposal", "Negotiation", "Won"];
+const FUNNEL_STATUSES: Lead["status"][] = ["New", "Contacted", "Qualified"];
 const RAMP: { shade: string; txt: string }[] = [
   { shade: "#A7F3D0", txt: "#065F46" },
-  { shade: "#6EE7B7", txt: "#065F46" },
   { shade: "#34D399", txt: "#fff" },
-  { shade: "#10B981", txt: "#fff" },
   { shade: "#059669", txt: "#fff" },
-  { shade: "#047857", txt: "#fff" },
 ];
 
 /**
- * Single-hue funnel (light → dark) with the weakest stage-to-stage
- * conversion flagged in the status "bad" color. Counts are computed live
- * from whatever leads currently exist — this deliberately does NOT reuse
- * the prototype's hardcoded 1,284/870/540/... figures, since those were
- * fictional prototype data, not real production numbers.
+ * Lead qualification funnel: New → Contacted → Qualified. "Won"/"Lost"/
+ * "Proposal"/"Negotiation" no longer appear here — those are Opportunity
+ * stages (a Lead's lifecycle ends at Qualified or Rejected; see
+ * lib/types/domain.ts). Rejected leads are called out as a separate
+ * leakage stat rather than a funnel stage, since rejection is a gated
+ * action, not a step in the qualification sequence.
  */
 export function LeadFunnel({ leads }: { leads: Lead[] }) {
-  const counts = FUNNEL_STAGES.map((stage) => leads.filter((l) => l.stage === stage).length);
+  const counts = FUNNEL_STATUSES.map((status) => leads.filter((l) => l.status === status).length);
   const maxCount = Math.max(...counts, 1);
+  const rejectedCount = leads.filter((l) => l.status === "Rejected").length;
 
   let worstIdx = -1;
   let worstDrop = -Infinity;
@@ -36,13 +35,13 @@ export function LeadFunnel({ leads }: { leads: Lead[] }) {
 
   return (
     <div className="funnel">
-      {FUNNEL_STAGES.map((stage, i) => {
+      {FUNNEL_STATUSES.map((status, i) => {
         const count = counts[i];
         const pct = count === 0 ? 4 : Math.max(8, (count / maxCount) * 100);
         const flagged = i === worstIdx && worstDrop > 0;
         const ramp = RAMP[i];
         return (
-          <div className="f" key={stage}>
+          <div className="f" key={status}>
             <div
               className="bx"
               style={{
@@ -51,7 +50,7 @@ export function LeadFunnel({ leads }: { leads: Lead[] }) {
                 color: ramp.txt,
               }}
             >
-              {stage}
+              {status}
             </div>
             <div className="meta">
               <b>{count}</b> leads
@@ -73,6 +72,16 @@ export function LeadFunnel({ leads }: { leads: Lead[] }) {
           </div>
         );
       })}
+      {rejectedCount > 0 && (
+        <div className="f" style={{ marginTop: 2 }}>
+          <div className="bx" style={{ width: "auto", minWidth: 74, background: "var(--bad-bg)", color: "var(--bad)" }}>
+            Rejected
+          </div>
+          <div className="meta">
+            <b>{rejectedCount}</b> lead{rejectedCount === 1 ? "" : "s"} did not qualify
+          </div>
+        </div>
+      )}
     </div>
   );
 }

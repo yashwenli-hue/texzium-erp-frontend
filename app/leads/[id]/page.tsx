@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Icon } from "../../../components/ui/Icon";
 import { Panel } from "../../../components/ui/Card";
@@ -9,12 +9,18 @@ import { QuickActions } from "../../../components/ui/QuickActions";
 import { DataTable, Column } from "../../../components/ui/DataTable";
 import { Button } from "../../../components/ui/Button";
 import { DesignNote } from "../../../components/ui/PageHeader";
+import { DocumentTrail } from "../../../components/ui/DocumentTrail";
 import { NoteForm } from "../../../components/forms/NoteForm";
 import { ActivityForm } from "../../../components/forms/ActivityForm";
+import { AssignLeadDialog } from "../../../components/forms/AssignLeadDialog";
+import { OpportunityForm } from "../../../components/forms/OpportunityForm";
+import { ConfirmDialog } from "../../../components/ui/ConfirmDialog";
 import { useLeadDetail } from "../../../lib/hooks/useLeads";
 import { useNotesByRelated } from "../../../lib/hooks/useNotes";
 import { useQuotations } from "../../../lib/hooks/useQuotations";
+import { useOpportunities } from "../../../lib/hooks/useOpportunities";
 import { useRepository } from "../../../lib/repository/RepositoryProvider";
+import { useToast } from "../../../components/ui/Toast";
 import { initials } from "../../../components/ui/Who";
 import { formatInr, formatDateTime } from "../../../lib/format";
 import { Quotation } from "../../../lib/types/domain";
@@ -30,13 +36,24 @@ function goBackOrTo(router: ReturnType<typeof useRouter>, fallback: string) {
 export default function LeadDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
+  const toast = useToast();
   const id = params?.id;
-  const { lead, timeline, loading, appendActivity } = useLeadDetail(id);
+  const { lead, timeline, loading, appendActivity, assignLead, qualifyLead, rejectLead } = useLeadDetail(id);
   const { notes, refetch: refetchNotes } = useNotesByRelated(id);
   const { quotations } = useQuotations();
+  const { opportunities, createOpportunity } = useOpportunities();
   const repo = useRepository();
   const [showNoteForm, setShowNoteForm] = useState(false);
   const [showActivityForm, setShowActivityForm] = useState(false);
+  const [showAssign, setShowAssign] = useState(false);
+  const [showQualify, setShowQualify] = useState(false);
+  const [showReject, setShowReject] = useState(false);
+  const [showConvert, setShowConvert] = useState(false);
+
+  const relatedOpportunity = useMemo(
+    () => opportunities.find((o) => o.leadId === id),
+    [opportunities, id]
+  );
 
   if (loading && !lead) {
     return (
@@ -62,7 +79,9 @@ export default function LeadDetailPage() {
     );
   }
 
-  const relatedQuotes = quotations.filter((q) => q.customerName === lead.name);
+  const relatedQuotes = quotations.filter((q) => q.customerName === lead.customerName);
+  const canQualify = lead.status !== "Qualified" && lead.status !== "Rejected";
+  const canReject = lead.status !== "Rejected";
 
   const quoteColumns: Column<Quotation>[] = [
     { key: "quoteNo", header: "No.", render: (q) => q.quoteNo },
@@ -79,25 +98,65 @@ export default function LeadDetailPage() {
         <div className="card panel">
           <div className="profile-head">
             <div className="top">
-              <div className="av-lg">{initials(lead.name)}</div>
+              <div className="av-lg">{initials(lead.customerName)}</div>
               <div>
-                <h3>{lead.name}</h3>
-                <div className="co">{lead.industry} · {lead.city}</div>
+                <h3>{lead.customerName}</h3>
+                <div className="co">{lead.companyName ?? "No company on file"}</div>
               </div>
             </div>
             <div className="tagrow">
-              <StatusTag status={lead.stage} />
-              <Tag color="i">{lead.source}</Tag>
-              <Tag color="n">Owner: {lead.ownerName}</Tag>
+              <StatusTag status={lead.status} />
+              <Tag color="i">{lead.sourceName}</Tag>
+              <Tag color="n">{lead.assignedToName ? `Assigned: ${lead.assignedToName}` : "Unassigned"}</Tag>
               <StatusTag status={lead.score} />
             </div>
-            <QuickActions phone={lead.phone} email={lead.email} contactName={lead.name} />
+            <QuickActions phone={lead.phone} email={lead.email} contactName={lead.customerName} />
+            <div className="lead-action-row">
+              <Button variant="ghost" icon="user" onClick={() => setShowAssign(true)}>
+                {lead.assignedToId ? "Reassign" : "Assign"}
+              </Button>
+              <Button variant="ghost" icon="check" onClick={() => setShowQualify(true)} disabled={!canQualify}>
+                Qualify
+              </Button>
+              <Button variant="ghost" className="danger-ghost" icon="close" onClick={() => setShowReject(true)} disabled={!canReject}>
+                Reject
+              </Button>
+            </div>
           </div>
           <div className="info-grid">
             <div className="f"><label>Phone</label><div>{lead.phone}</div></div>
-            <div className="f"><label>Email</label><div style={{ wordBreak: "break-all" }}>{lead.email}</div></div>
-            <div className="f"><label>Assigned To</label><div>{lead.ownerName}</div></div>
-            <div className="f"><label>Deal Value</label><div>{formatInr(lead.value)}</div></div>
+            <div className="f"><label>Email</label><div style={{ wordBreak: "break-all" }}>{lead.email ?? "—"}</div></div>
+            <div className="f"><label>Alternate Phone</label><div>{lead.alternatePhone ?? "—"}</div></div>
+            <div className="f"><label>Last Activity</label><div>{formatDateTime(lead.lastActivityAt)}</div></div>
+          </div>
+          <div style={{ padding: "0 19px 16px" }}>
+            <DocumentTrail
+              nodes={[
+                { key: "lead", label: lead.customerName, sublabel: "Lead", current: !relatedOpportunity },
+                ...(relatedOpportunity
+                  ? [{
+                      key: "opp",
+                      label: relatedOpportunity.title,
+                      sublabel: "Opportunity",
+                      href: `/opportunities/${relatedOpportunity.id}`,
+                      current: true,
+                    }]
+                  : []),
+              ]}
+            />
+            {!relatedOpportunity && (
+              <div style={{ marginTop: 10 }}>
+                {lead.status === "Qualified" ? (
+                  <Button variant="primary" icon="brief" onClick={() => setShowConvert(true)}>
+                    Convert to Opportunity
+                  </Button>
+                ) : (
+                  <p style={{ fontSize: 12.5, color: "var(--muted)" }}>
+                    Qualify this lead to create an opportunity from it.
+                  </p>
+                )}
+              </div>
+            )}
           </div>
           <div className="panel-head" style={{ borderTop: "none" }}>
             <h3 style={{ fontSize: 13.5 }}>Lead Timeline</h3>
@@ -164,8 +223,9 @@ export default function LeadDetailPage() {
       </div>
 
       <DesignNote>
-        <b>Design note.</b> One profile header, one timeline, one place for quick actions. Related
-        quotations and notes surface right here so nobody has to go hunting across screens.
+        <b>Design note.</b> Assign, Qualify and Reject are explicit gated actions here — each mirrors a
+        dedicated backend endpoint with its own permission, so they&apos;re never a side effect of dragging
+        a card on the pipeline board.
       </DesignNote>
 
       {showNoteForm && (
@@ -173,7 +233,7 @@ export default function LeadDetailPage() {
           onClose={() => { setShowNoteForm(false); refetchNotes(); }}
           onSubmit={(input) => repo.notes.create(input)}
           defaultLinkedType="Lead"
-          defaultLinkedName={lead.name}
+          defaultLinkedName={lead.customerName}
           defaultLinkedId={lead.id}
         />
       )}
@@ -188,8 +248,48 @@ export default function LeadDetailPage() {
             );
           }}
           defaultRelatedType="Lead"
-          defaultRelatedName={lead.name}
+          defaultRelatedName={lead.customerName}
           defaultRelatedId={lead.id}
+        />
+      )}
+      {showAssign && (
+        <AssignLeadDialog
+          currentAssigneeId={lead.assignedToId}
+          onClose={() => setShowAssign(false)}
+          onSubmit={(assignedToId, assignedToName) => assignLead(assignedToId, assignedToName)}
+        />
+      )}
+      {showQualify && (
+        <ConfirmDialog
+          title="Qualify Lead"
+          body={`Mark ${lead.customerName} as Qualified? This makes it eligible to become an Opportunity.`}
+          confirmLabel="Qualify"
+          onClose={() => setShowQualify(false)}
+          onConfirm={async () => {
+            await qualifyLead();
+            toast.show(`${lead.customerName} qualified`, "check");
+          }}
+        />
+      )}
+      {showReject && (
+        <ConfirmDialog
+          title="Reject Lead"
+          body={`Reject ${lead.customerName}? This closes out the lead — it can no longer be qualified.`}
+          confirmLabel="Reject Lead"
+          destructive
+          noteLabel="Reason (optional)"
+          onClose={() => setShowReject(false)}
+          onConfirm={async (reason) => {
+            await rejectLead(reason);
+            toast.show(`${lead.customerName} rejected`, "close");
+          }}
+        />
+      )}
+      {showConvert && (
+        <OpportunityForm
+          defaultLeadId={lead.id}
+          onClose={() => setShowConvert(false)}
+          onSubmit={(input) => createOpportunity(input)}
         />
       )}
     </div>

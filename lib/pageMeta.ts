@@ -10,19 +10,30 @@ export interface NavSection {
   items: NavItem[];
 }
 
+/**
+ * Regrouped around the revenue process rather than a flat module list:
+ * Pipeline (winning the deal) is now separate from Quote to Cash
+ * (fulfilling it) — Quotations moves into the latter as the first of
+ * several document stages that later stages will add (Proforma Invoices,
+ * Sales Orders, Sales Invoices, Payments). Nothing here is a route that
+ * doesn't already exist; this is a labeling/grouping change only.
+ */
 export const NAV_SECTIONS: NavSection[] = [
   {
     label: "Overview",
     items: [{ href: "/dashboard", label: "Dashboard", icon: "chart" }],
   },
   {
-    label: "Sales Pipeline",
+    label: "Pipeline",
     items: [
       { href: "/leads", label: "Leads", icon: "funnel", countKey: "leadsCount" },
       { href: "/pipeline", label: "Lead Pipeline", icon: "target" },
       { href: "/opportunities", label: "Opportunities", icon: "brief", countKey: "opportunitiesCount" },
-      { href: "/quotations", label: "Quotations", icon: "file", countKey: "quotationsCount" },
     ],
+  },
+  {
+    label: "Quote to Cash",
+    items: [{ href: "/quotations", label: "Quotations", icon: "file", countKey: "quotationsCount" }],
   },
   {
     label: "Accounts",
@@ -32,10 +43,10 @@ export const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
-    label: "Engagement",
+    label: "Activity",
     items: [
       { href: "/activities", label: "Activities", icon: "pulse" },
-      { href: "/tasks", label: "Follow-ups / Tasks", icon: "checksq", countKey: "openTasksCount" },
+      { href: "/tasks", label: "Tasks", icon: "checksq", countKey: "openTasksCount" },
       { href: "/notes", label: "Notes", icon: "notepad", countKey: "notesCount" },
     ],
   },

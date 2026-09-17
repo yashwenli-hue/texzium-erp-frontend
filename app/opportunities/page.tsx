@@ -1,33 +1,44 @@
 "use client";
 
+import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { PageHeader, DesignNote } from "../../components/ui/PageHeader";
 import { StatCard, StatRow, Panel } from "../../components/ui/Card";
 import { Button } from "../../components/ui/Button";
-import { StatusTag } from "../../components/ui/Tag";
+import { StatusTag, ChipGroup, Chip } from "../../components/ui/Tag";
 import { DataTable, Column, toggleSortDirection } from "../../components/ui/DataTable";
 import { OpportunityForm } from "../../components/forms/OpportunityForm";
 import { useOpportunities } from "../../lib/hooks/useOpportunities";
-import { useState } from "react";
-import { Opportunity } from "../../lib/types/domain";
+import { Opportunity, OPPORTUNITY_STAGES } from "../../lib/types/domain";
 import { formatInr, formatDate } from "../../lib/format";
 import { SortState } from "../../lib/types/common";
 import { OpportunitySortField } from "../../lib/repository/interfaces";
 
 export default function OpportunitiesPage() {
+  const router = useRouter();
   const { opportunities, createOpportunity, sort, setSort } = useOpportunities();
   const [showForm, setShowForm] = useState(false);
+  const [stageChip, setStageChip] = useState<string>("All");
 
   const open = opportunities.filter((o) => o.stage !== "Won" && o.stage !== "Lost");
-  const weighted = open.reduce((s, o) => s + (o.amount * o.probability) / 100, 0);
-  const avgDeal = open.length ? Math.round(open.reduce((s, o) => s + o.amount, 0) / open.length) : 0;
+  const weighted = open.reduce((s, o) => s + (o.expectedValue * o.probability) / 100, 0);
+  const avgDeal = open.length ? Math.round(open.reduce((s, o) => s + o.expectedValue, 0) / open.length) : 0;
   const won = opportunities.filter((o) => o.stage === "Won").length;
   const winRate = opportunities.length ? Math.round((won / opportunities.length) * 100) : 0;
 
+  const stageCounts = useMemo(() => {
+    const map: Record<string, number> = {};
+    opportunities.forEach((o) => (map[o.stage] = (map[o.stage] ?? 0) + 1));
+    return map;
+  }, [opportunities]);
+
+  const rows = stageChip === "All" ? opportunities : opportunities.filter((o) => o.stage === stageChip);
+
   const columns: Column<Opportunity>[] = [
-    { key: "name", header: "Opportunity", render: (o) => o.name },
+    { key: "title", header: "Opportunity", render: (o) => o.title },
     { key: "customerName", header: "Customer", render: (o) => o.customerName },
     { key: "stage", header: "Stage", render: (o) => <StatusTag status={o.stage} /> },
-    { key: "amount", header: "Amount", sortable: true, render: (o) => formatInr(o.amount) },
+    { key: "expectedValue", header: "Expected Value", sortable: true, render: (o) => formatInr(o.expectedValue) },
     {
       key: "probability",
       header: "Probability",
@@ -41,14 +52,14 @@ export default function OpportunitiesPage() {
         </div>
       ),
     },
-    { key: "expectedCloseAt", header: "Expected Close", sortable: true, render: (o) => formatDate(o.expectedCloseAt) },
+    { key: "expectedCloseDate", header: "Expected Close", sortable: true, render: (o) => formatDate(o.expectedCloseDate) },
     { key: "ownerName", header: "Owner", render: (o) => o.ownerName },
   ];
 
   return (
     <div className="page">
       <PageHeader
-        eyebrow="RevenueOS · Opportunities"
+        eyebrow="RevenueOS · Pipeline · Opportunities"
         title="Opportunities"
         subtitle="Qualified, forecastable deals — value, probability and expected close."
         cta={
@@ -60,29 +71,38 @@ export default function OpportunitiesPage() {
 
       <StatRow>
         <StatCard label="Open Opportunities" value={String(open.length)} note={`across ${new Set(open.map((o) => o.customerName)).size} accounts`} />
-        <StatCard label="Weighted Forecast" value={formatInr(weighted)} note="probability-adjusted" />
+        <StatCard label="Weighted Forecast" value={formatInr(weighted)} note="estimate — probability-adjusted, not a backend figure" />
         <StatCard label="Avg Deal Size" value={formatInr(avgDeal)} note="open opportunities" />
         <StatCard label="Win Rate" value={`${winRate}%`} note="of all opportunities" />
       </StatRow>
 
-      <div style={{ marginTop: 16 }}>
-        <Panel title="Open Opportunities" flush>
+      <ChipGroup>
+        <Chip label={`All ${opportunities.length}`} active={stageChip === "All"} onClick={() => setStageChip("All")} />
+        {OPPORTUNITY_STAGES.filter((s) => stageCounts[s]).map((s) => (
+          <Chip key={s} label={`${s} ${stageCounts[s]}`} active={stageChip === s} onClick={() => setStageChip(s)} />
+        ))}
+      </ChipGroup>
+
+      <div style={{ marginTop: 14 }}>
+        <Panel title="Opportunities" flush>
           <DataTable
             columns={columns}
-            rows={opportunities}
+            rows={rows}
             sort={sort}
             onSort={(field) =>
               setSort((s) => toggleSortDirection(s, field) as SortState<OpportunitySortField>)
             }
+            onRowClick={(o) => router.push(`/opportunities/${o.id}`)}
             emptyTitle="No opportunities yet"
-            emptyBody="Opportunities appear here once a lead is qualified."
+            emptyBody="Opportunities appear here once a lead is qualified and converted."
           />
         </Panel>
       </div>
 
       <DesignNote>
-        <b>Design note.</b> Opportunities is the forecastable view of the pipeline. The probability bar
-        lets a sales head scan likelihood without reading every number.
+        <b>Design note.</b> The probability bar lets a sales head scan likelihood without reading every
+        number. Weighted Forecast is a frontend estimate for presentation only — it is not authoritative
+        unless the backend supplies a real forecast figure.
       </DesignNote>
 
       {showForm && <OpportunityForm onClose={() => setShowForm(false)} onSubmit={createOpportunity} />}

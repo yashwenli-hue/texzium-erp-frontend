@@ -1,6 +1,7 @@
 import {
   Lead,
   LeadTimelineEntry,
+  LeadSourceRecord,
   Customer,
   Contact,
   Activity,
@@ -31,32 +32,50 @@ const daysFromNow = (n: number) => new Date(NOW + n * DAY).toISOString();
 const monthsAgo = (n: number) => new Date(NOW - n * 30 * DAY).toISOString();
 
 // ---------------------------------------------------------------------------
+// LEAD SOURCES — VERIFIED names from database discovery (contract §4)
+// ---------------------------------------------------------------------------
+export const SEED_LEAD_SOURCES: LeadSourceRecord[] = [
+  { id: "SRC1", name: "Website" },
+  { id: "SRC2", name: "Meta Ads" },
+  { id: "SRC3", name: "Google Ads" },
+  { id: "SRC4", name: "WhatsApp" },
+  { id: "SRC5", name: "IndiaMART" },
+  { id: "SRC6", name: "TradeIndia" },
+  { id: "SRC7", name: "ExporterIndia" },
+];
+
+// ---------------------------------------------------------------------------
 // LEADS
 // ---------------------------------------------------------------------------
 export const SEED_LEADS: Lead[] = [
-  { id: "L1", name: "Sterling Pumps", industry: "Manufacturing", city: "Pune", source: "Meta Ads", stage: "Negotiation", score: "Hot", value: 1_840_000, ownerId: "U2", ownerName: "Rohit M.", phone: "+91 98220 41120", email: "procurement@sterlingpumps.in", createdAt: daysAgo(9), updatedAt: hoursAgo(2), lastActivityAt: hoursAgo(2) },
-  { id: "L2", name: "GreenVolt Energy", industry: "Solar EPC", city: "Jaipur", source: "Website", stage: "Proposal", score: "Warm", value: 6_400_000, ownerId: "U1", ownerName: "Anita S.", phone: "+91 98110 22341", email: "ops@greenvolt.in", createdAt: daysAgo(6), updatedAt: daysAgo(1), lastActivityAt: daysAgo(1) },
-  { id: "L3", name: "Apex Controls", industry: "Trading", city: "Delhi", source: "Referral", stage: "Qualified", score: "Warm", value: 920_000, ownerId: "U3", ownerName: "Vikram J.", phone: "+91 90210 88213", email: "info@apexcontrols.com", createdAt: daysAgo(5), updatedAt: daysAgo(3), lastActivityAt: daysAgo(3) },
-  { id: "L4", name: "Nimbus Cold Chain", industry: "Cold Storage", city: "Surat", source: "IndiaMart", stage: "Contacted", score: "Cold", value: 2_750_000, ownerId: "U4", ownerName: "Priya N.", phone: "+91 99870 45210", email: "purchase@nimbuscc.in", createdAt: daysAgo(6), updatedAt: daysAgo(5), lastActivityAt: daysAgo(5) },
-  { id: "L5", name: "Havells India", industry: "Electricals", city: "Noida", source: "Manual", stage: "Won", score: "Hot", value: 5_200_000, ownerId: "U4", ownerName: "Priya N.", phone: "+91 98200 55672", email: "vendor.relations@havells.com", createdAt: daysAgo(14), updatedAt: daysAgo(7), lastActivityAt: daysAgo(7) },
-  { id: "L6", name: "JSW Steel", industry: "Manufacturing", city: "Bellary", source: "LinkedIn", stage: "Negotiation", score: "Hot", value: 8_800_000, ownerId: "U2", ownerName: "Rohit M.", phone: "+91 94220 10981", email: "sourcing@jsw.in", createdAt: daysAgo(8), updatedAt: daysAgo(1), lastActivityAt: daysAgo(1) },
-  { id: "L7", name: "L&T Infra", industry: "Infrastructure", city: "Chennai", source: "Website", stage: "Proposal", score: "Warm", value: 3_600_000, ownerId: "U1", ownerName: "Anita S.", phone: "+91 93450 12210", email: "procure@lninfra.com", createdAt: daysAgo(7), updatedAt: daysAgo(2), lastActivityAt: daysAgo(2) },
-  { id: "L8", name: "Adani Green", industry: "Renewable Energy", city: "Ahmedabad", source: "Referral", stage: "Proposal", score: "Hot", value: 11_000_000, ownerId: "U3", ownerName: "Vikram J.", phone: "+91 98980 44210", email: "vendors@adanigreen.com", createdAt: daysAgo(9), updatedAt: daysAgo(4), lastActivityAt: daysAgo(4) },
-  { id: "L9", name: "Reliance Industries", industry: "Petrochemicals", city: "Mumbai", source: "LinkedIn", stage: "Qualified", score: "Warm", value: 4_200_000, ownerId: "U1", ownerName: "Anita S.", phone: "+91 98200 11223", email: "vendor.dev@ril.com", createdAt: daysAgo(10), updatedAt: daysAgo(6), lastActivityAt: daysAgo(6) },
-  { id: "L10", name: "Tata Projects", industry: "EPC", city: "Mumbai", source: "Website", stage: "Qualified", score: "Warm", value: 2_850_000, ownerId: "U2", ownerName: "Rohit M.", phone: "+91 98330 66210", email: "procurement@tataprojects.com", createdAt: daysAgo(11), updatedAt: daysAgo(7), lastActivityAt: daysAgo(7) },
+  { id: "L1", customerName: "Sterling Pumps", companyName: "Sterling Pumps Pvt Ltd", sourceId: "SRC2", sourceName: "Meta Ads", status: "Qualified", score: "Hot", assignedToId: "U2", assignedToName: "Rohit M.", phone: "+91 98220 41120", email: "procurement@sterlingpumps.in", createdAt: daysAgo(9), updatedAt: hoursAgo(2), lastActivityAt: hoursAgo(2) },
+  { id: "L2", customerName: "GreenVolt Energy", sourceId: "SRC1", sourceName: "Website", status: "Qualified", score: "Warm", assignedToId: "U1", assignedToName: "Anita S.", phone: "+91 98110 22341", email: "ops@greenvolt.in", createdAt: daysAgo(6), updatedAt: daysAgo(1), lastActivityAt: daysAgo(1) },
+  { id: "L3", customerName: "Apex Controls", sourceId: "SRC6", sourceName: "TradeIndia", status: "Contacted", score: "Warm", assignedToId: "U3", assignedToName: "Vikram J.", phone: "+91 90210 88213", email: "info@apexcontrols.com", createdAt: daysAgo(5), updatedAt: daysAgo(3), lastActivityAt: daysAgo(3) },
+  { id: "L4", customerName: "Nimbus Cold Chain", sourceId: "SRC5", sourceName: "IndiaMART", status: "New", score: "Cold", phone: "+91 99870 45210", email: "purchase@nimbuscc.in", createdAt: daysAgo(6), updatedAt: daysAgo(5), lastActivityAt: daysAgo(5) },
+  { id: "L5", customerName: "Havells India", sourceId: "SRC7", sourceName: "ExporterIndia", status: "Qualified", score: "Hot", assignedToId: "U4", assignedToName: "Priya N.", phone: "+91 98200 55672", email: "vendor.relations@havells.com", createdAt: daysAgo(14), updatedAt: daysAgo(7), lastActivityAt: daysAgo(7) },
+  { id: "L6", customerName: "JSW Steel", companyName: "JSW Steel Ltd", sourceId: "SRC3", sourceName: "Google Ads", status: "Qualified", score: "Hot", assignedToId: "U2", assignedToName: "Rohit M.", phone: "+91 94220 10981", email: "sourcing@jsw.in", createdAt: daysAgo(8), updatedAt: daysAgo(1), lastActivityAt: daysAgo(1) },
+  { id: "L7", customerName: "L&T Infra", sourceId: "SRC1", sourceName: "Website", status: "Qualified", score: "Warm", assignedToId: "U1", assignedToName: "Anita S.", phone: "+91 93450 12210", email: "procure@lninfra.com", createdAt: daysAgo(7), updatedAt: daysAgo(2), lastActivityAt: daysAgo(2) },
+  { id: "L8", customerName: "Adani Green", sourceId: "SRC6", sourceName: "TradeIndia", status: "Qualified", score: "Hot", assignedToId: "U3", assignedToName: "Vikram J.", phone: "+91 98980 44210", email: "vendors@adanigreen.com", createdAt: daysAgo(9), updatedAt: daysAgo(4), lastActivityAt: daysAgo(4) },
+  { id: "L9", customerName: "Reliance Industries", sourceId: "SRC3", sourceName: "Google Ads", status: "Qualified", score: "Warm", assignedToId: "U1", assignedToName: "Anita S.", phone: "+91 98200 11223", email: "vendor.dev@ril.com", createdAt: daysAgo(10), updatedAt: daysAgo(6), lastActivityAt: daysAgo(6) },
+  { id: "L10", customerName: "Tata Projects", sourceId: "SRC1", sourceName: "Website", status: "Qualified", score: "Warm", assignedToId: "U2", assignedToName: "Rohit M.", phone: "+91 98330 66210", email: "procurement@tataprojects.com", createdAt: daysAgo(11), updatedAt: daysAgo(7), lastActivityAt: daysAgo(7) },
+  { id: "L11", customerName: "Bharat Textiles", sourceId: "SRC4", sourceName: "WhatsApp", status: "Rejected", score: "Cold", assignedToId: "U3", assignedToName: "Vikram J.", phone: "+91 90000 12345", email: "info@bharattextiles.in", createdAt: daysAgo(12), updatedAt: daysAgo(10), lastActivityAt: daysAgo(10) },
 ];
 
 export const SEED_LEAD_TIMELINE: LeadTimelineEntry[] = [
-  { id: "T1", leadId: "L1", icon: "pulse", title: "Quotation revised to v3 — 8% discount approved", detail: "", actorName: "Rohit M.", occurredAt: hoursAgo(2) },
+  { id: "T1", leadId: "L1", icon: "pulse", title: "STATUS_UPDATED — moved to Qualified", detail: "", actorName: "Rohit M.", occurredAt: hoursAgo(2) },
   { id: "T2", leadId: "L1", icon: "clock", title: "Follow-up call — asked for extended payment terms", detail: "", actorName: "Rohit M.", occurredAt: daysAgo(1) },
-  { id: "T3", leadId: "L1", icon: "file", title: "Quotation QT-3402 shared via email", detail: "", actorName: "System", occurredAt: daysAgo(3) },
+  { id: "T3", leadId: "L1", icon: "check", title: "LEAD_QUALIFIED", detail: "Budget and authority confirmed", actorName: "Rohit M.", occurredAt: daysAgo(3) },
   { id: "T4", leadId: "L1", icon: "check", title: "Meeting held — technical requirements finalised", detail: "", actorName: "Rohit M.", occurredAt: daysAgo(5) },
-  { id: "T5", leadId: "L1", icon: "user", title: "Lead assigned to Rohit M. (Pune territory)", detail: "", actorName: "Auto-assignment", occurredAt: daysAgo(9) },
-  { id: "T6", leadId: "L2", icon: "file", title: "Proposal shared — 5MW EPC scope", detail: "", actorName: "Anita S.", occurredAt: daysAgo(1) },
+  { id: "T5", leadId: "L1", icon: "user", title: "PRE_SALES_ASSIGNED — assigned to Rohit M.", detail: "", actorName: "Auto-assignment", occurredAt: daysAgo(9) },
+  { id: "T5b", leadId: "L1", icon: "funnel", title: "LEAD_CREATED", detail: "", actorName: "System", occurredAt: daysAgo(9) },
+  { id: "T6", leadId: "L2", icon: "check", title: "LEAD_QUALIFIED", detail: "", actorName: "Anita S.", occurredAt: daysAgo(1) },
   { id: "T7", leadId: "L2", icon: "clock", title: "Discovery call completed", detail: "", actorName: "Anita S.", occurredAt: daysAgo(4) },
-  { id: "T8", leadId: "L2", icon: "user", title: "Lead created from website enquiry form", detail: "", actorName: "System", occurredAt: daysAgo(6) },
-  { id: "T9", leadId: "L3", icon: "check", title: "Marked Qualified — budget & authority confirmed", detail: "", actorName: "Vikram J.", occurredAt: daysAgo(3) },
-  { id: "T10", leadId: "L3", icon: "pulse", title: "Referred by existing customer Havells India", detail: "", actorName: "System", occurredAt: daysAgo(5) },
+  { id: "T8", leadId: "L2", icon: "funnel", title: "LEAD_CREATED — from website enquiry form", detail: "", actorName: "System", occurredAt: daysAgo(6) },
+  { id: "T9", leadId: "L3", icon: "pulse", title: "STATUS_UPDATED — moved to Contacted", detail: "", actorName: "Vikram J.", occurredAt: daysAgo(3) },
+  { id: "T10", leadId: "L3", icon: "funnel", title: "LEAD_CREATED", detail: "Referred by existing customer Havells India", actorName: "System", occurredAt: daysAgo(5) },
+  { id: "T11", leadId: "L4", icon: "funnel", title: "LEAD_CREATED", detail: "", actorName: "System", occurredAt: daysAgo(6) },
+  { id: "T12", leadId: "L11", icon: "close", title: "LEAD_REJECTED", detail: "Budget did not match minimum order value", actorName: "Vikram J.", occurredAt: daysAgo(10) },
+  { id: "T13", leadId: "L11", icon: "funnel", title: "LEAD_CREATED", detail: "", actorName: "System", occurredAt: daysAgo(12) },
 ];
 
 // ---------------------------------------------------------------------------
@@ -134,17 +153,18 @@ export const SEED_NOTES: Note[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// OPPORTUNITIES
+// OPPORTUNITIES — VERIFIED: always linked to a lead (leadId); a lead must
+// already be Qualified before an opportunity is created from it.
 // ---------------------------------------------------------------------------
 export const SEED_OPPORTUNITIES: Opportunity[] = [
-  { id: "O1", name: "5MW Rooftop EPC — GreenVolt", customerName: "GreenVolt Energy", stage: "Proposal", amount: 6_400_000, probability: 60, expectedCloseAt: daysFromNow(20), ownerName: "Anita S.", sourceLeadId: "L2" },
-  { id: "O2", name: "Hydraulic Systems Upgrade", customerName: "Sterling Pumps", stage: "Negotiation", amount: 1_840_000, probability: 75, expectedCloseAt: daysFromNow(10), ownerName: "Rohit M.", sourceLeadId: "L1" },
-  { id: "O3", name: "Factory Automation Retrofit", customerName: "JSW Steel", stage: "Negotiation", amount: 8_800_000, probability: 70, expectedCloseAt: daysFromNow(15), ownerName: "Rohit M.", sourceLeadId: "L6" },
-  { id: "O4", name: "Control Room Equipment", customerName: "L&T Infra", stage: "Proposal", amount: 3_600_000, probability: 50, expectedCloseAt: daysFromNow(25), ownerName: "Anita S.", sourceLeadId: "L7" },
-  { id: "O5", name: "Rooftop Solar — Phase 1", customerName: "Adani Green", stage: "Proposal", amount: 11_000_000, probability: 55, expectedCloseAt: daysFromNow(30), ownerName: "Vikram J.", sourceLeadId: "L8" },
-  { id: "O6", name: "Bulk Procurement Contract", customerName: "Reliance Industries", stage: "Qualified", amount: 4_200_000, probability: 35, expectedCloseAt: daysFromNow(35), ownerName: "Anita S.", sourceLeadId: "L9" },
-  { id: "O7", name: "Cold Chain Equipment Supply", customerName: "Nimbus Cold Chain", stage: "Qualified", amount: 2_750_000, probability: 20, expectedCloseAt: daysFromNow(40), ownerName: "Priya N.", sourceLeadId: "L4" },
-  { id: "O8", name: "Warehouse Automation", customerName: "Tata Projects", stage: "Qualified", amount: 2_850_000, probability: 35, expectedCloseAt: daysFromNow(38), ownerName: "Rohit M.", sourceLeadId: "L10" },
+  { id: "O1", leadId: "L2", title: "5MW Rooftop EPC — GreenVolt", customerName: "GreenVolt Energy", stage: "Proposal", expectedValue: 6_400_000, probability: 60, expectedCloseDate: daysFromNow(20), ownerName: "Anita S.", createdAt: daysAgo(5) },
+  { id: "O2", leadId: "L1", title: "Hydraulic Systems Upgrade", customerName: "Sterling Pumps", stage: "Negotiation", expectedValue: 1_840_000, probability: 75, expectedCloseDate: daysFromNow(10), ownerName: "Rohit M.", createdAt: daysAgo(8) },
+  { id: "O3", leadId: "L6", title: "Factory Automation Retrofit", customerName: "JSW Steel", stage: "Negotiation", expectedValue: 8_800_000, probability: 70, expectedCloseDate: daysFromNow(15), ownerName: "Rohit M.", createdAt: daysAgo(7) },
+  { id: "O4", leadId: "L7", title: "Control Room Equipment", customerName: "L&T Infra", stage: "Proposal", expectedValue: 3_600_000, probability: 50, expectedCloseDate: daysFromNow(25), ownerName: "Anita S.", createdAt: daysAgo(6) },
+  { id: "O5", leadId: "L8", title: "Rooftop Solar — Phase 1", customerName: "Adani Green", stage: "Proposal", expectedValue: 11_000_000, probability: 55, expectedCloseDate: daysFromNow(30), ownerName: "Vikram J.", createdAt: daysAgo(8) },
+  { id: "O6", leadId: "L9", title: "Bulk Procurement Contract", customerName: "Reliance Industries", stage: "Qualified", expectedValue: 4_200_000, probability: 35, expectedCloseDate: daysFromNow(35), ownerName: "Anita S.", createdAt: daysAgo(9) },
+  { id: "O7", leadId: "L10", title: "Warehouse Automation", customerName: "Tata Projects", stage: "Qualified", expectedValue: 2_850_000, probability: 35, expectedCloseDate: daysFromNow(38), ownerName: "Rohit M.", createdAt: daysAgo(10) },
+  { id: "O8", leadId: "L5", title: "Switchgear Replacement Order", customerName: "Havells India", stage: "Won", expectedValue: 5_200_000, probability: 100, expectedCloseDate: daysAgo(6), ownerName: "Priya N.", createdAt: daysAgo(13) },
 ];
 
 // ---------------------------------------------------------------------------
@@ -157,8 +177,8 @@ export const SEED_QUOTATIONS: Quotation[] = [
   { id: "Q4", quoteNo: "QT-3385", customerName: "Havells India", opportunityName: "Sales Order SO-4798", amount: 5_200_000, status: "Accepted", validUntil: null, ownerName: "Priya N.", createdAt: daysAgo(8) },
   { id: "Q5", quoteNo: "QT-3379", customerName: "L&T Infra", opportunityId: "O4", opportunityName: "Control Room Equipment", amount: 3_600_000, status: "Draft", validUntil: null, ownerName: "Anita S.", createdAt: daysAgo(1) },
   { id: "Q6", quoteNo: "QT-3371", customerName: "Apex Controls", opportunityName: "Trial Order", amount: 920_000, status: "Rejected", validUntil: daysAgo(2), ownerName: "Vikram J.", createdAt: daysAgo(10) },
-  { id: "Q7", quoteNo: "QT-3365", customerName: "Nimbus Cold Chain", opportunityId: "O7", opportunityName: "Cold Chain Equipment", amount: 2_750_000, status: "Expired", validUntil: daysAgo(9), ownerName: "Priya N.", createdAt: daysAgo(20) },
-  { id: "Q8", quoteNo: "QT-3415", customerName: "Tata Projects", opportunityId: "O8", opportunityName: "Warehouse Automation", amount: 2_850_000, status: "Sent", validUntil: daysFromNow(22), ownerName: "Rohit M.", createdAt: daysAgo(1) },
+  { id: "Q7", quoteNo: "QT-3365", customerName: "Nimbus Cold Chain", opportunityName: "Cold Chain Equipment (pre-qualification estimate)", amount: 2_750_000, status: "Expired", validUntil: daysAgo(9), ownerName: "Priya N.", createdAt: daysAgo(20) },
+  { id: "Q8", quoteNo: "QT-3415", customerName: "Tata Projects", opportunityId: "O7", opportunityName: "Warehouse Automation", amount: 2_850_000, status: "Sent", validUntil: daysFromNow(22), ownerName: "Rohit M.", createdAt: daysAgo(1) },
 ];
 
 // ---------------------------------------------------------------------------

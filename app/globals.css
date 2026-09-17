@@ -70,6 +70,7 @@ h1.title{font-family:var(--display);font-size:26px;font-weight:800;letter-spacin
 .btn.ghost{background:var(--surface);color:var(--text);border:1px solid var(--line)}
 .btn.ghost:hover{background:var(--canvas)}
 .btn.sm{padding:6px 12px;font-size:12px;border-radius:9px}
+.btn:disabled{opacity:.4;cursor:not-allowed;pointer-events:none}
 
 /* grid + cards */
 .grid{display:grid;gap:16px}
@@ -359,3 +360,51 @@ tbody tr.clickable:hover{background:#FBFBFC}
 
 /* Topbar search is a real input in the app (was a navigation-only affordance in the prototype) */
 .topbar .search, .topbar .search input{cursor:text}
+
+/* ============================================================
+   STAGE 1 — Design Foundation additions
+   Document trail, lifecycle stepper, gated-action affordances.
+   Same tokens/spacing/radius language as everything above.
+   ============================================================ */
+
+/* Danger button variants — Reject / Mark Lost / other destructive-but-safe actions */
+.btn.ghost.danger-ghost{color:var(--bad);border-color:var(--bad-bg)}
+.btn.ghost.danger-ghost:hover{background:var(--bad-bg)}
+.btn.primary.danger{background:var(--bad);box-shadow:0 6px 16px -8px var(--bad)}
+
+/* Lead detail gated-action row (Assign / Qualify / Reject) */
+.lead-action-row{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+
+/* Document trail */
+.doc-trail{display:flex;align-items:center;flex-wrap:wrap;gap:2px}
+.doc-trail-item{display:inline-flex;align-items:center;gap:2px}
+.doc-trail-sep{color:var(--faint);margin:0 4px;flex:none}
+.doc-trail-node{display:inline-flex;flex-direction:column;padding:6px 10px;border-radius:9px;border:1px solid var(--line);background:var(--surface)}
+a.doc-trail-node:hover{border-color:var(--m);background:var(--m-soft)}
+.doc-trail-node.current{border-color:var(--m);background:var(--m-soft)}
+.doc-trail-label{font-size:12.5px;font-weight:700;color:var(--text)}
+.doc-trail-node.current .doc-trail-label{color:var(--m)}
+.doc-trail-sub{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-top:1px}
+
+/* Lifecycle stepper */
+.lifecycle-stepper-wrap{width:100%}
+.lifecycle-stepper{display:flex;align-items:flex-start}
+.ls-step{display:flex;align-items:center;flex:1;position:relative}
+.ls-step:last-child{flex:none}
+.ls-node{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;flex:none;font-family:var(--display);font-weight:700;font-size:11.5px;background:var(--line-2);color:var(--faint);border:2px solid var(--line-2)}
+.ls-label{font-size:12px;font-weight:600;color:var(--muted);margin-left:9px;white-space:nowrap}
+.ls-connector{flex:1;height:2px;background:var(--line-2);margin:0 10px}
+.ls-done .ls-node{background:var(--m);color:#fff;border-color:var(--m)}
+.ls-done .ls-label{color:var(--text)}
+.ls-done .ls-connector{background:var(--m)}
+.ls-current .ls-node{background:var(--surface);color:var(--m);border-color:var(--m)}
+.ls-current .ls-label{color:var(--ink);font-weight:700}
+.ls-past .ls-node{background:var(--line-2);color:var(--faint);border-color:var(--line-2)}
+.ls-past .ls-label{color:var(--faint)}
+.ls-lost-flag{display:inline-flex;align-items:center;gap:6px;margin-left:16px;padding:5px 12px;border-radius:20px;background:var(--bad-bg);color:var(--bad);font-size:12px;font-weight:700}
+.lifecycle-compact{display:none;font-size:12.5px;font-weight:600;color:var(--text);padding:8px 12px;background:var(--line-2);border-radius:9px}
+.lifecycle-stepper-wrap.lost .ls-lost-flag{display:inline-flex}
+@media(max-width:720px){
+  .lifecycle-stepper{display:none}
+  .lifecycle-compact{display:block}
+}

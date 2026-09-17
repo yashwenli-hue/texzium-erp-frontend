@@ -1,106 +1,108 @@
 "use client";
 
-import { useState } from "react";
-import { Lead, LeadStage } from "../../lib/types/domain";
-import { Icon } from "../ui/Icon";
+import { ReactNode, useState } from "react";
 import { STAGE_COLOR, TINT } from "../ui/Tag";
-import { formatInr, formatRelative } from "../../lib/format";
 
-export interface KanbanStageConfig {
-  key: LeadStage;
+export interface KanbanColumnConfig<S extends string> {
+  key: S;
   label: string;
 }
 
-export function KanbanBoard({
-  stages,
-  leads,
+/**
+ * Generic drag-and-drop board over any entity + string-keyed stage. Card
+ * markup is fully supplied by the caller (renderCard), so this component
+ * carries no domain knowledge — it is reused for the Lead pipeline (status)
+ * and the Dashboard's Opportunity snapshot (stage), and can host future
+ * boards (e.g. Sales Order approval gates) without change.
+ */
+export function KanbanBoard<T extends { id: string }, S extends string>({
+  columns,
+  items,
+  getStage,
+  renderCard,
   onMove,
   onCardClick,
-  columns,
+  gridColumns,
 }: {
-  stages: KanbanStageConfig[];
-  leads: Lead[];
-  onMove: (leadId: string, stage: LeadStage) => void;
-  onCardClick: (leadId: string) => void;
-  columns?: number;
+  columns: KanbanColumnConfig<S>[];
+  items: T[];
+  getStage: (item: T) => S;
+  renderCard: (item: T) => ReactNode;
+  onMove?: (id: string, stage: S) => void;
+  onCardClick?: (id: string) => void;
+  gridColumns?: number;
 }) {
-  const [dragOverStage, setDragOverStage] = useState<LeadStage | null>(null);
+  const [dragOverStage, setDragOverStage] = useState<S | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
 
   return (
     <div
       className="kanban"
-      style={columns ? { gridTemplateColumns: `repeat(${columns}, 1fr)` } : undefined}
+      style={gridColumns ? { gridTemplateColumns: `repeat(${gridColumns}, 1fr)` } : undefined}
     >
-      {stages.map((stage) => {
-        const items = leads.filter((l) => l.stage === stage.key);
-        const color = STAGE_COLOR[stage.key] ?? "n";
+      {columns.map((col) => {
+        const colItems = items.filter((item) => getStage(item) === col.key);
+        const color = STAGE_COLOR[col.key] ?? "n";
         const tint = TINT[color];
-        const isDropTarget = dragOverStage === stage.key;
+        const isDropTarget = dragOverStage === col.key;
 
         return (
           <div
-            key={stage.key}
+            key={col.key}
             className={`kcol ${isDropTarget ? "drop-target" : ""}`}
             style={{ background: isDropTarget ? undefined : tint.bg }}
             onDragOver={(e) => {
+              if (!onMove) return;
               e.preventDefault();
-              setDragOverStage(stage.key);
+              setDragOverStage(col.key);
             }}
-            onDragLeave={() => setDragOverStage((s) => (s === stage.key ? null : s))}
+            onDragLeave={() => setDragOverStage((s) => (s === col.key ? null : s))}
             onDrop={(e) => {
+              if (!onMove) return;
               e.preventDefault();
-              const leadId = e.dataTransfer.getData("text/lead-id");
-              if (leadId) onMove(leadId, stage.key);
+              const id = e.dataTransfer.getData("text/kanban-id");
+              if (id) onMove(id, col.key);
               setDragOverStage(null);
               setDraggingId(null);
             }}
           >
             <h4 style={{ color: tint.fg }}>
-              {stage.label}
-              <span style={{ color: tint.fg, opacity: 0.65 }}>{items.length}</span>
+              {col.label}
+              <span style={{ color: tint.fg, opacity: 0.65 }}>{colItems.length}</span>
             </h4>
-            {items.length === 0 && (
+            {colItems.length === 0 && (
               <div style={{ fontSize: 12, color: tint.fg, opacity: 0.55, padding: "8px 2px" }}>
                 No records
               </div>
             )}
-            {items.map((lead) => (
+            {colItems.map((item) => (
               <div
-                key={lead.id}
-                className={`kcard ${draggingId === lead.id ? "dragging" : ""}`}
-                draggable
+                key={item.id}
+                className={`kcard ${draggingId === item.id ? "dragging" : ""}`}
+                draggable={!!onMove}
                 onDragStart={(e) => {
-                  e.dataTransfer.setData("text/lead-id", lead.id);
-                  setDraggingId(lead.id);
+                  e.dataTransfer.setData("text/kanban-id", item.id);
+                  setDraggingId(item.id);
                 }}
                 onDragEnd={() => setDraggingId(null)}
-                onClick={() => onCardClick(lead.id)}
+                onClick={() => onCardClick?.(item.id)}
               >
-                <div className="co">{lead.name}</div>
-                <div className="amt">{formatInr(lead.value)}</div>
-                <div className="ppl">
-                  <Icon name="user" size={14} /> {lead.ownerName}
-                </div>
-                <div className="days">
-                  <span className="tag n" style={{ fontSize: 10.5, padding: "2px 8px" }}>
-                    {formatRelative(lead.lastActivityAt)}
-                  </span>
-                </div>
-                {/* Touch-friendly fallback: works alongside drag-and-drop on any device */}
-                <div className="kcard-move" onClick={(e) => e.stopPropagation()}>
-                  <select
-                    value={lead.stage}
-                    onChange={(e) => onMove(lead.id, e.target.value as LeadStage)}
-                    aria-label={`Move ${lead.name} to a different stage`}
-                  >
-                    {stages.map((s) => (
-                      <option key={s.key} value={s.key}>
-                        Move to: {s.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                {renderCard(item)}
+                {onMove && (
+                  <div className="kcard-move" onClick={(e) => e.stopPropagation()}>
+                    <select
+                      value={getStage(item)}
+                      onChange={(e) => onMove(item.id, e.target.value as S)}
+                      aria-label="Move to a different column"
+                    >
+                      {columns.map((c) => (
+                        <option key={c.key} value={c.key}>
+                          Move to: {c.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
               </div>
             ))}
           </div>

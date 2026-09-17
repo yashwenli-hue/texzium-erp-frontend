@@ -12,44 +12,47 @@ import { ID } from "./common";
  * ============================================================================
  */
 
-export type LeadStage =
-  | "New"
-  | "Contacted"
-  | "Qualified"
-  | "Proposal"
-  | "Negotiation"
-  | "Won"
-  | "Lost";
+// UI ASSUMPTION: verified timeline actions include LEAD_QUALIFIED and
+// LEAD_REJECTED as distinct, permission-gated events (leads.qualify /
+// leads.reject) separate from ordinary status movement — so "Qualified" and
+// "Rejected" are reachable only through the dedicated Qualify/Reject actions,
+// never a casual drag on the pipeline board. Exact backend enum values are
+// NOT confirmed; see docs/backend-ui-contract.md §3, §21.
+export type LeadStatus = "New" | "Contacted" | "Qualified" | "Rejected";
 
-export const LEAD_STAGES: LeadStage[] = [
-  "New",
-  "Contacted",
-  "Qualified",
-  "Proposal",
-  "Negotiation",
-  "Won",
-  "Lost",
-];
+export const LEAD_STATUSES: LeadStatus[] = ["New", "Contacted", "Qualified", "Rejected"];
 
+/** Freely draggable on the Lead Pipeline board — Qualified/Rejected are gated actions, not drag targets. */
+export const LEAD_BOARD_STATUSES: LeadStatus[] = ["New", "Contacted"];
+
+// Frontend-only lead-scoring heuristic for presentation/prioritization.
+// No backend equivalent — never treat as authoritative.
 export type LeadScore = "Hot" | "Warm" | "Cold";
 
-// @backend-verify: lead sources are open-text in this mock. Confirm whether
-// the backend enforces an enum/lookup table for sources.
-export type LeadSource = string;
+// VERIFIED: lead creation requires a valid sourceId referencing an existing
+// LeadSource record (name, description?). Mirrors the lead-sources module.
+export interface LeadSourceRecord {
+  id: ID;
+  name: string;
+  description?: string;
+}
 
+// VERIFIED CreateLeadDto: leadCode?, customerName, companyName?, email?,
+// phone, alternatePhone?, sourceId. See docs/backend-ui-contract.md §3.
 export interface Lead {
   id: ID;
-  name: string; // company / lead name
-  industry: string;
-  city: string;
-  source: LeadSource;
-  stage: LeadStage;
-  score: LeadScore;
-  value: number; // INR, whole rupees. @backend-verify: currency + unit.
-  ownerId: ID;
-  ownerName: string;
+  customerName: string;
+  companyName?: string;
+  email?: string;
   phone: string;
-  email: string;
+  alternatePhone?: string;
+  sourceId: ID;
+  sourceName: string; // denormalized — VERIFIED: lead list/detail includes the source relation
+  status: LeadStatus;
+  score: LeadScore;
+  // Unset until the dedicated Assign action fires (AssignLeadDto / PRE_SALES_ASSIGNED).
+  assignedToId?: ID;
+  assignedToName?: string;
   createdAt: string; // ISO 8601
   updatedAt: string; // ISO 8601
   lastActivityAt: string; // ISO 8601
@@ -147,6 +150,9 @@ export interface Note {
   pinned: boolean;
 }
 
+// UI ASSUMPTION: not a confirmed backend enum. VERIFIED is only that an
+// Opportunity carries expectedValue/probability/expectedCloseDate and a
+// backend-owned status; see docs/backend-ui-contract.md §7, §21.
 export type OpportunityStage =
   | "Qualified"
   | "Proposal"
@@ -154,19 +160,31 @@ export type OpportunityStage =
   | "Won"
   | "Lost";
 
+export const OPPORTUNITY_STAGES: OpportunityStage[] = [
+  "Qualified",
+  "Proposal",
+  "Negotiation",
+  "Won",
+  "Lost",
+];
+
+/** Linear happy-path order for the lifecycle stepper — "Lost" is a terminal flag, not a step. */
+export const OPPORTUNITY_STEPS: OpportunityStage[] = ["Qualified", "Proposal", "Negotiation", "Won"];
+
+// VERIFIED CreateOpportunityDto: leadId, title, expectedValue, probability,
+// expectedCloseDate. Creation writes OPPORTUNITY_CREATED to the lead
+// timeline. See docs/backend-ui-contract.md §7.
 export interface Opportunity {
   id: ID;
-  name: string;
-  customerId?: ID;
-  customerName: string;
+  leadId: ID;
+  title: string;
+  customerName: string; // denormalized from the linked lead, for display/grouping only
   stage: OpportunityStage;
-  amount: number; // INR
+  expectedValue: number; // INR. @backend-verify: currency + unit.
   probability: number; // 0-100
-  expectedCloseAt: string; // ISO 8601
+  expectedCloseDate: string; // ISO 8601
   ownerName: string;
-  // @backend-verify: is there a 1:1 link from Opportunity back to the
-  // originating Lead? Mock keeps them independent-but-related by customer name.
-  sourceLeadId?: ID;
+  createdAt: string; // ISO 8601
 }
 
 export type QuotationStatus =

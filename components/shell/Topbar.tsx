@@ -9,6 +9,7 @@ import { useLiveCounts } from "../../lib/hooks/useLiveCounts";
 function crumbFor(pathname: string): string {
   const seg = pathname.split("/").filter(Boolean);
   if (seg[0] === "leads" && seg[1]) return "Lead Details";
+  if (seg[0] === "opportunities" && seg[1]) return "Opportunity Details";
   if (seg[0] === "customers" && seg[1]) return "Customer Details";
   return PAGE_META[seg[0]]?.title ?? "Dashboard";
 }

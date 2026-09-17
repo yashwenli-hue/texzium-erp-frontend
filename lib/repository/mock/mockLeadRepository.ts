@@ -1,5 +1,5 @@
 import { ID, ListQuery, Page } from "../../types/common";
-import { Lead, LeadStage, LeadTimelineEntry } from "../../types/domain";
+import { Lead, LeadStatus, LeadTimelineEntry } from "../../types/domain";
 import {
   ILeadRepository,
   CreateLeadInput,
@@ -10,7 +10,7 @@ import { delay } from "./queryUtils";
 import { applyListQuery } from "./queryUtils";
 import { mockId } from "./entityStore";
 
-const SEARCHABLE: (keyof Lead)[] = ["name", "industry", "city", "ownerName", "email"];
+const SEARCHABLE: (keyof Lead)[] = ["customerName", "companyName", "sourceName", "assignedToName", "email"];
 
 export class MockLeadRepository implements ILeadRepository {
   async list(query?: ListQuery<LeadSortField>): Promise<Page<Lead>> {
@@ -24,19 +24,18 @@ export class MockLeadRepository implements ILeadRepository {
 
   async create(input: CreateLeadInput): Promise<Lead> {
     const now = new Date().toISOString();
+    const source = db.leadSources.getById(input.sourceId);
     const lead: Lead = {
       id: mockId("L"),
-      name: input.name,
-      industry: input.industry,
-      city: input.city,
-      source: input.source,
-      stage: "New",
-      score: "Warm",
-      value: input.value,
-      ownerId: mockId("U"),
-      ownerName: input.ownerName,
-      phone: input.phone,
+      customerName: input.customerName,
+      companyName: input.companyName,
       email: input.email,
+      phone: input.phone,
+      alternatePhone: input.alternatePhone,
+      sourceId: input.sourceId,
+      sourceName: source?.name ?? "Unknown source",
+      status: "New",
+      score: "Warm",
       createdAt: now,
       updatedAt: now,
       lastActivityAt: now,
@@ -45,25 +44,80 @@ export class MockLeadRepository implements ILeadRepository {
     db.leadTimeline.add({
       id: mockId("T"),
       leadId: lead.id,
-      icon: "user",
-      title: "Lead created",
+      icon: "funnel",
+      title: "LEAD_CREATED",
       detail: "",
-      actorName: input.ownerName,
+      actorName: "You",
       occurredAt: now,
     });
     return delay(lead);
   }
 
-  async updateStage(id: ID, stage: LeadStage): Promise<Lead> {
+  async updateStatus(id: ID, status: LeadStatus): Promise<Lead> {
     const now = new Date().toISOString();
-    const updated = db.leads.update(id, { stage, updatedAt: now, lastActivityAt: now });
+    const updated = db.leads.update(id, { status, updatedAt: now, lastActivityAt: now });
     if (!updated) throw new Error(`Lead ${id} not found`);
     db.leadTimeline.add({
       id: mockId("T"),
       leadId: id,
       icon: "pulse",
-      title: `Stage changed to ${stage}`,
+      title: `STATUS_UPDATED — moved to ${status}`,
       detail: "",
+      actorName: "You",
+      occurredAt: now,
+    });
+    return delay(updated);
+  }
+
+  async assign(id: ID, assignedToId: ID, assignedToName: string): Promise<Lead> {
+    const now = new Date().toISOString();
+    const updated = db.leads.update(id, { assignedToId, assignedToName, updatedAt: now, lastActivityAt: now });
+    if (!updated) throw new Error(`Lead ${id} not found`);
+    db.leadTimeline.add({
+      id: mockId("T"),
+      leadId: id,
+      icon: "user",
+      title: `PRE_SALES_ASSIGNED — assigned to ${assignedToName}`,
+      detail: "",
+      actorName: "You",
+      occurredAt: now,
+    });
+    return delay(updated);
+  }
+
+  async qualify(id: ID): Promise<Lead> {
+    const lead = db.leads.getById(id);
+    if (!lead) throw new Error(`Lead ${id} not found`);
+    if (lead.status === "Qualified") throw new Error("Lead is already qualified");
+    if (lead.status === "Rejected") throw new Error("A rejected lead cannot be qualified");
+    const now = new Date().toISOString();
+    const updated = db.leads.update(id, { status: "Qualified", updatedAt: now, lastActivityAt: now });
+    if (!updated) throw new Error(`Lead ${id} not found`);
+    db.leadTimeline.add({
+      id: mockId("T"),
+      leadId: id,
+      icon: "check",
+      title: "LEAD_QUALIFIED",
+      detail: "",
+      actorName: "You",
+      occurredAt: now,
+    });
+    return delay(updated);
+  }
+
+  async reject(id: ID, reason?: string): Promise<Lead> {
+    const lead = db.leads.getById(id);
+    if (!lead) throw new Error(`Lead ${id} not found`);
+    if (lead.status === "Rejected") throw new Error("Lead is already rejected");
+    const now = new Date().toISOString();
+    const updated = db.leads.update(id, { status: "Rejected", updatedAt: now, lastActivityAt: now });
+    if (!updated) throw new Error(`Lead ${id} not found`);
+    db.leadTimeline.add({
+      id: mockId("T"),
+      leadId: id,
+      icon: "close",
+      title: "LEAD_REJECTED",
+      detail: reason ?? "",
       actorName: "You",
       occurredAt: now,
     });
