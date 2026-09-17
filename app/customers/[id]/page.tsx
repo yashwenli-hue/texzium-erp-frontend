@@ -1,0 +1,129 @@
+"use client";
+
+import { useParams, useRouter } from "next/navigation";
+import { Icon } from "../../../components/ui/Icon";
+import { Panel } from "../../../components/ui/Card";
+import { StatusTag, Tag } from "../../../components/ui/Tag";
+import { DataTable, Column } from "../../../components/ui/DataTable";
+import { DesignNote } from "../../../components/ui/PageHeader";
+import { useCustomerDetail } from "../../../lib/hooks/useCustomers";
+import { initials } from "../../../components/ui/Who";
+import { formatInr, formatDate } from "../../../lib/format";
+import { Quotation, Contact } from "../../../lib/types/domain";
+
+function goBackOrTo(router: ReturnType<typeof useRouter>, fallback: string) {
+  if (typeof window !== "undefined" && window.history.length > 1) {
+    router.back();
+  } else {
+    router.push(fallback);
+  }
+}
+
+export default function CustomerDetailPage() {
+  const params = useParams<{ id: string }>();
+  const router = useRouter();
+  const id = params?.id;
+  const { customer, contacts, quotations, loading } = useCustomerDetail(id);
+
+  if (loading && !customer) {
+    return (
+      <div className="page">
+        <div className="skeleton" style={{ height: 220, marginBottom: 16 }} />
+      </div>
+    );
+  }
+
+  if (!customer) {
+    return (
+      <div className="page">
+        <a className="back-link" onClick={() => goBackOrTo(router, "/customers")}>
+          <Icon name="back" size={14} /> Back to Customers
+        </a>
+        <Panel title="Customer not found">
+          <p style={{ color: "var(--muted)", fontSize: 13.5 }}>
+            This account may have been removed, or the link is out of date.
+          </p>
+        </Panel>
+      </div>
+    );
+  }
+
+  const quoteColumns: Column<Quotation>[] = [
+    { key: "quoteNo", header: "No.", render: (q) => q.quoteNo },
+    { key: "opportunityName", header: "Opportunity", render: (q) => q.opportunityName },
+    { key: "amount", header: "Amount", render: (q) => formatInr(q.amount) },
+    { key: "status", header: "Status", render: (q) => <StatusTag status={q.status} /> },
+    { key: "validUntil", header: "Valid Until", render: (q) => formatDate(q.validUntil) },
+  ];
+
+  const contactColumns: Column<Contact>[] = [
+    { key: "name", header: "Contact", render: (c) => <span><b>{c.name}</b><br /><small style={{ color: "var(--muted)" }}>{c.email}</small></span> },
+    { key: "title", header: "Title", render: (c) => c.title },
+    { key: "type", header: "Type", render: (c) => <StatusTag status={c.type} /> },
+    { key: "lastContactedAt", header: "Last Contacted", render: (c) => (c.lastContactedAt ? formatDate(c.lastContactedAt) : "—") },
+  ];
+
+  return (
+    <div className="page">
+      <a className="back-link" onClick={() => goBackOrTo(router, "/customers")}>
+        <Icon name="back" size={14} /> Back to Customers
+      </a>
+      <div className="crm-grid">
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <div className="card panel">
+            <div className="profile-head">
+              <div className="top">
+                <div className="av-lg">{initials(customer.name)}</div>
+                <div>
+                  <h3>{customer.name}</h3>
+                  <div className="co">{customer.industry} · {customer.city} · Customer since {formatDate(customer.customerSince)}</div>
+                </div>
+              </div>
+              <div className="tagrow">
+                <StatusTag status={customer.status} />
+                <Tag color="n">Owner: {customer.ownerName}</Tag>
+                <Tag color="i">{contacts.length} contacts</Tag>
+              </div>
+            </div>
+            <div className="info-grid" style={{ gridTemplateColumns: "repeat(4, 1fr)" }}>
+              <div className="f"><label>Lifetime Value</label><div>{formatInr(customer.lifetimeValue)}</div></div>
+              <div className="f"><label>Open Orders</label><div>{customer.openOrders}</div></div>
+              <div className="f"><label>Account Owner</label><div>{customer.ownerName}</div></div>
+              <div className="f"><label>Status</label><div>{customer.status}</div></div>
+            </div>
+          </div>
+          <Panel title="Quotation History" flush>
+            <DataTable columns={quoteColumns} rows={quotations} emptyTitle="No quotations yet" />
+          </Panel>
+          <Panel title="Account Contacts" flush>
+            <DataTable columns={contactColumns} rows={contacts} emptyTitle="No contacts logged" />
+          </Panel>
+        </div>
+        <div>
+          <Panel title="Account Timeline">
+            <div className="tl">
+              <div className="tl-item">
+                <div className="dot"><Icon name="cash" size={14} /></div>
+                <div className="body"><div className="r1"><b>Payment received</b></div><p>Latest invoice settled on time</p></div>
+              </div>
+              <div className="tl-item">
+                <div className="dot"><Icon name="file" size={14} /></div>
+                <div className="body"><div className="r1"><b>Quotation accepted</b></div><p>Most recent quote converted to a sales order</p></div>
+              </div>
+              <div className="tl-item">
+                <div className="dot"><Icon name="user" size={14} /></div>
+                <div className="body"><div className="r1"><b>Account created</b></div><p>Converted from a won lead by {customer.ownerName}</p></div>
+              </div>
+            </div>
+          </Panel>
+        </div>
+      </div>
+
+      <DesignNote>
+        <b>Design note.</b> Customer Details mirrors Lead Details on purpose — same profile header,
+        same info-grid, same timeline pattern — so the transition from &quot;lead&quot; to
+        &quot;customer&quot; doesn&apos;t require learning a new screen.
+      </DesignNote>
+    </div>
+  );
+}

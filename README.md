@@ -1,36 +1,48 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# RevenueOS Frontend
 
-## Getting Started
+Interactive frontend for the RevenueOS (CRM) module of the Texzium ERP.
+Currently running on a **temporary in-memory mock repository** so the full
+UX can be exercised before connecting to the existing backend. The backend
+at `/root/texzium-erp/backend` is untouched by this project.
 
-First, run the development server:
+## Run
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cd frontend
+npm install
+npm run dev        # http://localhost:3000
+npm run typecheck  # tsc --noEmit
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Note: mock data lives in browser memory only — a refresh resets to seed data.
+That is intentional; persistence arrives with the real API, not localStorage.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Architecture
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```
+app/ (14 screens)            ← UI components (Next.js App Router pages)
+components/                  ← shell, ui primitives, kanban, forms
+lib/hooks/                   ← hooks/state (loading, mutations, refetch)
+lib/repository/interfaces.ts ← repository/service interfaces  ★ the seam
+lib/repository/mock/         ← temporary local implementation (DELETE later)
+lib/repository/real/         ← future fetch-based implementation (empty)
+```
 
-## Learn More
+UI components and hooks depend **only** on the interfaces. To integrate the
+real backend: implement the same interfaces in `lib/repository/real/`
+(see `lib/repository/real/README.md`), then swap one line in
+`lib/repository/RepositoryProvider.tsx`. One deliberate exception is
+documented inline: `lib/hooks/useLiveCounts.ts` (sidebar badge counts)
+subscribes to the mock store directly and needs its internals — not its
+return shape — reimplemented for the real API.
 
-To learn more about Next.js, take a look at the following resources:
+Every assumption that must be checked against the existing backend is
+tracked in **`docs/backend-ui-contract.md`**. Do not modify the backend to
+match this frontend; map differences inside the real repository layer.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Screens
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Dashboard, Leads, Lead Details, Lead Pipeline (drag-and-drop kanban),
+Customers, Customer Details, Contacts, Activities, Follow-ups/Tasks, Notes,
+Opportunities, Quotations, Notifications, Search — all navigable from the
+sidebar; detail screens open by clicking rows/cards.
