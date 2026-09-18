@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Modal } from "../ui/Modal";
-import { TextField, SelectField, FieldRow } from "../ui/FormField";
+import { TextField, TextAreaField, SelectField, FieldRow } from "../ui/FormField";
 import { Button } from "../ui/Button";
 import { useToast } from "../ui/Toast";
 import { CreateLeadInput } from "../../lib/repository/interfaces";
@@ -29,6 +29,8 @@ export function LeadForm({
   const [phone, setPhone] = useState("");
   const [alternatePhone, setAlternatePhone] = useState("");
   const [email, setEmail] = useState("");
+  const [productInterest, setProductInterest] = useState("");
+  const [remarks, setRemarks] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
 
@@ -55,6 +57,10 @@ export function LeadForm({
         phone: phone.trim(),
         alternatePhone: alternatePhone.trim() || undefined,
         sourceId: effectiveSourceId,
+        uiContext: {
+          productInterest: productInterest.trim() || undefined,
+          remarks: remarks.trim() || undefined,
+        },
       });
       toast.show(`Lead "${customerName.trim()}" created`, "check");
       onClose();
@@ -110,6 +116,14 @@ export function LeadForm({
         <TextField label="Phone" required value={phone} onChange={(e) => setPhone(e.target.value)} error={errors.phone} placeholder="+91 …" />
         <TextField label="Email" value={email} onChange={(e) => setEmail(e.target.value)} error={errors.email} placeholder="name@company.com (optional)" />
       </FieldRow>
+
+      <div className="field-divider">
+        <span>Additional context</span>
+        <small>Stored locally for this demo — not yet part of the connected backend</small>
+      </div>
+      <TextField label="Product / Interest" value={productInterest} onChange={(e) => setProductInterest(e.target.value)} placeholder="e.g. Hydraulic Pump Systems (optional)" />
+      <TextAreaField label="Remarks" rows={3} value={remarks} onChange={(e) => setRemarks(e.target.value)} placeholder="Any context worth capturing now (optional)" />
+
       {errors.form && <p style={{ color: "var(--bad)", fontSize: 12.5 }}>{errors.form}</p>}
     </Modal>
   );

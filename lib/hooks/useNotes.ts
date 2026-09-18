@@ -3,7 +3,7 @@
 import { useCallback } from "react";
 import { useRepository } from "../repository/RepositoryProvider";
 import { useAsyncList } from "./useAsyncList";
-import { CreateNoteInput } from "../repository/interfaces";
+import { CreateNoteInput, UpdateNoteInput } from "../repository/interfaces";
 
 export function useNotes() {
   const repo = useRepository();
@@ -22,11 +22,21 @@ export function useNotes() {
     [repo, refetch]
   );
 
+  const updateNote = useCallback(
+    async (id: string, input: UpdateNoteInput) => {
+      const note = await repo.notes.update(id, input);
+      refetch();
+      return note;
+    },
+    [repo, refetch]
+  );
+
   return {
     notes: data?.items ?? [],
     loading,
     error,
     createNote,
+    updateNote,
     refetch,
   };
 }

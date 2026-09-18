@@ -14,17 +14,25 @@ const LINK_TYPES: RelatedRecordType[] = ["Lead", "Customer"];
 export function TaskForm({
   onClose,
   onSubmit,
+  defaultLinkedType,
+  defaultLinkedName,
+  defaultLinkedId,
+  defaultAssigneeName,
 }: {
   onClose: () => void;
   onSubmit: (input: CreateTaskInput) => Promise<unknown>;
+  defaultLinkedType?: RelatedRecordType;
+  defaultLinkedName?: string;
+  defaultLinkedId?: string;
+  defaultAssigneeName?: string;
 }) {
   const toast = useToast();
   const [title, setTitle] = useState("");
   const [dueAt, setDueAt] = useState("");
   const [priority, setPriority] = useState<TaskPriority>("Medium");
-  const [linkedType, setLinkedType] = useState<RelatedRecordType>("Lead");
-  const [linkedName, setLinkedName] = useState("");
-  const [assigneeName, setAssigneeName] = useState("");
+  const [linkedType, setLinkedType] = useState<RelatedRecordType>(defaultLinkedType ?? "Lead");
+  const [linkedName, setLinkedName] = useState(defaultLinkedName ?? "");
+  const [assigneeName, setAssigneeName] = useState(defaultAssigneeName ?? "");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
 
@@ -46,7 +54,7 @@ export function TaskForm({
         dueAt: dueAt ? new Date(dueAt).toISOString() : null,
         priority,
         linkedType,
-        linkedId: `manual_${Date.now()}`,
+        linkedId: defaultLinkedId ?? `manual_${Date.now()}`,
         linkedName: linkedName.trim(),
         assigneeName: assigneeName.trim(),
       });
@@ -77,10 +85,12 @@ export function TaskForm({
         <TextField label="Due Date" type="datetime-local" value={dueAt} onChange={(e) => setDueAt(e.target.value)} />
         <SelectField label="Priority" value={priority} onChange={(e) => setPriority(e.target.value as TaskPriority)} options={PRIORITIES.map((p) => ({ value: p, label: p }))} />
       </FieldRow>
-      <FieldRow>
-        <SelectField label="Linked To" value={linkedType} onChange={(e) => setLinkedType(e.target.value as RelatedRecordType)} options={LINK_TYPES.map((t) => ({ value: t, label: t }))} />
-        <TextField label={`${linkedType} Name`} required value={linkedName} onChange={(e) => setLinkedName(e.target.value)} error={errors.linkedName} placeholder="e.g. Sterling Pumps" />
-      </FieldRow>
+      {!defaultLinkedName && (
+        <FieldRow>
+          <SelectField label="Linked To" value={linkedType} onChange={(e) => setLinkedType(e.target.value as RelatedRecordType)} options={LINK_TYPES.map((t) => ({ value: t, label: t }))} />
+          <TextField label={`${linkedType} Name`} required value={linkedName} onChange={(e) => setLinkedName(e.target.value)} error={errors.linkedName} placeholder="e.g. Sterling Pumps" />
+        </FieldRow>
+      )}
       <TextField label="Assignee" required value={assigneeName} onChange={(e) => setAssigneeName(e.target.value)} error={errors.assigneeName} placeholder="e.g. Rohit M." />
       {errors.form && <p style={{ color: "var(--bad)", fontSize: 12.5 }}>{errors.form}</p>}
     </Modal>

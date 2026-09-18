@@ -4,6 +4,7 @@ import {
   LeadStatus,
   LeadSourceRecord,
   LeadTimelineEntry,
+  LeadUIContext,
   Customer,
   Contact,
   Activity,
@@ -45,12 +46,28 @@ export interface CreateLeadInput {
   phone: string;
   alternatePhone?: string;
   sourceId: ID;
+  /** MOCK/UI-ONLY extras — kept structurally separate from the DTO fields above. See LeadUIContext. */
+  uiContext?: LeadUIContext;
+}
+
+// Mirrors the VERIFIED UpdateLeadDto (customerName?, companyName?, email?,
+// phone?, alternatePhone?, sourceId?), plus the same separated uiContext
+// block used at creation.
+export interface UpdateLeadInput {
+  customerName?: string;
+  companyName?: string;
+  email?: string;
+  phone?: string;
+  alternatePhone?: string;
+  sourceId?: string;
+  uiContext?: LeadUIContext;
 }
 
 export interface ILeadRepository {
   list(query?: ListQuery<LeadSortField>): Promise<Page<Lead>>;
   getById(id: ID): Promise<Lead | null>;
   create(input: CreateLeadInput): Promise<Lead>;
+  update(id: ID, input: UpdateLeadInput): Promise<Lead>;
   /** Lightweight status movement (New/Contacted) — mirrors the lead-status module. */
   updateStatus(id: ID, status: LeadStatus): Promise<Lead>;
   /** VERIFIED: AssignLeadDto { leadId, assignedToId } — writes PRE_SALES_ASSIGNED. */
@@ -141,9 +158,15 @@ export interface CreateNoteInput {
   pinned?: boolean;
 }
 
+export interface UpdateNoteInput {
+  text?: string;
+  pinned?: boolean;
+}
+
 export interface INoteRepository {
   list(query?: ListQuery): Promise<Page<Note>>;
   create(input: CreateNoteInput): Promise<Note>;
+  update(id: ID, input: UpdateNoteInput): Promise<Note>;
   listByRelated(linkedId: ID): Promise<Note[]>;
 }
 
@@ -171,20 +194,29 @@ export interface IOpportunityRepository {
   updateStage(id: ID, stage: OpportunityStage): Promise<Opportunity>;
 }
 
+// Simplified mock creation input: an opportunity + a presentation amount.
+// The real CreateQuotationDto additionally requires quoteDate,
+// inventoryItemId, quantity, unitPrice, sellerGstId, buyerGstId (backend
+// computes tax/total from those) — none of which have a UI/master-data
+// source yet in this frontend, so quotation creation stays a simplified
+// mock stand-in until Quote-to-Cash masters (inventory, GST) are built.
+// See docs/backend-ui-contract.md §8. customerName/opportunityName/ownerName
+// are always derived from the linked opportunity, mirroring how Opportunity
+// derives its own fields from the linked Lead.
 export interface CreateQuotationInput {
-  customerName: string;
-  customerId?: ID;
-  opportunityName: string;
-  opportunityId?: ID;
+  opportunityId: ID;
   amount: number;
-  status: Quotation["status"];
   validUntil: string | null;
-  ownerName: string;
 }
 
 export interface IQuotationRepository {
   list(query?: ListQuery<QuotationSortField>): Promise<Page<Quotation>>;
+  getById(id: ID): Promise<Quotation | null>;
   create(input: CreateQuotationInput): Promise<Quotation>;
+  /** VERIFIED operation (`PATCH /:id/revise` sets REVISED). Version/history trail is mock-only. */
+  revise(id: ID, amount: number, note?: string): Promise<Quotation>;
+  /** VERIFIED operation (`PATCH /:id/approve` sets APPROVED). */
+  approve(id: ID): Promise<Quotation>;
 }
 
 export interface INotificationRepository {

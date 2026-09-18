@@ -6,13 +6,16 @@ import { Button } from "../../components/ui/Button";
 import { ChipGroup, Chip } from "../../components/ui/Tag";
 import { Icon } from "../../components/ui/Icon";
 import { NoteForm } from "../../components/forms/NoteForm";
+import { NoteDetailModal } from "../../components/forms/NoteDetailModal";
 import { useNotes } from "../../lib/hooks/useNotes";
 import { formatDateTime } from "../../lib/format";
+import { Note } from "../../lib/types/domain";
 
 export default function NotesPage() {
-  const { notes, createNote } = useNotes();
+  const { notes, createNote, updateNote } = useNotes();
   const [filter, setFilter] = useState<"All" | "Pinned" | "Lead" | "Customer">("All");
   const [showForm, setShowForm] = useState(false);
+  const [activeNote, setActiveNote] = useState<Note | null>(null);
 
   const filtered = notes.filter((n) => {
     if (filter === "All") return true;
@@ -50,7 +53,7 @@ export default function NotesPage() {
       ) : (
         <div className="notes-grid" style={{ marginTop: 14 }}>
           {filtered.map((n) => (
-            <div className={`note ${n.pinned ? "pinned" : ""}`} key={n.id}>
+            <div className={`note clickable ${n.pinned ? "pinned" : ""}`} key={n.id} onClick={() => setActiveNote(n)}>
               {n.pinned && (
                 <div style={{ display: "flex", alignItems: "center", gap: 5, color: "var(--m)", fontSize: 11, fontWeight: 700 }}>
                   <Icon name="pin" size={14} /> PINNED
@@ -66,7 +69,10 @@ export default function NotesPage() {
                 </div>
               </div>
               <div>
-                <span className="tag n"><Icon name="building" size={14} /> {n.linkedName}</span>
+                <span className="tag n">
+                  <Icon name={n.linkedType === "Lead" ? "funnel" : n.linkedType === "Customer" ? "building" : "brief"} size={14} />
+                  {n.linkedName}
+                </span>
               </div>
             </div>
           ))}
@@ -74,11 +80,19 @@ export default function NotesPage() {
       )}
 
       <DesignNote>
-        <b>Design note.</b> Notes are short and scannable by design — a card, not a document. Pinned
-        notes get a colored border so they surface before routine notes.
+        <b>Design note.</b> Notes are short and scannable by design — click any card to open its full
+        context, jump to the related record, or edit it. Pinned notes get a colored border so they
+        surface before routine notes.
       </DesignNote>
 
       {showForm && <NoteForm onClose={() => setShowForm(false)} onSubmit={createNote} />}
+      {activeNote && (
+        <NoteDetailModal
+          note={activeNote}
+          onClose={() => setActiveNote(null)}
+          onUpdate={(id, input) => updateNote(id, input)}
+        />
+      )}
     </div>
   );
 }

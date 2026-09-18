@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { useRepository } from "../repository/RepositoryProvider";
 import { useAsyncList } from "./useAsyncList";
-import { CreateLeadInput } from "../repository/interfaces";
+import { CreateLeadInput, UpdateLeadInput } from "../repository/interfaces";
 import { LeadStatus } from "../types/domain";
 import { FilterMap, SortState } from "../types/common";
 import { LeadSortField } from "../repository/interfaces";
@@ -141,6 +141,16 @@ export function useLeadDetail(id: string | undefined) {
     [id, repo, refetch, refetchTimeline]
   );
 
+  const updateLead = useCallback(
+    async (input: UpdateLeadInput) => {
+      if (!id) return;
+      await repo.leads.update(id, input);
+      refetch();
+      refetchTimeline();
+    },
+    [id, repo, refetch, refetchTimeline]
+  );
+
   return {
     lead,
     timeline: timeline ?? [],
@@ -150,6 +160,7 @@ export function useLeadDetail(id: string | undefined) {
     assignLead,
     qualifyLead,
     rejectLead,
+    updateLead,
     refetch,
   };
 }

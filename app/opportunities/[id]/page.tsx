@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Icon } from "../../../components/ui/Icon";
 import { Panel } from "../../../components/ui/Card";
@@ -10,6 +11,8 @@ import { DocumentTrail } from "../../../components/ui/DocumentTrail";
 import { LifecycleStepper } from "../../../components/ui/LifecycleStepper";
 import { QuickActions } from "../../../components/ui/QuickActions";
 import { DataTable, Column } from "../../../components/ui/DataTable";
+import { ConfirmDialog } from "../../../components/ui/ConfirmDialog";
+import { QuotationForm } from "../../../components/forms/QuotationForm";
 import { useOpportunityDetail } from "../../../lib/hooks/useOpportunities";
 import { useQuotations } from "../../../lib/hooks/useQuotations";
 import { useToast } from "../../../components/ui/Toast";
@@ -25,13 +28,17 @@ function goBackOrTo(router: ReturnType<typeof useRouter>, fallback: string) {
   }
 }
 
+type StageAction = { kind: "forward" | "back"; stage: OpportunityStage } | { kind: "lost" };
+
 export default function OpportunityDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const toast = useToast();
   const id = params?.id;
-  const { opportunity, lead, loading, updateStage } = useOpportunityDetail(id);
-  const { quotations } = useQuotations();
+  const { opportunity, lead, loading, updateStage, refetch } = useOpportunityDetail(id);
+  const { quotations, createQuotation, refetch: refetchQuotations } = useQuotations();
+  const [pendingAction, setPendingAction] = useState<StageAction | null>(null);
+  const [showQuotationForm, setShowQuotationForm] = useState(false);
 
   if (loading && !opportunity) {
     return (
@@ -63,20 +70,22 @@ export default function OpportunityDetailPage() {
   const isTerminal = isLost || opportunity.stage === "Won";
   const nextStep: OpportunityStage | undefined =
     !isTerminal && stepIdx >= 0 && stepIdx < OPPORTUNITY_STEPS.length - 1 ? OPPORTUNITY_STEPS[stepIdx + 1] : undefined;
+  const prevStep: OpportunityStage | undefined =
+    !isTerminal && stepIdx > 0 ? OPPORTUNITY_STEPS[stepIdx - 1] : undefined;
 
-  async function advance() {
-    if (!nextStep) return;
-    await updateStage(nextStep);
-    toast.show(`Moved to ${nextStep}`, "check");
-  }
-
-  async function markLost() {
-    await updateStage("Lost");
-    toast.show("Opportunity marked Lost", "close");
+  async function runAction() {
+    if (!pendingAction) return;
+    if (pendingAction.kind === "lost") {
+      await updateStage("Lost");
+      toast.show("Opportunity marked Lost", "close");
+    } else {
+      await updateStage(pendingAction.stage);
+      toast.show(`Moved to ${pendingAction.stage}`, "check");
+    }
   }
 
   const quoteColumns: Column<Quotation>[] = [
-    { key: "quoteNo", header: "No.", render: (q) => q.quoteNo },
+    { key: "quoteNo", header: "No.", render: (q) => `${q.quoteNo} · V${q.version}` },
     { key: "amount", header: "Amount", render: (q) => formatInr(q.amount) },
     { key: "status", header: "Status", render: (q) => <StatusTag status={q.status} /> },
   ];
@@ -121,13 +130,18 @@ export default function OpportunityDetailPage() {
               lostLabel="Lost"
             />
             {!isTerminal && (
-              <div style={{ display: "flex", gap: 9, marginTop: 16 }}>
+              <div style={{ display: "flex", gap: 9, marginTop: 16, flexWrap: "wrap" }}>
                 {nextStep && (
-                  <Button variant="primary" icon="arrow" onClick={advance}>
+                  <Button variant="primary" icon="arrow" onClick={() => setPendingAction({ kind: "forward", stage: nextStep })}>
                     Move to {nextStep}
                   </Button>
                 )}
-                <Button variant="ghost" className="danger-ghost" icon="close" onClick={markLost}>
+                {prevStep && (
+                  <Button variant="ghost" onClick={() => setPendingAction({ kind: "back", stage: prevStep })}>
+                    Move back to {prevStep}
+                  </Button>
+                )}
+                <Button variant="ghost" className="danger-ghost" icon="close" onClick={() => setPendingAction({ kind: "lost" })}>
                   Mark Lost
                 </Button>
               </div>
@@ -140,22 +154,61 @@ export default function OpportunityDetailPage() {
           </div>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <Panel title="Related Quotations" flush>
+          <Panel
+            title="Related Quotations"
+            flush
+            extraHead={
+              <a className="more" href="#" onClick={(e) => { e.preventDefault(); setShowQuotationForm(true); }}>
+                <Icon name="plus" size={14} /> Create Quotation
+              </a>
+            }
+          >
             <DataTable
               columns={quoteColumns}
               rows={relatedQuotes}
+              onRowClick={(q) => router.push(`/quotations/${q.id}`)}
               emptyTitle="No quotations yet"
-              emptyBody="Quote-to-cash workflows (Quotations onward) arrive in a later stage."
+              emptyBody="Create one to move this opportunity toward Quote-to-Cash."
             />
           </Panel>
         </div>
       </div>
 
       <DesignNote>
-        <b>Design note.</b> Stage-advance here is UI-only for now — no backend PATCH route for
-        Opportunity stage is confirmed yet (docs/backend-ui-contract.md §2), so this exercises the
-        stepper and updates only the local mock store until a real endpoint is confirmed.
+        <b>Design note.</b> Stage movement (forward, backward, or Lost) is UI-only for now — no backend
+        PATCH route for Opportunity stage is confirmed yet (docs/backend-ui-contract.md §2), so this
+        exercises the stepper and confirmation flow against the local mock store only.
       </DesignNote>
+
+      {pendingAction && (
+        <ConfirmDialog
+          title={pendingAction.kind === "lost" ? "Mark Opportunity Lost" : pendingAction.kind === "back" ? "Move Stage Back" : "Advance Stage"}
+          body={
+            pendingAction.kind === "lost"
+              ? `Mark "${opportunity.title}" as Lost? This is a terminal state — the opportunity will drop out of the active pipeline.`
+              : pendingAction.kind === "back"
+              ? `Move "${opportunity.title}" back to ${pendingAction.stage}? Use this if the deal genuinely regressed.`
+              : `Move "${opportunity.title}" to ${pendingAction.stage}?`
+          }
+          confirmLabel={pendingAction.kind === "lost" ? "Mark Lost" : `Move to ${pendingAction.stage}`}
+          destructive={pendingAction.kind === "lost"}
+          onClose={() => setPendingAction(null)}
+          onConfirm={runAction}
+        />
+      )}
+
+      {showQuotationForm && (
+        <QuotationForm
+          defaultOpportunityId={opportunity.id}
+          onClose={() => setShowQuotationForm(false)}
+          onSubmit={async (input) => {
+            const q = await createQuotation(input);
+            refetchQuotations();
+            refetch();
+            return q;
+          }}
+        />
+      )}
     </div>
   );
 }

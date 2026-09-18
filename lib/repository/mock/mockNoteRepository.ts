@@ -1,6 +1,6 @@
 import { ID, ListQuery, Page } from "../../types/common";
 import { Note } from "../../types/domain";
-import { INoteRepository, CreateNoteInput } from "../interfaces";
+import { INoteRepository, CreateNoteInput, UpdateNoteInput } from "../interfaces";
 import { db } from "./db";
 import { delay, applyListQuery } from "./queryUtils";
 import { mockId } from "./entityStore";
@@ -25,6 +25,12 @@ export class MockNoteRepository implements INoteRepository {
     };
     db.notes.add(note);
     return delay(note);
+  }
+
+  async update(id: ID, input: UpdateNoteInput): Promise<Note> {
+    const updated = db.notes.update(id, input);
+    if (!updated) throw new Error(`Note ${id} not found`);
+    return delay(updated);
   }
 
   async listByRelated(linkedId: ID): Promise<Note[]> {

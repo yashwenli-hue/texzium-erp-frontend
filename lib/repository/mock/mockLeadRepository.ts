@@ -3,6 +3,7 @@ import { Lead, LeadStatus, LeadTimelineEntry } from "../../types/domain";
 import {
   ILeadRepository,
   CreateLeadInput,
+  UpdateLeadInput,
   LeadSortField,
 } from "../interfaces";
 import { db } from "./db";
@@ -39,6 +40,7 @@ export class MockLeadRepository implements ILeadRepository {
       createdAt: now,
       updatedAt: now,
       lastActivityAt: now,
+      uiContext: input.uiContext,
     };
     db.leads.add(lead);
     db.leadTimeline.add({
@@ -51,6 +53,36 @@ export class MockLeadRepository implements ILeadRepository {
       occurredAt: now,
     });
     return delay(lead);
+  }
+
+  async update(id: ID, input: UpdateLeadInput): Promise<Lead> {
+    const existing = db.leads.getById(id);
+    if (!existing) throw new Error(`Lead ${id} not found`);
+    const now = new Date().toISOString();
+    const source = input.sourceId ? db.leadSources.getById(input.sourceId) : undefined;
+    const patch: Partial<Lead> = {
+      ...(input.customerName !== undefined ? { customerName: input.customerName } : {}),
+      ...(input.companyName !== undefined ? { companyName: input.companyName } : {}),
+      ...(input.email !== undefined ? { email: input.email } : {}),
+      ...(input.phone !== undefined ? { phone: input.phone } : {}),
+      ...(input.alternatePhone !== undefined ? { alternatePhone: input.alternatePhone } : {}),
+      ...(input.sourceId !== undefined ? { sourceId: input.sourceId, sourceName: source?.name ?? existing.sourceName } : {}),
+      ...(input.uiContext !== undefined ? { uiContext: { ...existing.uiContext, ...input.uiContext } } : {}),
+      updatedAt: now,
+      lastActivityAt: now,
+    };
+    const updated = db.leads.update(id, patch);
+    if (!updated) throw new Error(`Lead ${id} not found`);
+    db.leadTimeline.add({
+      id: mockId("T"),
+      leadId: id,
+      icon: "pulse",
+      title: "LEAD_UPDATED",
+      detail: "",
+      actorName: "You",
+      occurredAt: now,
+    });
+    return delay(updated);
   }
 
   async updateStatus(id: ID, status: LeadStatus): Promise<Lead> {

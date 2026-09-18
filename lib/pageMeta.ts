@@ -33,7 +33,13 @@ export const NAV_SECTIONS: NavSection[] = [
   },
   {
     label: "Quote to Cash",
-    items: [{ href: "/quotations", label: "Quotations", icon: "file", countKey: "quotationsCount" }],
+    items: [
+      { href: "/quotations", label: "Quotations", icon: "file", countKey: "quotationsCount" },
+      { href: "/proforma-invoices", label: "Proforma Invoices", icon: "receipt" },
+      { href: "/sales-orders", label: "Sales Orders", icon: "cart" },
+      { href: "/sales-invoices", label: "Sales Invoices", icon: "file" },
+      { href: "/payments", label: "Payments", icon: "cash" },
+    ],
   },
   {
     label: "Accounts",
@@ -49,6 +55,10 @@ export const NAV_SECTIONS: NavSection[] = [
       { href: "/tasks", label: "Tasks", icon: "checksq", countKey: "openTasksCount" },
       { href: "/notes", label: "Notes", icon: "notepad", countKey: "notesCount" },
     ],
+  },
+  {
+    label: "Analytics",
+    items: [{ href: "/reports", label: "Reports", icon: "barChart" }],
   },
   {
     label: "System",
@@ -75,4 +85,9 @@ export const PAGE_META: Record<string, { title: string; subtitle: string }> = {
   quotations: { title: "Quotations", subtitle: "Every quote sent, its status, and how close it is to becoming revenue." },
   notifications: { title: "Notifications", subtitle: "Everything that needs your attention, in one feed." },
   search: { title: "Search", subtitle: "Find any lead, customer, contact, quotation or note in RevenueOS." },
+  "proforma-invoices": { title: "Proforma Invoices", subtitle: "Generated from approved quotations, ahead of a sales order." },
+  "sales-orders": { title: "Sales Orders", subtitle: "Multi-gate approval workflow." },
+  "sales-invoices": { title: "Sales Invoices", subtitle: "Raised once a sales order is dispatched." },
+  payments: { title: "Payments", subtitle: "Payment collections and collection reminders." },
+  reports: { title: "Reports", subtitle: "Funnel, revenue, conversion and performance reports." },
 };

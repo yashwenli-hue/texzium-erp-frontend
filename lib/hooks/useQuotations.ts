@@ -30,3 +30,34 @@ export function useQuotations() {
     refetch,
   };
 }
+
+export function useQuotationDetail(id: string | undefined) {
+  const repo = useRepository();
+
+  const { data: quotation, loading, error, refetch } = useAsyncList(
+    () => (id ? repo.quotations.getById(id) : Promise.resolve(null)),
+    [repo, id]
+  );
+
+  const { data: opportunity } = useAsyncList(
+    () => (quotation?.opportunityId ? repo.opportunities.getById(quotation.opportunityId) : Promise.resolve(null)),
+    [repo, quotation?.opportunityId]
+  );
+
+  const reviseQuotation = useCallback(
+    async (amount: number, note?: string) => {
+      if (!id) return;
+      await repo.quotations.revise(id, amount, note);
+      refetch();
+    },
+    [id, repo, refetch]
+  );
+
+  const approveQuotation = useCallback(async () => {
+    if (!id) return;
+    await repo.quotations.approve(id);
+    refetch();
+  }, [id, repo, refetch]);
+
+  return { quotation, opportunity, loading, error, reviseQuotation, approveQuotation, refetch };
+}

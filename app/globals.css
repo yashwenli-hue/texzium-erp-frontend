@@ -19,9 +19,11 @@ svg.i14{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:1.9;st
 svg.i18{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
 
 /* ---------- Shell ---------- */
-.app{display:grid;grid-template-columns:240px 1fr;min-height:100vh}
-.rail{background:var(--ink);color:#C7CCD5;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow:hidden}
+.app{display:flex;min-height:100vh}
+.rail{width:240px;flex:none;background:var(--ink);color:#C7CCD5;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow:hidden;transition:width .18s ease}
+.rail.collapsed{width:68px}
 .brand{display:flex;align-items:center;gap:10px;padding:19px 18px 15px;border-bottom:1px solid rgba(255,255,255,.06)}
+.rail.collapsed .brand{justify-content:center;padding:19px 0 15px}
 .brand .logo{width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,var(--m),#10B981);display:grid;place-items:center;color:#fff;font-family:var(--display);font-weight:700;font-size:14px;flex:none}
 .brand b{font-family:var(--display);font-weight:700;font-size:15px;color:#fff;letter-spacing:-.2px}
 .brand small{display:block;color:#767E8C;font-size:11px;font-weight:400}
@@ -37,8 +39,32 @@ svg.i18{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.6;st
 .mod .badge-count{margin-left:auto;font-size:10.5px;color:#8890A0;font-weight:700;background:rgba(255,255,255,.06);padding:1px 7px;border-radius:20px}
 .mod.active .badge-count{background:rgba(5,150,105,.25);color:#fff}
 
+.rail-collapse-btn{display:flex;align-items:center;gap:10px;padding:9px 10px;margin:8px 10px 10px;border-radius:10px;color:#8890A0;font-size:13.5px;font-weight:600;border-top:1px solid rgba(255,255,255,.06)}
+.rail-collapse-btn:hover{background:rgba(255,255,255,.05);color:#fff}
+.rail-collapse-btn .flip{transform:rotate(180deg)}
+.rail-dot{display:none;position:absolute;top:6px;right:14px;width:7px;height:7px;border-radius:50%;background:var(--m);border:2px solid var(--ink)}
+
+/* Collapsed rail: icon-only, centered. Tooltip is a fixed-position element
+   driven from Sidebar.tsx (not CSS ::after) because the rail's own scroll
+   container clips absolutely-positioned overflow — position:fixed is the
+   reliable way to escape that. */
+.rail.collapsed .brand-text,
+.rail.collapsed .mod-label,
+.rail.collapsed .nav-label,
+.rail.collapsed .badge-count{display:none}
+.rail.collapsed .brand{justify-content:center;padding:19px 0 15px}
+.rail.collapsed .mod{justify-content:center;padding:9px 0}
+.rail.collapsed .mod .dot{margin:0}
+.rail.collapsed .rail-dot{display:block}
+.rail.collapsed .rail-collapse-btn{justify-content:center}
+.rail-tooltip{
+  position:fixed;left:76px;transform:translateY(-50%);
+  background:var(--ink);color:#fff;padding:6px 10px;border-radius:8px;font-size:12px;font-weight:600;white-space:nowrap;
+  pointer-events:none;z-index:200;box-shadow:0 8px 20px -8px rgba(0,0,0,.5);
+}
+
 /* ---------- Topbar ---------- */
-.main{display:flex;flex-direction:column;min-width:0}
+.main{flex:1;display:flex;flex-direction:column;min-width:0}
 .topbar{height:62px;background:var(--surface);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:16px;padding:0 26px;position:sticky;top:0;z-index:20}
 .crumb{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);flex:none}
 .crumb b{color:var(--text);font-weight:700}
@@ -98,6 +124,7 @@ h1.title{font-family:var(--display);font-size:26px;font-weight:800;letter-spacin
 .panel-body.flush{padding:0}
 
 /* table */
+.table-scroll{overflow-x:auto}
 table{width:100%;border-collapse:collapse;font-size:13px}
 th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--faint);font-weight:700;padding:11px 21px;border-bottom:1px solid var(--line);white-space:nowrap}
 td{padding:13px 21px;border-bottom:1px solid var(--line-2);color:var(--text)}
@@ -108,11 +135,14 @@ tbody tr.clickable:hover{background:#FBFBFC}
 .who{display:flex;align-items:center;gap:10px}
 .who .av{width:31px;height:31px;border-radius:9px;background:var(--m-soft);color:var(--m);display:grid;place-items:center;font-weight:700;font-size:12px;font-family:var(--display);flex:none}
 .who small{display:block;color:var(--muted);font-size:11.5px;margin-top:1px}
+.av-wrap{position:relative;flex:none}
+.av-source-dot{position:absolute;bottom:-4px;right:-4px;display:flex;border-radius:7px;box-shadow:0 0 0 2px var(--surface)}
 .tag{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:700;padding:4px 10px;border-radius:20px;white-space:nowrap}
 .tag::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
 .tag.g{color:var(--good);background:var(--good-bg)} .tag.w{color:var(--warn);background:var(--warn-bg)}
 .tag.b{color:var(--bad);background:var(--bad-bg)} .tag.i{color:var(--info);background:var(--info-bg)}
 .tag.n{color:var(--muted);background:var(--line-2)}
+.version-badge{display:inline-flex;align-items:center;font-family:var(--display);font-size:10.5px;font-weight:700;color:var(--muted);background:var(--line-2);padding:1px 6px;border-radius:6px}
 
 /* progress / legend */
 .bar{height:6px;border-radius:6px;background:var(--line-2);overflow:hidden}
@@ -160,6 +190,8 @@ tbody tr.clickable:hover{background:#FBFBFC}
 .li .tx{flex:1;min-width:0}.li .tx b{font-size:13px;font-weight:600}.li .tx small{display:block;color:var(--muted);font-size:12px;margin-top:1px}
 .li .rt{text-align:right;font-size:12px;color:var(--muted)}
 .li .rt b{font-family:var(--display);color:var(--text);font-size:13px}
+.li-arrow{color:var(--faint);flex:none}
+.li:hover .li-arrow{color:var(--muted)}
 
 .helper{margin-top:26px;padding:17px 21px;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);color:var(--muted);font-size:12.5px;display:flex;gap:12px;align-items:flex-start;line-height:1.6}
 .helper svg{flex:none;color:var(--m);margin-top:1px}
@@ -199,6 +231,10 @@ tbody tr.clickable:hover{background:#FBFBFC}
 .info-grid .f{font-size:12px}
 .info-grid .f label{display:block;color:var(--faint);font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px;font-weight:700}
 .info-grid .f div{color:var(--text);font-weight:500}
+.activity-summary{display:flex;gap:18px;flex-wrap:wrap;padding:2px 21px 16px;border-bottom:1px solid var(--line-2)}
+.as-item{display:flex;align-items:center;gap:6px;color:var(--muted)}
+.as-item b{font-family:var(--display);font-size:16px;color:var(--ink);font-weight:800}
+.as-item span{font-size:12px}
 .tl{padding:16px 19px;position:relative}
 .tl-item{display:flex;gap:12px;padding-bottom:18px;position:relative}
 .tl-item:last-child{padding-bottom:0}
@@ -231,6 +267,8 @@ tbody tr.clickable:hover{background:#FBFBFC}
 /* notes */
 .notes-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
 .note{border:1px solid var(--line);border-radius:15px;padding:16px;background:var(--surface);display:flex;flex-direction:column;gap:10px}
+.note.clickable{cursor:pointer;transition:border-color .12s,box-shadow .12s}
+.note.clickable:hover{border-color:var(--m);box-shadow:0 6px 16px -10px rgba(5,150,105,.35)}
 .note .txt{font-size:13px;color:var(--text);line-height:1.55;flex:1}
 .note .foot{display:flex;align-items:center;gap:9px;padding-top:10px;border-top:1px solid var(--line-2)}
 .note .foot small{color:var(--muted);font-size:11.5px}
@@ -261,9 +299,18 @@ tbody tr.clickable:hover{background:#FBFBFC}
 
 @media(max-width:1080px){.cols{grid-template-columns:1fr}.crm-grid{grid-template-columns:1fr}.stat-row{grid-template-columns:repeat(2,1fr)}.tiles{grid-template-columns:1fr 1fr}.notes-grid{grid-template-columns:1fr 1fr}.kanban{grid-template-columns:repeat(3,1fr)}}
 @media(max-width:720px){
-  .app{grid-template-columns:1fr}
   .rail{position:fixed;left:0;top:0;z-index:60;width:250px;transform:translateX(-100%);transition:transform .22s}
   .rail.show{transform:none;box-shadow:0 0 0 100vmax rgba(0,0,0,.4)}
+  /* Mobile always shows the full drawer regardless of the desktop collapse preference. */
+  .rail.collapsed{width:250px}
+  .rail.collapsed .brand{justify-content:flex-start;padding:19px 18px 15px}
+  .rail.collapsed .brand-text,
+  .rail.collapsed .mod-label,
+  .rail.collapsed .nav-label,
+  .rail.collapsed .badge-count{display:revert}
+  .rail.collapsed .mod{justify-content:flex-start;padding:9px 10px}
+  .rail.collapsed .rail-dot{display:none}
+  .rail-collapse-btn{display:none}
   .mobile-toggle{display:grid}
   .search{display:none}.stat-row{grid-template-columns:1fr 1fr}.tiles{grid-template-columns:1fr}.notes-grid{grid-template-columns:1fr}
   .kanban{grid-template-columns:repeat(2,1fr)}
@@ -300,6 +347,9 @@ tbody tr.clickable:hover{background:#FBFBFC}
 .field.has-err input,.field.has-err select,.field.has-err textarea{border-color:var(--bad)}
 .field-row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 @media(max-width:520px){.field-row{grid-template-columns:1fr}}
+.field-divider{display:flex;flex-direction:column;gap:2px;margin:6px 0 14px;padding-top:14px;border-top:1px solid var(--line-2)}
+.field-divider span{font-size:11.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+.field-divider small{color:var(--faint);font-size:11.5px}
 
 /* Filter drawer / popover */
 .filter-panel{position:absolute;top:calc(100% + 8px);right:0;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:0 20px 48px -16px rgba(10,10,12,.28);width:300px;z-index:50;padding:18px}
@@ -308,13 +358,22 @@ tbody tr.clickable:hover{background:#FBFBFC}
 .filter-panel .group:last-child{margin-bottom:0}
 .filter-panel .group-label{font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--faint);font-weight:700;margin-bottom:8px}
 .filter-options{display:flex;flex-wrap:wrap;gap:6px}
-.filter-opt{padding:6px 11px;border-radius:20px;font-size:12px;font-weight:600;border:1px solid var(--line);color:var(--muted);background:var(--canvas)}
+.filter-opt{display:inline-flex;align-items:center;gap:4px;padding:6px 11px;border-radius:20px;font-size:12px;font-weight:600;border:1px solid var(--line);color:var(--muted);background:var(--canvas);cursor:pointer}
 .filter-opt.active{background:var(--m);border-color:var(--m);color:#fff}
 .filter-backdrop{position:fixed;inset:0;z-index:40}
 @media(max-width:640px){
   .filter-panel{position:fixed;left:0;right:0;bottom:0;top:auto;width:auto;border-radius:20px 20px 0 0;max-height:80vh;overflow-y:auto;animation:sheetIn .18s ease-out}
   @keyframes sheetIn{from{transform:translateY(100%)}to{transform:translateY(0)}}
 }
+
+/* Active filter chips (below the header, mirrors the filter popover state) */
+.active-filter-chips{display:flex;flex-wrap:wrap;align-items:center;gap:7px;margin:12px 0 2px}
+.af-chip{display:inline-flex;align-items:center;gap:6px;padding:5px 6px 5px 11px;border-radius:20px;font-size:12px;font-weight:600;background:var(--m-soft);color:var(--m)}
+.af-chip-label{opacity:.75;font-weight:600}
+.af-chip button{display:grid;place-items:center;width:18px;height:18px;border-radius:50%;color:var(--m)}
+.af-chip button:hover{background:rgba(5,150,105,.18)}
+.af-clear{font-size:12px;font-weight:600;color:var(--muted);padding:5px 4px}
+.af-clear:hover{color:var(--text)}
 
 /* Pagination */
 .pagination{display:flex;align-items:center;justify-content:space-between;padding:14px 21px;border-top:1px solid var(--line);flex-wrap:wrap;gap:10px}
