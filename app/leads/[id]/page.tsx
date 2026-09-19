@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Icon } from "../../../components/ui/Icon";
 import { Panel } from "../../../components/ui/Card";
-import { StatusTag, LeadStatusTag, Tag, STAGE_COLOR } from "../../../components/ui/Tag";
+import { StatusTag, LeadStatusTag, LeadScoreTag, Tag } from "../../../components/ui/Tag";
 import { SourceBadge } from "../../../components/ui/SourceBadge";
 import { FollowupTag } from "../../../components/ui/FollowupTag";
 import { QuickActions } from "../../../components/ui/QuickActions";
@@ -154,7 +154,7 @@ export default function LeadDetailPage() {
                 <SourceBadge source={lead.sourceName} size={18} />
                 <Tag color="n">{lead.sourceName}</Tag>
                 <Tag color="n">{lead.assignedToName ? `Assigned: ${lead.assignedToName}` : "Unassigned"}</Tag>
-                <Tag color={STAGE_COLOR[lead.score] ?? "n"}>{lead.score} lead</Tag>
+                <LeadScoreTag score={lead.score} suffix="lead" />
               </div>
               <QuickActions phone={lead.phone} email={lead.email} contactName={lead.customerName} />
               <div className="lead-action-row">

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { PageHeader, DesignNote } from "../../components/ui/PageHeader";
 import { Panel } from "../../components/ui/Card";
 import { Button } from "../../components/ui/Button";
-import { StatusTag, LeadStatusTag } from "../../components/ui/Tag";
+import { LeadStatusTag, LeadScoreTag } from "../../components/ui/Tag";
 import { SourceTag } from "../../components/ui/SourceBadge";
 import { FollowupTag } from "../../components/ui/FollowupTag";
 import { initials } from "../../components/ui/Who";
@@ -24,7 +24,7 @@ const PAGE_SIZE = 8;
 
 export default function LeadsPage() {
   const router = useRouter();
-  const { leads: allLeads, createLead } = useLeads();
+  const { leads: allLeads, loading, createLead } = useLeads();
   const { sources } = useLeadSources();
   const { tasks } = useTasks();
   const [showForm, setShowForm] = useState(false);
@@ -131,7 +131,7 @@ export default function LeadsPage() {
       header: "Product / Interest",
       render: (l) => l.uiContext?.productInterest ?? <span style={{ color: "var(--faint)" }}>—</span>,
     },
-    { key: "score", header: "Score", render: (l) => <StatusTag status={l.score} /> },
+    { key: "score", header: "Score", render: (l) => <LeadScoreTag score={l.score} /> },
     { key: "status", header: "Status", render: (l) => <LeadStatusTag status={l.status} /> },
     {
       key: "followup",
@@ -148,6 +148,19 @@ export default function LeadsPage() {
     },
     { key: "lastActivityAt", header: "Last Activity", sortable: true, render: (l) => formatRelative(l.lastActivityAt) },
   ];
+
+  // Without this guard the table briefly renders its "no leads match these
+  // filters" empty state during the initial mock fetch (allLeads starts
+  // empty until the request resolves), which reads as a real empty result
+  // rather than a loading state — same guard Lead Detail already uses.
+  if (loading && allLeads.length === 0) {
+    return (
+      <div className="page">
+        <div className="skeleton" style={{ height: 220, marginBottom: 16 }} />
+        <div className="skeleton" style={{ height: 300 }} />
+      </div>
+    );
+  }
 
   return (
     <div className="page">
@@ -185,7 +198,7 @@ export default function LeadsPage() {
       />
       <ActiveFilterChips groups={filterGroups} value={filters} onChange={(f) => { setFilters(f); setPage(1); }} />
 
-      <div style={{ marginTop: 14 }}>
+      <div className="lead-table" style={{ marginTop: 14 }}>
         <Panel title={`Lead Master · ${filtered.length}`} flush>
           <DataTable
             columns={columns}

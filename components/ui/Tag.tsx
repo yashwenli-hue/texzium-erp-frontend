@@ -43,21 +43,23 @@ export function StatusTag({ status }: { status: string }) {
   return <Tag color={STAGE_COLOR[status] ?? "n"}>{status}</Tag>;
 }
 
-// Dedicated indigo/violet family for the verified Lead lifecycle
-// (LEAD_STATUSES in lib/types/domain.ts) — deliberately its own hue,
-// separate from the shared STAGE_COLOR palette above. Score (Hot/Warm/Cold)
-// already spans red/amber/blue and Follow-up (Overdue/Due/Upcoming) spans
-// red/amber/blue/grey, so Status previously ended up reusing the same
-// tones and reading as "the same visual system" in a Lead Master row. This
-// keeps the four statuses mutually distinguishable via lightness/fill
-// (not hue alone) while staying visually unmistakable as its own group —
-// see design review Stage 1.3.3 §2. No new status values are introduced,
-// only presentation color, and the text label is always rendered alongside
-// it so nothing depends on color alone.
+// Dedicated lifecycle palette for the verified Lead statuses (LEAD_STATUSES
+// in lib/types/domain.ts) — its own hue per stage, separate from the
+// shared STAGE_COLOR palette above and from Score's own deep red/amber/blue
+// (see LEAD_SCORE_STYLE below). New/blue and Qualified/green read as the
+// natural "entry" and "success" cues; Contacted gets a hue (teal) neither
+// Score nor Follow-up use anywhere, so a Warm+Contacted+Due-Today row never
+// shows three same-colored badges; Rejected keeps the deep filled
+// purple/indigo treatment as the clearly terminal state. Where a status
+// happens to share a hue family with Score (New/blue vs. Cold/blue), the
+// tint-vs-solid-fill weight keeps them visually distinct at a glance — see
+// design review Stage 1.3 patch 04 §3. No new status values are
+// introduced, only presentation color, and the text label always renders
+// alongside it so nothing depends on color alone.
 export const LEAD_STATUS_STYLE: Record<LeadStatus, { bg: string; fg: string }> = {
-  New: { bg: "#EEF2FF", fg: "#4F46E5" },
-  Contacted: { bg: "#E0E7FF", fg: "#4338CA" },
-  Qualified: { bg: "#C7D2FE", fg: "#312E81" },
+  New: { bg: "#DBEAFE", fg: "#1E3A8A" },
+  Contacted: { bg: "#CCFBF1", fg: "#0F766E" },
+  Qualified: { bg: "#D1FAE5", fg: "#065F46" },
   Rejected: { bg: "#4338CA", fg: "#FFFFFF" },
 };
 
@@ -66,6 +68,29 @@ export function LeadStatusTag({ status }: { status: string }) {
   return (
     <span className="tag" style={{ background: style.bg, color: style.fg }}>
       {status}
+    </span>
+  );
+}
+
+// Deep/saturated solid-fill treatment for Lead Score (Hot/Warm/Cold) —
+// reuses the app's existing red/amber/blue brand tokens (--bad/--warn/
+// --info) but as a bold filled pill (white text) instead of the pale tint
+// every other badge in the app uses, so Score reads as its own
+// higher-contrast "heat scale," distinct in weight from both Status's
+// lifecycle palette and Follow-up's urgency palette even where a hue
+// (blue) is shared. See design review Stage 1.3 patch 04 §2.
+export const LEAD_SCORE_STYLE: Record<string, { bg: string; fg: string }> = {
+  Hot: { bg: "var(--bad)", fg: "#FFFFFF" },
+  Warm: { bg: "var(--warn)", fg: "#FFFFFF" },
+  Cold: { bg: "var(--info)", fg: "#FFFFFF" },
+};
+
+export function LeadScoreTag({ score, suffix }: { score: string; suffix?: string }) {
+  const style = LEAD_SCORE_STYLE[score] ?? { bg: "var(--line-2)", fg: "var(--muted)" };
+  return (
+    <span className="tag" style={{ background: style.bg, color: style.fg }}>
+      {score}
+      {suffix ? ` ${suffix}` : ""}
     </span>
   );
 }
