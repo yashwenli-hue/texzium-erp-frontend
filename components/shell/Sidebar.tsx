@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { Icon } from "../ui/Icon";
 import { NAV_SECTIONS } from "../../lib/pageMeta";
 import { useLiveCounts } from "../../lib/hooks/useLiveCounts";
+import { UserMenu } from "./UserMenu";
 
 interface TooltipState {
   label: string;
@@ -86,6 +87,7 @@ export function Sidebar({
         <Icon name="collapse" size={15} className={collapsed ? "flip" : undefined} />
         <span className="mod-label">Collapse</span>
       </button>
+      <UserMenu collapsed={collapsed} onShowTooltip={(e) => showTooltip("Account", e)} onHideTooltip={hideTooltip} />
       {collapsed && tooltip && (
         <div className="rail-tooltip" style={{ top: tooltip.top }}>
           {tooltip.label}

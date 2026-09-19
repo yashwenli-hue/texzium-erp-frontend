@@ -126,6 +126,7 @@ export default function LeadsPage() {
       header: "Product / Interest",
       render: (l) => l.uiContext?.productInterest ?? <span style={{ color: "var(--faint)" }}>—</span>,
     },
+    { key: "score", header: "Score", render: (l) => <StatusTag status={l.score} /> },
     { key: "status", header: "Status", render: (l) => <StatusTag status={l.status} /> },
     {
       key: "followup",

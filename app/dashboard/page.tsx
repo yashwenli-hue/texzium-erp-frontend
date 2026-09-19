@@ -5,10 +5,7 @@ import { useRouter } from "next/navigation";
 import { PageHeader, DesignNote } from "../../components/ui/PageHeader";
 import { StatCard, StatRow, Panel, Cols } from "../../components/ui/Card";
 import { Button } from "../../components/ui/Button";
-import { Who } from "../../components/ui/Who";
-import { StatusTag } from "../../components/ui/Tag";
 import { Icon } from "../../components/ui/Icon";
-import { DataTable, Column } from "../../components/ui/DataTable";
 import { KanbanBoard, KanbanColumnConfig } from "../../components/kanban/KanbanBoard";
 import { LeadFunnel } from "../../components/ui/Funnel";
 import { SourceBreakdown } from "../../components/ui/SourceBreakdown";
@@ -17,8 +14,8 @@ import { useLeads } from "../../lib/hooks/useLeads";
 import { useOpportunities } from "../../lib/hooks/useOpportunities";
 import { useTasks } from "../../lib/hooks/useTasks";
 import { useQuotations } from "../../lib/hooks/useQuotations";
-import { Lead, Opportunity, OpportunityStage, OPPORTUNITY_STEPS } from "../../lib/types/domain";
-import { formatInr } from "../../lib/format";
+import { Opportunity, OpportunityStage, OPPORTUNITY_STEPS } from "../../lib/types/domain";
+import { formatInr, formatRelative } from "../../lib/format";
 import { classifyFollowup } from "../../lib/followup";
 
 const SNAPSHOT_COLUMNS: KanbanColumnConfig<OpportunityStage>[] = OPPORTUNITY_STEPS.map((stage) => ({
@@ -26,12 +23,13 @@ const SNAPSHOT_COLUMNS: KanbanColumnConfig<OpportunityStage>[] = OPPORTUNITY_STE
   label: stage,
 }));
 
-interface AttentionItem {
+interface FocusItem {
   id: string;
   icon: string;
   tone: "bad" | "warn" | "info" | "n";
   title: string;
-  subtitle: string;
+  company: string;
+  time: string;
   href: string;
 }
 
@@ -61,9 +59,8 @@ export default function DashboardPage() {
   // derived from the generic mock Task list (see lib/followup.ts), not a
   // real backend LeadFollowup. Unassigned leads and Draft quotations are
   // computed straight from already-loaded mock data — nothing invented.
-  const attentionItems = useMemo<AttentionItem[]>(() => {
-    const items: AttentionItem[] = [];
-    const leadById = new Map(leads.map((l) => [l.id, l]));
+  const focusItems = useMemo<FocusItem[]>(() => {
+    const items: FocusItem[] = [];
 
     for (const t of tasks) {
       if (t.done || !t.dueAt) continue;
@@ -75,7 +72,8 @@ export default function DashboardPage() {
         icon: "clock",
         tone: urgency === "Overdue" ? "bad" : "warn",
         title: t.title,
-        subtitle: `${urgency === "Overdue" ? "Overdue" : "Due today"} · ${t.linkedName}`,
+        company: t.linkedName,
+        time: formatRelative(t.dueAt),
         href,
       });
     }
@@ -86,8 +84,9 @@ export default function DashboardPage() {
           id: `unassigned-${l.id}`,
           icon: "user",
           tone: "info",
-          title: `${l.customerName} needs an owner`,
-          subtitle: `New lead · ${l.sourceName} · unassigned`,
+          title: "Needs an owner assigned",
+          company: l.companyName ?? l.customerName,
+          time: formatRelative(l.lastActivityAt),
           href: `/leads/${l.id}`,
         });
       }
@@ -100,25 +99,15 @@ export default function DashboardPage() {
         icon: "file",
         tone: "n",
         title: `${q.quoteNo} still in Draft`,
-        subtitle: `${q.customerName} · ${formatInr(q.amount)}`,
+        company: q.customerName,
+        time: formatRelative(q.createdAt),
         href: `/quotations/${q.id}`,
       });
     }
 
-    const priority: Record<AttentionItem["tone"], number> = { bad: 0, warn: 1, info: 2, n: 3 };
+    const priority: Record<FocusItem["tone"], number> = { bad: 0, warn: 1, info: 2, n: 3 };
     return items.sort((a, b) => priority[a.tone] - priority[b.tone]).slice(0, 7);
   }, [tasks, leads, quotations]);
-
-  const recentColumns: Column<Lead>[] = [
-    { key: "customerName", header: "Lead", render: (l) => <Who name={l.customerName} sub={l.companyName ?? l.sourceName} /> },
-    { key: "sourceName", header: "Source", render: (l) => l.sourceName },
-    { key: "status", header: "Status", render: (l) => <StatusTag status={l.status} /> },
-    { key: "assignedToName", header: "Assigned To", render: (l) => l.assignedToName ?? "Unassigned" },
-  ];
-
-  const recentLeads = [...leads]
-    .sort((a, b) => (a.lastActivityAt < b.lastActivityAt ? 1 : -1))
-    .slice(0, 5);
 
   function renderOppCard(o: Opportunity) {
     return (
@@ -156,14 +145,14 @@ export default function DashboardPage() {
       </StatRow>
 
       <Cols>
-        <Panel title="What Needs Your Attention">
-          {attentionItems.length === 0 ? (
+        <Panel title="Today's Focus" more={{ label: "View all", onClick: () => router.push("/tasks") }}>
+          {focusItems.length === 0 ? (
             <p style={{ color: "var(--muted)", fontSize: 13, padding: "6px 0" }}>
               Nothing urgent right now — every follow-up is on schedule.
             </p>
           ) : (
             <div className="list-tight">
-              {attentionItems.map((item) => (
+              {focusItems.map((item) => (
                 <div
                   className="li"
                   key={item.id}
@@ -175,8 +164,9 @@ export default function DashboardPage() {
                   </div>
                   <div className="tx">
                     <b>{item.title}</b>
-                    <small>{item.subtitle}</small>
+                    <small>{item.company}</small>
                   </div>
+                  <div className="rt">{item.time}</div>
                   <Icon name="arrow" size={14} className="li-arrow" />
                 </div>
               ))}
@@ -205,22 +195,11 @@ export default function DashboardPage() {
         </Panel>
       </Cols>
 
-      <div style={{ marginTop: 16 }}>
-        <Panel title="Recent Leads" more={{ label: "View all", onClick: () => router.push("/leads") }} flush>
-          <DataTable
-            columns={recentColumns}
-            rows={recentLeads}
-            onRowClick={(l) => router.push(`/leads/${l.id}`)}
-            emptyTitle="No leads yet"
-            emptyBody="Create your first lead to see it here."
-          />
-        </Panel>
-      </div>
-
       <DesignNote>
-        <b>Design note.</b> &quot;What Needs Your Attention&quot; is a presentation-only prioritization
-        built from mock Task/Lead/Quotation data — overdue/due-today follow-ups are not a real backend
-        LeadFollowup yet (see lib/followup.ts). Everything else recomputes live from current data.
+        <b>Design note.</b> &quot;Today&apos;s Focus&quot; is a presentation-only prioritization built from
+        mock Task/Lead/Quotation data — overdue/due-today follow-ups are not a real backend LeadFollowup
+        yet (see lib/followup.ts). Opportunity stage now persists across a refresh via local mock
+        storage (see lib/repository/mock/entityStore.ts) — still not a real backend transition endpoint.
       </DesignNote>
 
       {showLeadForm && (

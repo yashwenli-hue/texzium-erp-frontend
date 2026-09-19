@@ -15,13 +15,45 @@ import { ID } from "../../types/common";
  * in — at that point, hooks call the repository directly and rely on
  * normal fetch/response cycles (optionally revalidated with whatever
  * data-fetching approach the team standardizes on, e.g. SWR/React Query).
+ *
+ * Optional `storageKey`: when set, the table's rows are mirrored to
+ * localStorage on every mutation and restored from there on construction
+ * (falling back to `seed` if nothing is stored yet, or on any read/parse
+ * failure — e.g. private browsing). This is a MOCK/UI-ONLY persistence
+ * mechanism for surviving a browser refresh during Phase A; it has no
+ * relationship to real backend persistence and is dropped entirely once
+ * this store is replaced by real API calls.
  */
 export class EntityStore<T extends { id: ID }> {
   private rows: T[];
   private listeners = new Set<() => void>();
+  private storageKey?: string;
 
-  constructor(seed: T[]) {
-    this.rows = [...seed];
+  constructor(seed: T[], storageKey?: string) {
+    this.storageKey = storageKey;
+    this.rows = this.loadFromStorage() ?? [...seed];
+  }
+
+  private loadFromStorage(): T[] | null {
+    if (!this.storageKey || typeof window === "undefined") return null;
+    try {
+      const raw = window.localStorage.getItem(this.storageKey);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : null;
+    } catch {
+      return null;
+    }
+  }
+
+  private persist() {
+    if (!this.storageKey || typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(this.storageKey, JSON.stringify(this.rows));
+    } catch {
+      // Storage unavailable (private mode, quota, etc.) — mutation still
+      // succeeds in-memory, it just won't survive a refresh this time.
+    }
   }
 
   subscribe = (listener: () => void): (() => void) => {
@@ -47,6 +79,7 @@ export class EntityStore<T extends { id: ID }> {
 
   add(row: T): T {
     this.rows = [row, ...this.rows];
+    this.persist();
     this.emit();
     return row;
   }
@@ -60,12 +93,16 @@ export class EntityStore<T extends { id: ID }> {
       }
       return r;
     });
-    if (updated) this.emit();
+    if (updated) {
+      this.persist();
+      this.emit();
+    }
     return updated;
   }
 
   remove(id: ID): void {
     this.rows = this.rows.filter((r) => r.id !== id);
+    this.persist();
     this.emit();
   }
 }

@@ -64,7 +64,6 @@ export const NAV_SECTIONS: NavSection[] = [
     label: "System",
     items: [
       { href: "/notifications", label: "Notifications", icon: "bell", countKey: "unreadNotificationsCount" },
-      { href: "/search", label: "Search", icon: "search" },
     ],
   },
 ];

@@ -47,7 +47,10 @@ export const db = {
   activities: new EntityStore<Activity>(SEED_ACTIVITIES),
   tasks: new EntityStore<Task>(SEED_TASKS),
   notes: new EntityStore<Note>(SEED_NOTES),
-  opportunities: new EntityStore<Opportunity>(SEED_OPPORTUNITIES),
+  // storageKey enabled here only: the design review specifically calls out
+  // Opportunity pipeline stage needing to survive a refresh. Other stores
+  // intentionally keep the original "resets on refresh" mock behavior.
+  opportunities: new EntityStore<Opportunity>(SEED_OPPORTUNITIES, "revenueos.mock.opportunities"),
   quotations: new EntityStore<Quotation>(SEED_QUOTATIONS),
   notifications: new EntityStore<AppNotification>(SEED_NOTIFICATIONS),
 };
