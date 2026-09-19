@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Icon } from "../../../components/ui/Icon";
 import { Panel } from "../../../components/ui/Card";
-import { StatusTag, Tag, STAGE_COLOR } from "../../../components/ui/Tag";
+import { StatusTag, LeadStatusTag, Tag, STAGE_COLOR } from "../../../components/ui/Tag";
 import { SourceBadge } from "../../../components/ui/SourceBadge";
 import { FollowupTag } from "../../../components/ui/FollowupTag";
 import { QuickActions } from "../../../components/ui/QuickActions";
@@ -150,7 +150,7 @@ export default function LeadDetailPage() {
                 </div>
               </div>
               <div className="tagrow">
-                <StatusTag status={lead.status} />
+                <LeadStatusTag status={lead.status} />
                 <SourceBadge source={lead.sourceName} size={18} />
                 <Tag color="n">{lead.sourceName}</Tag>
                 <Tag color="n">{lead.assignedToName ? `Assigned: ${lead.assignedToName}` : "Unassigned"}</Tag>

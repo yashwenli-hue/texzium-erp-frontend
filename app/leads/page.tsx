@@ -5,8 +5,8 @@ import { useRouter } from "next/navigation";
 import { PageHeader, DesignNote } from "../../components/ui/PageHeader";
 import { Panel } from "../../components/ui/Card";
 import { Button } from "../../components/ui/Button";
-import { StatusTag } from "../../components/ui/Tag";
-import { SourceBadge, SourceTag } from "../../components/ui/SourceBadge";
+import { StatusTag, LeadStatusTag } from "../../components/ui/Tag";
+import { SourceTag } from "../../components/ui/SourceBadge";
 import { FollowupTag } from "../../components/ui/FollowupTag";
 import { initials } from "../../components/ui/Who";
 import { DataTable, Column, toggleSortDirection } from "../../components/ui/DataTable";
@@ -16,7 +16,7 @@ import { LeadForm } from "../../components/forms/LeadForm";
 import { useLeads, useLeadSources } from "../../lib/hooks/useLeads";
 import { useTasks } from "../../lib/hooks/useTasks";
 import { Lead } from "../../lib/types/domain";
-import { formatRelative } from "../../lib/format";
+import { formatRelative, formatDate } from "../../lib/format";
 import { nextFollowupFor, FollowupInfo } from "../../lib/followup";
 import { FilterMap, SortState } from "../../lib/types/common";
 
@@ -103,10 +103,7 @@ export default function LeadsPage() {
       sortable: true,
       render: (l) => (
         <div className="who">
-          <div className="av-wrap">
-            <div className="av">{initials(l.customerName)}</div>
-            <span className="av-source-dot"><SourceBadge source={l.sourceName} size={15} /></span>
-          </div>
+          <div className="av">{initials(l.customerName)}</div>
           <div>
             <b>{l.customerName}</b>
             <small>{[l.companyName, l.uiContext?.city].filter(Boolean).join(" · ") || l.sourceName}</small>
@@ -115,13 +112,14 @@ export default function LeadsPage() {
       ),
     },
     { key: "sourceName", header: "Source", render: (l) => <SourceTag source={l.sourceName} /> },
+    { key: "createdAt", header: "Received", sortable: true, render: (l) => formatDate(l.createdAt) },
     {
       key: "productInterest",
       header: "Product / Interest",
       render: (l) => l.uiContext?.productInterest ?? <span style={{ color: "var(--faint)" }}>—</span>,
     },
     { key: "score", header: "Score", render: (l) => <StatusTag status={l.score} /> },
-    { key: "status", header: "Status", render: (l) => <StatusTag status={l.status} /> },
+    { key: "status", header: "Status", render: (l) => <LeadStatusTag status={l.status} /> },
     {
       key: "followup",
       header: "Follow-up",

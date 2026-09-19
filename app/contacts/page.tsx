@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { PageHeader, DesignNote } from "../../components/ui/PageHeader";
 import { Panel } from "../../components/ui/Card";
 import { Button } from "../../components/ui/Button";
@@ -11,6 +12,7 @@ import { Pagination, paginate } from "../../components/ui/Button";
 import { ContactForm } from "../../components/forms/ContactForm";
 import { ContactRowActions } from "../../components/ui/ContactRowActions";
 import { useContacts } from "../../lib/hooks/useContacts";
+import { useCustomers } from "../../lib/hooks/useCustomers";
 import { Contact, ContactType } from "../../lib/types/domain";
 import { formatDate } from "../../lib/format";
 
@@ -18,10 +20,21 @@ const PAGE_SIZE = 6;
 const TYPES: ContactType[] = ["Decision Maker", "Champion", "Influencer"];
 
 export default function ContactsPage() {
+  const router = useRouter();
   const { contacts: allContacts, createContact } = useContacts();
+  const { customers } = useCustomers();
   const [showForm, setShowForm] = useState(false);
   const [typeChip, setTypeChip] = useState("All");
   const [page, setPage] = useState(1);
+
+  // A contact's companyName only becomes a navigable link once that company
+  // is an existing Customer account — matched the same way Customer Detail
+  // already resolves its Key Contacts (by name, via
+  // repo.contacts.listByCompanyName in lib/hooks/useCustomers.ts). Contacts
+  // still tied to a company that's only a Lead (not yet converted) show
+  // plain text — no invented companyId relationship, no misleading link to
+  // a page that doesn't exist yet.
+  const customerByName = useMemo(() => new Map(customers.map((c) => [c.name, c])), [customers]);
 
   const typeCounts = useMemo(() => {
     const map: Record<string, number> = {};
@@ -34,7 +47,23 @@ export default function ContactsPage() {
 
   const columns: Column<Contact>[] = [
     { key: "name", header: "Contact", render: (c) => <Who name={c.name} sub={c.email} /> },
-    { key: "companyName", header: "Company", render: (c) => c.companyName },
+    {
+      key: "companyName",
+      header: "Company",
+      render: (c) => {
+        const customer = customerByName.get(c.companyName);
+        return customer ? (
+          <a
+            className="record-link"
+            onClick={(e) => { e.stopPropagation(); router.push(`/customers/${customer.id}`); }}
+          >
+            {c.companyName}
+          </a>
+        ) : (
+          c.companyName
+        );
+      },
+    },
     { key: "title", header: "Title", render: (c) => c.title },
     { key: "type", header: "Type", render: (c) => <StatusTag status={c.type} /> },
     { key: "phone", header: "Phone", render: (c) => c.phone },
@@ -76,7 +105,9 @@ export default function ContactsPage() {
       <DesignNote>
         <b>Design note.</b> Contacts is the people-first view — the same humans who show up inside
         Leads and Customers, listed once so reps don&apos;t have to remember which account a person
-        belongs to.
+        belongs to. A company name links through to its Customer account only once that company has
+        actually converted — contacts still tied to an open Lead show as plain text rather than a
+        link to a page that doesn&apos;t exist yet.
       </DesignNote>
 
       {showForm && <ContactForm onClose={() => setShowForm(false)} onSubmit={createContact} />}

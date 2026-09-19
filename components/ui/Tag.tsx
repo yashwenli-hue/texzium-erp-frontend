@@ -6,7 +6,10 @@ export function Tag({ children, color }: { children: React.ReactNode; color: Tag
 
 /** Maps domain status/stage strings to a consistent tag color across the app. */
 export const STAGE_COLOR: Record<string, TagColor> = {
-  New: "n",
+  // "New" is shared with CustomerStatus (see LEAD_STATUS_COLOR below for why
+  // Lead itself no longer reads this entry) — design review Stage 1.3.1 §3
+  // asks Customer's New badge to be blue.
+  New: "i",
   Contacted: "n",
   Qualified: "n",
   Proposal: "w",
@@ -26,7 +29,9 @@ export const STAGE_COLOR: Record<string, TagColor> = {
   Influencer: "n",
   Hot: "b",
   Warm: "w",
-  Cold: "n",
+  // Design review Stage 1.3.1 §1.3: Cold must read as blue, distinguishable
+  // from Hot (red) and Warm (amber).
+  Cold: "i",
   High: "b",
   Medium: "w",
   Low: "n",
@@ -34,6 +39,24 @@ export const STAGE_COLOR: Record<string, TagColor> = {
 
 export function StatusTag({ status }: { status: string }) {
   return <Tag color={STAGE_COLOR[status] ?? "n"}>{status}</Tag>;
+}
+
+// Dedicated color map for the verified Lead lifecycle (LEAD_STATUSES in
+// lib/types/domain.ts). Kept separate from the shared STAGE_COLOR above
+// because "New" and "Qualified" are reused there by CustomerStatus and
+// OpportunityStage with different intended colors — this keeps Lead's own
+// four statuses mutually distinguishable (design review Stage 1.3.1 §1.3)
+// without leaking that requirement into Customers/Opportunities. No new
+// status values are introduced, only presentation color.
+export const LEAD_STATUS_COLOR: Record<string, TagColor> = {
+  New: "n",
+  Contacted: "w",
+  Qualified: "g",
+  Rejected: "b",
+};
+
+export function LeadStatusTag({ status }: { status: string }) {
+  return <Tag color={LEAD_STATUS_COLOR[status] ?? "n"}>{status}</Tag>;
 }
 
 export const TINT: Record<TagColor, { bg: string; fg: string }> = {

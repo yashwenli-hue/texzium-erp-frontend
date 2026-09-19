@@ -1,7 +1,7 @@
 "use client";
 
 import { ReactNode, useState } from "react";
-import { STAGE_COLOR, TINT } from "../ui/Tag";
+import { STAGE_COLOR, TINT, TagColor } from "../ui/Tag";
 
 export interface KanbanColumnConfig<S extends string> {
   key: S;
@@ -23,6 +23,7 @@ export function KanbanBoard<T extends { id: string }, S extends string>({
   onMove,
   onCardClick,
   gridColumns,
+  colorMap,
 }: {
   columns: KanbanColumnConfig<S>[];
   items: T[];
@@ -31,6 +32,10 @@ export function KanbanBoard<T extends { id: string }, S extends string>({
   onMove?: (id: string, stage: S) => void;
   onCardClick?: (id: string) => void;
   gridColumns?: number;
+  /** Overrides the shared STAGE_COLOR lookup for this board's columns — e.g. the Lead
+   * Pipeline board uses LEAD_STATUS_COLOR since it shares column labels ("New") with
+   * other domains that need a different color. */
+  colorMap?: Record<string, TagColor>;
 }) {
   const [dragOverStage, setDragOverStage] = useState<S | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
@@ -42,7 +47,7 @@ export function KanbanBoard<T extends { id: string }, S extends string>({
     >
       {columns.map((col) => {
         const colItems = items.filter((item) => getStage(item) === col.key);
-        const color = STAGE_COLOR[col.key] ?? "n";
+        const color = (colorMap ?? STAGE_COLOR)[col.key] ?? "n";
         const tint = TINT[color];
         const isDropTarget = dragOverStage === col.key;
 

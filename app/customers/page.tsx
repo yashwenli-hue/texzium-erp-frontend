@@ -76,9 +76,10 @@ export default function CustomersPage() {
 
       <DesignNote>
         <b>Design note.</b> Customers is where a lead lands after Won. Status uses the same muted tag
-        system as everywhere else in RevenueOS — green/amber/red always means the same thing. These
-        four statuses are frontend-only presentation labels — the verified Customer master contract has
-        no status field yet (see CustomerStatus in lib/types/domain.ts).
+        system as everywhere else in RevenueOS — each color always means the same thing (green =
+        healthy, amber = at risk, red = churned, blue = new). These four statuses are frontend-only
+        presentation labels — the verified Customer master contract has no status field yet (see
+        CustomerStatus in lib/types/domain.ts).
       </DesignNote>
 
       {showForm && <CustomerForm onClose={() => setShowForm(false)} onSubmit={createCustomer} />}
