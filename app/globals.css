@@ -43,9 +43,14 @@ svg.i18{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.6;st
 .mod .badge-count{margin-left:auto;font-size:10.5px;color:var(--muted);font-weight:700;background:var(--line-2);padding:1px 7px;border-radius:20px}
 .mod.active .badge-count{background:var(--m);color:#fff}
 
-.rail-collapse-btn{display:flex;align-items:center;gap:10px;padding:9px 10px;margin:8px 10px 0;border-radius:10px;color:var(--muted);font-size:13.5px;font-weight:600;border-top:1px solid var(--line)}
-.rail-collapse-btn:hover{background:var(--canvas);color:var(--text)}
-.rail-collapse-btn .flip{transform:rotate(180deg)}
+/* Small icon-only collapse/expand control, top-right edge of the rail —
+   separated from navigation (design review Stage 1.3 §1), not a full-width
+   row competing with nav items for attention. Fixed position within the
+   rail so it lands in the same spot whether expanded or collapsed. */
+.rail-toggle-btn{position:absolute;top:16px;right:10px;width:26px;height:26px;border-radius:8px;display:grid;place-items:center;color:var(--muted);background:var(--surface);border:1px solid var(--line);z-index:6}
+.rail-toggle-btn:hover{background:var(--canvas);color:var(--text)}
+.rail-toggle-btn .flip{transform:rotate(180deg)}
+.rail.collapsed .rail-toggle-btn{right:auto;left:50%;transform:translateX(-50%);top:56px}
 .rail-dot{display:none;position:absolute;top:6px;right:14px;width:7px;height:7px;border-radius:50%;background:var(--m);border:2px solid var(--surface)}
 
 /* Collapsed rail: icon-only, centered. Tooltip is a fixed-position element
@@ -60,24 +65,13 @@ svg.i18{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.6;st
 .rail.collapsed .mod{justify-content:center;padding:9px 0}
 .rail.collapsed .mod .dot{margin:0}
 .rail.collapsed .rail-dot{display:block}
-.rail.collapsed .rail-collapse-btn{justify-content:center}
 .rail-tooltip{
-  position:fixed;left:76px;transform:translateY(-50%);
+  position:fixed;transform:translateY(-50%);
   background:var(--ink);color:#fff;padding:6px 10px;border-radius:8px;font-size:12px;font-weight:600;white-space:nowrap;
   pointer-events:none;z-index:200;box-shadow:0 8px 20px -8px rgba(0,0,0,.5);
 }
 
-/* User/profile menu at the bottom of the rail */
-.rail-user{display:flex;align-items:center;gap:10px;padding:10px;margin:6px 10px 10px;border-radius:10px;border:1px solid transparent;text-align:left}
-.rail-user:hover{background:var(--canvas)}
-.rail-user.open{background:var(--canvas);border-color:var(--line)}
-.rail-user .av{width:32px;height:32px;border-radius:9px;background:var(--ink);color:#fff;display:grid;place-items:center;font-family:var(--display);font-weight:700;font-size:12px;flex:none}
-.rail-user .ru-text{flex:1;min-width:0}
-.rail-user .ru-text b{display:block;font-size:13px;color:var(--text);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.rail-user .ru-text small{display:block;color:var(--muted);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.rail-user .ru-chev{color:var(--faint);flex:none}
-.rail.collapsed .rail-user{justify-content:center;padding:10px 0}
-.rail.collapsed .rail-user .ru-text,.rail.collapsed .rail-user .ru-chev{display:none}
+/* Topbar account/profile menu (popover anchored to the topbar avatar) */
 .user-menu{
   position:fixed;width:216px;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-sm);
   box-shadow:0 20px 48px -16px rgba(10,10,12,.28);z-index:210;padding:6px;
@@ -101,6 +95,8 @@ svg.i18{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.6;st
 .icon-btn{width:37px;height:37px;border-radius:10px;display:grid;place-items:center;color:var(--muted);position:relative;transition:background .12s}
 .icon-btn:hover{background:var(--canvas);color:var(--text)}
 .icon-btn .badge{position:absolute;top:7px;right:8px;width:6px;height:6px;border-radius:50%;background:var(--bad);border:2px solid var(--surface)}
+.icon-btn.sm{width:28px;height:28px;border-radius:8px;border:1px solid var(--line);background:var(--surface)}
+.contact-row-actions{display:flex;align-items:center;gap:6px}
 .avatar{width:34px;height:34px;border-radius:10px;background:var(--ink);color:#fff;display:grid;place-items:center;font-family:var(--display);font-weight:700;font-size:12px;margin-left:4px}
 .mobile-toggle{display:none}
 
@@ -225,10 +221,18 @@ tbody tr.clickable:hover{background:#FBFBFC}
 .li:last-child{border-bottom:none}
 .li .ic{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;flex:none;background:var(--m-soft);color:var(--m)}
 .li .tx{flex:1;min-width:0}.li .tx b{font-size:13px;font-weight:600}.li .tx small{display:block;color:var(--muted);font-size:12px;margin-top:1px}
-.li .rt{text-align:right;font-size:12px;color:var(--muted)}
+.li .rt{display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex:none;font-size:12px;color:var(--muted)}
 .li .rt b{font-family:var(--display);color:var(--text);font-size:13px}
+.li .rt small{color:var(--faint);font-size:11px}
 .li-arrow{color:var(--faint);flex:none}
 .li:hover .li-arrow{color:var(--muted)}
+
+/* Today's Focus row: urgency badge stacked above the relative time */
+.focus-urgency{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;padding:2px 8px;border-radius:20px;white-space:nowrap}
+.focus-urgency.bad{background:var(--bad-bg);color:var(--bad)}
+.focus-urgency.warn{background:var(--warn-bg);color:var(--warn)}
+.focus-urgency.info{background:var(--info-bg);color:var(--info)}
+.focus-urgency.n{background:var(--line-2);color:var(--muted)}
 
 .helper{margin-top:26px;padding:17px 21px;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);color:var(--muted);font-size:12.5px;display:flex;gap:12px;align-items:flex-start;line-height:1.6}
 .helper svg{flex:none;color:var(--m);margin-top:1px}
@@ -347,7 +351,7 @@ tbody tr.clickable:hover{background:#FBFBFC}
   .rail.collapsed .badge-count{display:revert}
   .rail.collapsed .mod{justify-content:flex-start;padding:9px 10px}
   .rail.collapsed .rail-dot{display:none}
-  .rail-collapse-btn{display:none}
+  .rail-toggle-btn{display:none}
   .mobile-toggle{display:grid}
   .search{display:none}.stat-row{grid-template-columns:1fr 1fr}.tiles{grid-template-columns:1fr}.notes-grid{grid-template-columns:1fr}
   .kanban{grid-template-columns:repeat(2,1fr)}
@@ -388,19 +392,26 @@ tbody tr.clickable:hover{background:#FBFBFC}
 .field-divider span{font-size:11.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
 .field-divider small{color:var(--faint);font-size:11.5px}
 
-/* Filter drawer / popover */
-.filter-panel{position:absolute;top:calc(100% + 8px);right:0;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:0 20px 48px -16px rgba(10,10,12,.28);width:300px;z-index:50;padding:18px}
-.filter-panel h4{font-size:13px;font-weight:700;margin-bottom:12px;font-family:var(--display)}
-.filter-panel .group{margin-bottom:16px}
-.filter-panel .group:last-child{margin-bottom:0}
-.filter-panel .group-label{font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--faint);font-weight:700;margin-bottom:8px}
-.filter-options{display:flex;flex-wrap:wrap;gap:6px}
-.filter-opt{display:inline-flex;align-items:center;gap:4px;padding:6px 11px;border-radius:20px;font-size:12px;font-weight:600;border:1px solid var(--line);color:var(--muted);background:var(--canvas);cursor:pointer}
-.filter-opt.active{background:var(--m);border-color:var(--m);color:#fff}
-.filter-backdrop{position:fixed;inset:0;z-index:40}
+/* Compact per-group filter dropdowns — a row of small independent
+   popovers instead of one long combined panel (design review Stage 1.3 §3). */
+.filter-bar{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 2px}
+.fd{position:relative;display:inline-block}
+.fd-trigger{display:inline-flex;align-items:center;gap:6px;padding:8px 12px;border-radius:10px;font-size:12.5px;font-weight:600;border:1px solid var(--line);color:var(--muted);background:var(--surface)}
+.fd-trigger:hover{border-color:var(--faint);color:var(--text)}
+.fd-trigger.active{border-color:var(--m);color:var(--m);background:var(--m-soft)}
+.fd-count{display:inline-flex;align-items:center;justify-content:center;min-width:17px;height:17px;padding:0 4px;border-radius:20px;background:var(--m);color:#fff;font-size:10.5px;font-weight:700}
+.fd-panel{position:absolute;top:calc(100% + 6px);left:0;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-sm);box-shadow:0 20px 48px -16px rgba(10,10,12,.28);width:220px;z-index:50;padding:8px}
+.fd-search{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:12.5px;font-family:inherit;outline:none;margin-bottom:6px}
+.fd-search:focus{border-color:var(--m)}
+.fd-options{max-height:220px;overflow-y:auto;display:flex;flex-direction:column}
+.fd-opt{display:flex;align-items:center;gap:9px;padding:7px 8px;border-radius:7px;font-size:13px;color:var(--text);cursor:pointer}
+.fd-opt:hover{background:var(--canvas)}
+.fd-opt input{width:auto;margin:0}
+.fd-empty{padding:10px 8px;font-size:12.5px;color:var(--faint)}
+.fd-clear{width:100%;text-align:left;margin-top:4px;padding:7px 8px;border-top:1px solid var(--line-2);font-size:12px;font-weight:600;color:var(--muted)}
+.fd-clear:hover{color:var(--bad)}
 @media(max-width:640px){
-  .filter-panel{position:fixed;left:0;right:0;bottom:0;top:auto;width:auto;border-radius:20px 20px 0 0;max-height:80vh;overflow-y:auto;animation:sheetIn .18s ease-out}
-  @keyframes sheetIn{from{transform:translateY(100%)}to{transform:translateY(0)}}
+  .fd-panel{position:fixed;left:12px;right:12px;top:auto;bottom:12px;width:auto;max-height:70vh}
 }
 
 /* Active filter chips (below the header, mirrors the filter popover state) */

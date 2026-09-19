@@ -6,11 +6,11 @@ import { usePathname } from "next/navigation";
 import { Icon } from "../ui/Icon";
 import { NAV_SECTIONS } from "../../lib/pageMeta";
 import { useLiveCounts } from "../../lib/hooks/useLiveCounts";
-import { UserMenu } from "./UserMenu";
 
 interface TooltipState {
   label: string;
   top: number;
+  left: number;
 }
 
 export function Sidebar({
@@ -31,10 +31,17 @@ export function Sidebar({
   // Tooltip is position:fixed (not CSS-hover ::after) because the rail's
   // scroll container clips absolutely-positioned overflow — fixed
   // positioning is the reliable way to escape that in a scrollable rail.
+  // Nav items only need it once collapsed (their label is hidden then);
+  // the icon-only collapse toggle always benefits from one.
   function showTooltip(label: string, e: React.MouseEvent<HTMLElement>) {
     if (!collapsed || mobileOpen) return;
     const rect = e.currentTarget.getBoundingClientRect();
-    setTooltip({ label, top: rect.top + rect.height / 2 });
+    setTooltip({ label, top: rect.top + rect.height / 2, left: rect.right + 10 });
+  }
+  function showToggleTooltip(e: React.MouseEvent<HTMLElement>) {
+    if (mobileOpen) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    setTooltip({ label: collapsed ? "Expand sidebar" : "Collapse sidebar", top: rect.top + rect.height / 2, left: rect.right + 10 });
   }
   function hideTooltip() {
     setTooltip(null);
@@ -42,6 +49,15 @@ export function Sidebar({
 
   return (
     <aside className={`rail ${mobileOpen ? "show" : ""} ${collapsed ? "collapsed" : ""}`}>
+      <button
+        className="rail-toggle-btn"
+        onClick={onToggleCollapsed}
+        aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+        onMouseEnter={showToggleTooltip}
+        onMouseLeave={hideTooltip}
+      >
+        <Icon name="collapse" size={14} className={collapsed ? "flip" : undefined} />
+      </button>
       <div className="brand">
         <div className="logo">R</div>
         <div className="brand-text">
@@ -77,19 +93,8 @@ export function Sidebar({
           </div>
         ))}
       </div>
-      <button
-        className="rail-collapse-btn"
-        onClick={onToggleCollapsed}
-        aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-        onMouseEnter={(e) => showTooltip("Expand", e)}
-        onMouseLeave={hideTooltip}
-      >
-        <Icon name="collapse" size={15} className={collapsed ? "flip" : undefined} />
-        <span className="mod-label">Collapse</span>
-      </button>
-      <UserMenu collapsed={collapsed} onShowTooltip={(e) => showTooltip("Account", e)} onHideTooltip={hideTooltip} />
-      {collapsed && tooltip && (
-        <div className="rail-tooltip" style={{ top: tooltip.top }}>
+      {tooltip && (
+        <div className="rail-tooltip" style={{ top: tooltip.top, left: tooltip.left }}>
           {tooltip.label}
         </div>
       )}

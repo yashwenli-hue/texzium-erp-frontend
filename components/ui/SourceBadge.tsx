@@ -14,13 +14,16 @@
  * colored monogram badges. No new dependency — everything here is inline
  * SVG.
  */
+// Colors per design review Stage 1.3 §1 (Website=grey, WhatsApp=WhatsApp
+// green, IndiaMART=red, TradeIndia=orange, Google=yellow). Meta Ads and
+// ExporterIndia weren't specified, so they keep their existing colors.
 const SOURCE_STYLES: Record<string, { bg: string; fg: string; mark: string }> = {
-  Website: { bg: "#E7F6EF", fg: "#0D7A4E", mark: "W" },
+  Website: { bg: "#F1F2F4", fg: "#6B7280", mark: "W" },
   "Meta Ads": { bg: "#E7EEFE", fg: "#3457D5", mark: "M" },
-  "Google Ads": { bg: "#FEF3E2", fg: "#B7791F", mark: "G" },
-  WhatsApp: { bg: "#E7F8ED", fg: "#1C9A4B", mark: "wa" },
-  IndiaMART: { bg: "#FDEEEA", fg: "#C6491F", mark: "iM" },
-  TradeIndia: { bg: "#FFF1E0", fg: "#B45B00", mark: "T" },
+  "Google Ads": { bg: "#FDF6DC", fg: "#B8860B", mark: "G" },
+  WhatsApp: { bg: "#E7F8ED", fg: "#1F9D55", mark: "wa" },
+  IndiaMART: { bg: "#FCE9E9", fg: "#C4272E", mark: "iM" },
+  TradeIndia: { bg: "#FFF1E0", fg: "#D2660A", mark: "T" },
   ExporterIndia: { bg: "#EFEAFE", fg: "#5B3FD1", mark: "E" },
 };
 

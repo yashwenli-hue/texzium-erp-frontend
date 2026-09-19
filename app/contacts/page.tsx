@@ -9,6 +9,7 @@ import { StatusTag, ChipGroup, Chip } from "../../components/ui/Tag";
 import { DataTable, Column } from "../../components/ui/DataTable";
 import { Pagination, paginate } from "../../components/ui/Button";
 import { ContactForm } from "../../components/forms/ContactForm";
+import { ContactRowActions } from "../../components/ui/ContactRowActions";
 import { useContacts } from "../../lib/hooks/useContacts";
 import { Contact, ContactType } from "../../lib/types/domain";
 import { formatDate } from "../../lib/format";
@@ -38,6 +39,11 @@ export default function ContactsPage() {
     { key: "type", header: "Type", render: (c) => <StatusTag status={c.type} /> },
     { key: "phone", header: "Phone", render: (c) => c.phone },
     { key: "lastContactedAt", header: "Last Contacted", render: (c) => (c.lastContactedAt ? formatDate(c.lastContactedAt) : "—") },
+    {
+      key: "actions",
+      header: "Actions",
+      render: (c) => <ContactRowActions phone={c.phone} email={c.email} name={c.name} />,
+    },
   ];
 
   return (

@@ -5,29 +5,20 @@ import { Icon } from "../ui/Icon";
 import { useToast } from "../ui/Toast";
 
 interface MenuPos {
-  left: number;
-  bottom: number;
+  right: number;
+  top: number;
 }
 
 /**
- * Account/profile menu anchored to the bottom of the sidebar. No real auth
- * exists in this frontend, so every action is an explicit mock placeholder
- * (a toast) rather than a fake navigation or an invented API call — same
- * pattern already used for the unconnected "Meet" quick action.
- *
- * The popover uses position:fixed with a rect computed on open (like the
- * collapsed-rail tooltip) because it lives inside the rail's own scroll
- * container, which clips absolutely-positioned overflow.
+ * Topbar account/profile menu — the one global account affordance in the
+ * app (design review Stage 1.3 §1 removed the duplicate sidebar block).
+ * No real auth exists in this frontend, so every action is an explicit
+ * mock placeholder (a toast) rather than a fake navigation or an invented
+ * API call — same pattern already used for the unconnected "Meet" quick
+ * action. The popover uses position:fixed with a rect computed on open so
+ * it never gets clipped by an ancestor's overflow.
  */
-export function UserMenu({
-  collapsed,
-  onShowTooltip,
-  onHideTooltip,
-}: {
-  collapsed: boolean;
-  onShowTooltip?: (e: React.MouseEvent<HTMLElement>) => void;
-  onHideTooltip?: () => void;
-}) {
+export function UserMenu() {
   const toast = useToast();
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<MenuPos | null>(null);
@@ -55,10 +46,7 @@ export function UserMenu({
   function toggle() {
     if (!open && btnRef.current) {
       const rect = btnRef.current.getBoundingClientRect();
-      setPos({
-        left: collapsed ? rect.right + 10 : rect.left,
-        bottom: window.innerHeight - rect.bottom,
-      });
+      setPos({ right: window.innerWidth - rect.right, top: rect.bottom + 8 });
     }
     setOpen((o) => !o);
   }
@@ -72,23 +60,16 @@ export function UserMenu({
     <>
       <button
         ref={btnRef}
-        className={`rail-user ${open ? "open" : ""}`}
+        className="avatar"
         onClick={toggle}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label="Account menu"
-        onMouseEnter={onShowTooltip}
-        onMouseLeave={onHideTooltip}
       >
-        <span className="av">RK</span>
-        <span className="ru-text">
-          <b>Account</b>
-          <small>RevenueOS User</small>
-        </span>
-        <Icon name="chevronRight" size={14} className="ru-chev" />
+        RK
       </button>
       {open && pos && (
-        <div className="user-menu" ref={menuRef} role="menu" style={{ left: pos.left, bottom: pos.bottom }}>
+        <div className="user-menu" ref={menuRef} role="menu" style={{ right: pos.right, top: pos.top }}>
           <button className="user-menu-item" role="menuitem" onClick={() => action("View Profile", "user")}>
             <Icon name="user" size={15} /> View Profile
           </button>

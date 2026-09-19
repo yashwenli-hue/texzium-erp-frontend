@@ -6,9 +6,10 @@ import { Panel } from "../../../components/ui/Card";
 import { StatusTag, Tag } from "../../../components/ui/Tag";
 import { DataTable, Column } from "../../../components/ui/DataTable";
 import { DesignNote } from "../../../components/ui/PageHeader";
+import { ContactRowActions } from "../../../components/ui/ContactRowActions";
 import { useCustomerDetail } from "../../../lib/hooks/useCustomers";
 import { initials } from "../../../components/ui/Who";
-import { formatInr, formatDate } from "../../../lib/format";
+import { formatInr, formatDate, formatDateTime } from "../../../lib/format";
 import { Quotation, Contact } from "../../../lib/types/domain";
 
 function goBackOrTo(router: ReturnType<typeof useRouter>, fallback: string) {
@@ -61,7 +62,26 @@ export default function CustomerDetailPage() {
     { key: "title", header: "Title", render: (c) => c.title },
     { key: "type", header: "Type", render: (c) => <StatusTag status={c.type} /> },
     { key: "lastContactedAt", header: "Last Contacted", render: (c) => (c.lastContactedAt ? formatDate(c.lastContactedAt) : "—") },
+    { key: "actions", header: "Actions", render: (c) => <ContactRowActions phone={c.phone} email={c.email} name={c.name} /> },
   ];
+
+  // Real account timeline, not fabricated — derived from this customer's
+  // own quotations plus the verified customerSince date. No new field
+  // invented; account status has no verified backend field at all
+  // (see CustomerStatus in lib/types/domain.ts) so it isn't shown as an event.
+  const timelineEvents = [
+    ...quotations
+      .slice()
+      .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
+      .map((q) => ({
+        id: q.id,
+        icon: "file",
+        title: `Quotation ${q.quoteNo} — ${q.status}`,
+        detail: `${formatInr(q.amount)} · V${q.version}`,
+        at: q.createdAt,
+      })),
+    { id: "created", icon: "user", title: "Account created", detail: `Converted from a won lead by ${customer.ownerName}`, at: customer.customerSince },
+  ].sort((a, b) => (a.at < b.at ? 1 : -1));
 
   return (
     <div className="page">
@@ -95,25 +115,22 @@ export default function CustomerDetailPage() {
           <Panel title="Quotation History" flush>
             <DataTable columns={quoteColumns} rows={quotations} emptyTitle="No quotations yet" />
           </Panel>
-          <Panel title="Account Contacts" flush>
+          <Panel title="Key Contacts" flush>
             <DataTable columns={contactColumns} rows={contacts} emptyTitle="No contacts logged" />
           </Panel>
         </div>
         <div>
           <Panel title="Account Timeline">
             <div className="tl">
-              <div className="tl-item">
-                <div className="dot"><Icon name="cash" size={14} /></div>
-                <div className="body"><div className="r1"><b>Payment received</b></div><p>Latest invoice settled on time</p></div>
-              </div>
-              <div className="tl-item">
-                <div className="dot"><Icon name="file" size={14} /></div>
-                <div className="body"><div className="r1"><b>Quotation accepted</b></div><p>Most recent quote converted to a sales order</p></div>
-              </div>
-              <div className="tl-item">
-                <div className="dot"><Icon name="user" size={14} /></div>
-                <div className="body"><div className="r1"><b>Account created</b></div><p>Converted from a won lead by {customer.ownerName}</p></div>
-              </div>
+              {timelineEvents.map((ev) => (
+                <div className="tl-item" key={ev.id}>
+                  <div className="dot"><Icon name={ev.icon} size={14} /></div>
+                  <div className="body">
+                    <div className="r1"><b>{ev.title}</b><span className="when">{formatDateTime(ev.at)}</span></div>
+                    <p>{ev.detail}</p>
+                  </div>
+                </div>
+              ))}
             </div>
           </Panel>
         </div>
@@ -121,8 +138,10 @@ export default function CustomerDetailPage() {
 
       <DesignNote>
         <b>Design note.</b> Customer Details mirrors Lead Details on purpose — same profile header,
-        same info-grid, same timeline pattern — so the transition from &quot;lead&quot; to
-        &quot;customer&quot; doesn&apos;t require learning a new screen.
+        same info-grid, same timeline pattern. Account Timeline is built from this account&apos;s real
+        quotations, not placeholder text. Status (Active/At Risk/New/Churned) is frontend-only — the
+        verified Customer master contract has no status field yet (see CustomerStatus in
+        lib/types/domain.ts).
       </DesignNote>
     </div>
   );

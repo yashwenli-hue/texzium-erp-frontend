@@ -91,6 +91,14 @@ export interface LeadTimelineEntry {
   occurredAt: string; // ISO 8601
 }
 
+// UI ASSUMPTION — carried over from the prototype. The VERIFIED
+// CreateCustomerDto (customerCode, customerName, panNumber?, email?,
+// phone?, customerType?) has no status field at all, so this is not a
+// case of "unconfirmed enum values" like Lead/Opportunity/Quotation —
+// there is currently no backend account-health concept to mirror. Kept as
+// a frontend-only presentation label until a real field is confirmed; do
+// not treat these four values as backend-verified. See
+// docs/backend-ui-contract.md §6.
 export type CustomerStatus = "Active" | "At Risk" | "New" | "Churned";
 
 export interface Customer {

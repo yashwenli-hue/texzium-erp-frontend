@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "./Icon";
 import { FilterMap } from "../../lib/types/common";
 
@@ -10,14 +10,101 @@ export interface FilterGroupConfig {
   options: string[];
 }
 
-function valuesOf(value: FilterMap, key: string): string[] {
+export function valuesOf(value: FilterMap, key: string): string[] {
   const v = value[key];
   if (!v) return [];
   return Array.isArray(v) ? v : [v];
 }
 
-/** Multi-select filter popover: each group's active options are toggled independently. */
-export function FilterButton({
+const SEARCH_THRESHOLD = 6;
+
+/**
+ * One compact multi-select dropdown for a single filter group. A search
+ * box only appears once a group has enough options to warrant one — the
+ * "many options → searchable dropdown" rule from the design review.
+ */
+function FilterDropdown({
+  group,
+  active,
+  onChange,
+}: {
+  group: FilterGroupConfig;
+  active: string[];
+  onChange: (next: string[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onDocClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("mousedown", onDocClick);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDocClick);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  const filteredOptions = useMemo(
+    () => group.options.filter((o) => o.toLowerCase().includes(query.toLowerCase())),
+    [group.options, query]
+  );
+
+  function toggle(option: string) {
+    onChange(active.includes(option) ? active.filter((v) => v !== option) : [...active, option]);
+  }
+
+  return (
+    <div className="fd" ref={ref}>
+      <button className={`fd-trigger ${active.length ? "active" : ""}`} onClick={() => setOpen((o) => !o)}>
+        {group.label}
+        {active.length > 0 && <span className="fd-count">{active.length}</span>}
+        <Icon name="down" size={12} />
+      </button>
+      {open && (
+        <div className="fd-panel">
+          {group.options.length > SEARCH_THRESHOLD && (
+            <input
+              className="fd-search"
+              placeholder={`Search ${group.label.toLowerCase()}…`}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              autoFocus
+            />
+          )}
+          <div className="fd-options">
+            {filteredOptions.length === 0 && <div className="fd-empty">No matches</div>}
+            {filteredOptions.map((opt) => (
+              <label className="fd-opt" key={opt}>
+                <input type="checkbox" checked={active.includes(opt)} onChange={() => toggle(opt)} />
+                {opt}
+              </label>
+            ))}
+          </div>
+          {active.length > 0 && (
+            <button className="fd-clear" onClick={() => onChange([])}>
+              Clear {group.label.toLowerCase()}
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * A row of independent compact filter dropdowns, one per group — replaces
+ * a single long combined popover so each dimension (Status, Source, City,
+ * …) stays quick to scan and search on its own. Wraps on narrow screens.
+ */
+export function FilterBar({
   groups,
   value,
   onChange,
@@ -26,68 +113,16 @@ export function FilterButton({
   value: FilterMap;
   onChange: (next: FilterMap) => void;
 }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const onDocClick = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", onDocClick);
-    return () => document.removeEventListener("mousedown", onDocClick);
-  }, [open]);
-
-  const activeCount = groups.reduce((n, g) => n + valuesOf(value, g.key).length, 0);
-
-  function toggle(groupKey: string, option: string) {
-    const current = valuesOf(value, groupKey);
-    const next = current.includes(option) ? current.filter((v) => v !== option) : [...current, option];
-    onChange({ ...value, [groupKey]: next.length ? next : undefined });
-  }
-
   return (
-    <div style={{ position: "relative", display: "inline-block" }} ref={ref}>
-      <button className="btn ghost" onClick={() => setOpen((o) => !o)}>
-        <Icon name="filter" size={16} />
-        Filter{activeCount > 0 ? ` (${activeCount})` : ""}
-      </button>
-      {open && (
-        <>
-          <div className="filter-backdrop" onClick={() => setOpen(false)} />
-          <div className="filter-panel">
-            <h4>Filter</h4>
-            {groups.map((g) => {
-              const active = valuesOf(value, g.key);
-              return (
-                <div className="group" key={g.key}>
-                  <div className="group-label">{g.label}</div>
-                  <div className="filter-options">
-                    {g.options.map((opt) => (
-                      <span
-                        key={opt}
-                        className={`filter-opt ${active.includes(opt) ? "active" : ""}`}
-                        onClick={() => toggle(g.key, opt)}
-                      >
-                        {active.includes(opt) && <Icon name="check" size={11} />}
-                        {opt}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 16 }}>
-              <button className="btn ghost sm" onClick={() => onChange({})}>
-                Clear all
-              </button>
-              <button className="btn primary sm" onClick={() => setOpen(false)}>
-                Done
-              </button>
-            </div>
-          </div>
-        </>
-      )}
+    <div className="filter-bar">
+      {groups.map((g) => (
+        <FilterDropdown
+          key={g.key}
+          group={g}
+          active={valuesOf(value, g.key)}
+          onChange={(next) => onChange({ ...value, [g.key]: next.length ? next : undefined })}
+        />
+      ))}
     </div>
   );
 }

@@ -9,6 +9,7 @@ import { StatusTag, ChipGroup, Chip } from "../../components/ui/Tag";
 import { DataTable, Column, toggleSortDirection } from "../../components/ui/DataTable";
 import { OpportunityForm } from "../../components/forms/OpportunityForm";
 import { useOpportunities } from "../../lib/hooks/useOpportunities";
+import { useLeads } from "../../lib/hooks/useLeads";
 import { Opportunity, OPPORTUNITY_STAGES } from "../../lib/types/domain";
 import { formatInr, formatDate } from "../../lib/format";
 import { SortState } from "../../lib/types/common";
@@ -17,8 +18,14 @@ import { OpportunitySortField } from "../../lib/repository/interfaces";
 export default function OpportunitiesPage() {
   const router = useRouter();
   const { opportunities, createOpportunity, sort, setSort } = useOpportunities();
+  const { leads } = useLeads();
   const [showForm, setShowForm] = useState(false);
   const [stageChip, setStageChip] = useState<string>("All");
+
+  // Product isn't an Opportunity field — it's surfaced from the linked
+  // Lead's existing uiContext.productInterest (mock/UI-only, see
+  // LeadUIContext in lib/types/domain.ts). No new relation invented.
+  const productByLeadId = useMemo(() => new Map(leads.map((l) => [l.id, l.uiContext?.productInterest])), [leads]);
 
   const open = opportunities.filter((o) => o.stage !== "Won" && o.stage !== "Lost");
   const weighted = open.reduce((s, o) => s + (o.expectedValue * o.probability) / 100, 0);
@@ -35,9 +42,22 @@ export default function OpportunitiesPage() {
   const rows = stageChip === "All" ? opportunities : opportunities.filter((o) => o.stage === stageChip);
 
   const columns: Column<Opportunity>[] = [
-    { key: "title", header: "Opportunity", render: (o) => o.title },
-    { key: "customerName", header: "Customer", render: (o) => o.customerName },
+    {
+      key: "title",
+      header: "Opportunity",
+      render: (o) => (
+        <div>
+          <b style={{ fontSize: 13.5, fontWeight: 600 }}>{o.title}</b>
+          <small style={{ display: "block", color: "var(--muted)", fontSize: 12, marginTop: 1 }}>{o.customerName}</small>
+        </div>
+      ),
+    },
     { key: "stage", header: "Stage", render: (o) => <StatusTag status={o.stage} /> },
+    {
+      key: "product",
+      header: "Product",
+      render: (o) => productByLeadId.get(o.leadId) ?? <span style={{ color: "var(--faint)" }}>—</span>,
+    },
     { key: "expectedValue", header: "Expected Value", sortable: true, render: (o) => formatInr(o.expectedValue) },
     {
       key: "probability",

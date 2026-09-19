@@ -6,12 +6,12 @@ import { PageHeader, DesignNote } from "../../components/ui/PageHeader";
 import { Panel } from "../../components/ui/Card";
 import { Button } from "../../components/ui/Button";
 import { StatusTag } from "../../components/ui/Tag";
-import { SourceBadge } from "../../components/ui/SourceBadge";
+import { SourceBadge, SourceTag } from "../../components/ui/SourceBadge";
 import { FollowupTag } from "../../components/ui/FollowupTag";
 import { initials } from "../../components/ui/Who";
 import { DataTable, Column, toggleSortDirection } from "../../components/ui/DataTable";
 import { Pagination, paginate } from "../../components/ui/Button";
-import { FilterButton, ActiveFilterChips, FilterGroupConfig } from "../../components/ui/FilterButton";
+import { FilterBar, ActiveFilterChips, FilterGroupConfig, valuesOf } from "../../components/ui/FilterButton";
 import { LeadForm } from "../../components/forms/LeadForm";
 import { useLeads, useLeadSources } from "../../lib/hooks/useLeads";
 import { useTasks } from "../../lib/hooks/useTasks";
@@ -21,12 +21,6 @@ import { nextFollowupFor, FollowupInfo } from "../../lib/followup";
 import { FilterMap, SortState } from "../../lib/types/common";
 
 const PAGE_SIZE = 8;
-
-function valuesOf(value: FilterMap, key: string): string[] {
-  const v = value[key];
-  if (!v) return [];
-  return Array.isArray(v) ? v : [v];
-}
 
 export default function LeadsPage() {
   const router = useRouter();
@@ -120,7 +114,7 @@ export default function LeadsPage() {
         </div>
       ),
     },
-    { key: "sourceName", header: "Source", render: (l) => <SourceBadge source={l.sourceName} size={20} /> },
+    { key: "sourceName", header: "Source", render: (l) => <SourceTag source={l.sourceName} /> },
     {
       key: "productInterest",
       header: "Product / Interest",
@@ -151,12 +145,9 @@ export default function LeadsPage() {
         title="Leads"
         subtitle="Every inbound and outbound lead, from first contact to qualification."
         cta={
-          <>
-            <FilterButton groups={filterGroups} value={filters} onChange={(f) => { setFilters(f); setPage(1); }} />
-            <Button variant="primary" icon="plus" onClick={() => setShowForm(true)}>
-              New Lead
-            </Button>
-          </>
+          <Button variant="primary" icon="plus" onClick={() => setShowForm(true)}>
+            New Lead
+          </Button>
         }
       />
 
@@ -169,6 +160,7 @@ export default function LeadsPage() {
         />
       </div>
 
+      <FilterBar groups={filterGroups} value={filters} onChange={(f) => { setFilters(f); setPage(1); }} />
       <ActiveFilterChips groups={filterGroups} value={filters} onChange={(f) => { setFilters(f); setPage(1); }} />
 
       <div style={{ marginTop: 14 }}>

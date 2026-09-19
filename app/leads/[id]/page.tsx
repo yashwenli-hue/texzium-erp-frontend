@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Icon } from "../../../components/ui/Icon";
 import { Panel } from "../../../components/ui/Card";
-import { StatusTag, Tag } from "../../../components/ui/Tag";
+import { StatusTag, Tag, STAGE_COLOR } from "../../../components/ui/Tag";
 import { SourceBadge } from "../../../components/ui/SourceBadge";
 import { FollowupTag } from "../../../components/ui/FollowupTag";
 import { QuickActions } from "../../../components/ui/QuickActions";
@@ -154,7 +154,7 @@ export default function LeadDetailPage() {
                 <SourceBadge source={lead.sourceName} size={18} />
                 <Tag color="n">{lead.sourceName}</Tag>
                 <Tag color="n">{lead.assignedToName ? `Assigned: ${lead.assignedToName}` : "Unassigned"}</Tag>
-                <StatusTag status={lead.score} />
+                <Tag color={STAGE_COLOR[lead.score] ?? "n"}>{lead.score} lead</Tag>
               </div>
               <QuickActions phone={lead.phone} email={lead.email} contactName={lead.customerName} />
               <div className="lead-action-row">
@@ -287,6 +287,10 @@ export default function LeadDetailPage() {
               </a>
             }
           >
+            <p style={{ color: "var(--faint)", fontSize: 11.5, marginBottom: 10 }}>
+              General context that stays useful across every call and meeting — not a record of a
+              specific interaction. Log what happened on a call or email above instead.
+            </p>
             {notes.length === 0 ? (
               <p style={{ color: "var(--muted)", fontSize: 13 }}>No notes yet for this lead.</p>
             ) : (

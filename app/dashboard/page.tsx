@@ -23,10 +23,13 @@ const SNAPSHOT_COLUMNS: KanbanColumnConfig<OpportunityStage>[] = OPPORTUNITY_STE
   label: stage,
 }));
 
+const FOCUS_DEFAULT_COUNT = 5;
+
 interface FocusItem {
   id: string;
   icon: string;
   tone: "bad" | "warn" | "info" | "n";
+  urgencyLabel: string;
   title: string;
   company: string;
   time: string;
@@ -40,6 +43,7 @@ export default function DashboardPage() {
   const { tasks } = useTasks();
   const { quotations } = useQuotations();
   const [showLeadForm, setShowLeadForm] = useState(false);
+  const [focusExpanded, setFocusExpanded] = useState(false);
 
   const openOpportunities = useMemo(
     () => opportunities.filter((o) => o.stage !== "Won" && o.stage !== "Lost"),
@@ -54,23 +58,28 @@ export default function DashboardPage() {
     [opportunities]
   );
   const openLeadsCount = leads.filter((l) => l.status !== "Rejected").length;
+  const qualificationRate = leads.length
+    ? Math.round((leads.filter((l) => l.status === "Qualified").length / leads.length) * 100)
+    : 0;
 
-  // MOCK/UI-ONLY prioritization surface — overdue/due-today follow-ups are
-  // derived from the generic mock Task list (see lib/followup.ts), not a
-  // real backend LeadFollowup. Unassigned leads and Draft quotations are
+  // MOCK/UI-ONLY prioritization surface — follow-up urgency is derived from
+  // the generic mock Task list (see lib/followup.ts), not a real backend
+  // LeadFollowup/priority field. Unassigned leads and Draft quotations are
   // computed straight from already-loaded mock data — nothing invented.
-  const focusItems = useMemo<FocusItem[]>(() => {
+  const allFocusItems = useMemo<FocusItem[]>(() => {
     const items: FocusItem[] = [];
 
     for (const t of tasks) {
       if (t.done || !t.dueAt) continue;
       const urgency = classifyFollowup(t.dueAt);
-      if (urgency !== "Overdue" && urgency !== "Due Today") continue;
       const href = t.linkedType === "Lead" ? `/leads/${t.linkedId}` : `/customers/${t.linkedId}`;
+      const tone = urgency === "Overdue" ? "bad" : urgency === "Due Today" ? "warn" : "n";
+      const urgencyLabel = urgency === "Overdue" ? "Overdue" : urgency === "Due Today" ? "Due today" : "Upcoming";
       items.push({
         id: `task-${t.id}`,
         icon: "clock",
-        tone: urgency === "Overdue" ? "bad" : "warn",
+        tone,
+        urgencyLabel,
         title: t.title,
         company: t.linkedName,
         time: formatRelative(t.dueAt),
@@ -84,6 +93,7 @@ export default function DashboardPage() {
           id: `unassigned-${l.id}`,
           icon: "user",
           tone: "info",
+          urgencyLabel: "Needs action",
           title: "Needs an owner assigned",
           company: l.companyName ?? l.customerName,
           time: formatRelative(l.lastActivityAt),
@@ -98,6 +108,7 @@ export default function DashboardPage() {
         id: `quote-${q.id}`,
         icon: "file",
         tone: "n",
+        urgencyLabel: "Needs action",
         title: `${q.quoteNo} still in Draft`,
         company: q.customerName,
         time: formatRelative(q.createdAt),
@@ -105,9 +116,11 @@ export default function DashboardPage() {
       });
     }
 
-    const priority: Record<FocusItem["tone"], number> = { bad: 0, warn: 1, info: 2, n: 3 };
-    return items.sort((a, b) => priority[a.tone] - priority[b.tone]).slice(0, 7);
+    const priority: Record<string, number> = { Overdue: 0, "Due today": 1, "Needs action": 2, Upcoming: 3 };
+    return items.sort((a, b) => (priority[a.urgencyLabel] ?? 4) - (priority[b.urgencyLabel] ?? 4));
   }, [tasks, leads, quotations]);
+
+  const focusItems = focusExpanded ? allFocusItems : allFocusItems.slice(0, FOCUS_DEFAULT_COUNT);
 
   function renderOppCard(o: Opportunity) {
     return (
@@ -141,11 +154,14 @@ export default function DashboardPage() {
         <StatCard label="Open Leads" value={String(openLeadsCount)} note="not yet rejected" />
         <StatCard label="Open Pipeline" value={formatInr(openPipelineValue)} note={`${openOpportunities.length} open opportunities`} />
         <StatCard label="Won Value" value={formatInr(wonValue)} note={`${opportunities.filter((o) => o.stage === "Won").length} deals`} />
-        <StatCard label="Total Leads" value={String(leads.length)} note="in the system" />
+        <StatCard label="Qualification Rate" value={`${qualificationRate}%`} note="of all leads" />
       </StatRow>
 
       <Cols>
-        <Panel title="Today's Focus" more={{ label: "View all", onClick: () => router.push("/tasks") }}>
+        <Panel
+          title="Today's Focus"
+          more={allFocusItems.length > FOCUS_DEFAULT_COUNT ? { label: focusExpanded ? "Show less" : `View all (${allFocusItems.length})`, onClick: () => setFocusExpanded((e) => !e) } : undefined}
+        >
           {focusItems.length === 0 ? (
             <p style={{ color: "var(--muted)", fontSize: 13, padding: "6px 0" }}>
               Nothing urgent right now — every follow-up is on schedule.
@@ -166,15 +182,18 @@ export default function DashboardPage() {
                     <b>{item.title}</b>
                     <small>{item.company}</small>
                   </div>
-                  <div className="rt">{item.time}</div>
+                  <div className="rt">
+                    <span className={`focus-urgency ${item.tone}`}>{item.urgencyLabel}</span>
+                    <small>{item.time}</small>
+                  </div>
                   <Icon name="arrow" size={14} className="li-arrow" />
                 </div>
               ))}
             </div>
           )}
         </Panel>
-        <Panel title="Leads by Source">
-          <SourceBreakdown leads={leads} />
+        <Panel title="Lead Qualification Funnel">
+          <LeadFunnel leads={leads} />
         </Panel>
       </Cols>
 
@@ -190,16 +209,16 @@ export default function DashboardPage() {
             onCardClick={(id) => router.push(`/opportunities/${id}`)}
           />
         </Panel>
-        <Panel title="Lead Qualification Funnel">
-          <LeadFunnel leads={leads} />
+        <Panel title="Leads by Source">
+          <SourceBreakdown leads={leads} />
         </Panel>
       </Cols>
 
       <DesignNote>
         <b>Design note.</b> &quot;Today&apos;s Focus&quot; is a presentation-only prioritization built from
-        mock Task/Lead/Quotation data — overdue/due-today follow-ups are not a real backend LeadFollowup
-        yet (see lib/followup.ts). Opportunity stage now persists across a refresh via local mock
-        storage (see lib/repository/mock/entityStore.ts) — still not a real backend transition endpoint.
+        mock Task/Lead/Quotation data — follow-up urgency is not a real backend priority field yet (see
+        lib/followup.ts). Opportunity stage now persists across a refresh via local mock storage (see
+        lib/repository/mock/entityStore.ts) — still not a real backend transition endpoint.
       </DesignNote>
 
       {showLeadForm && (

@@ -17,6 +17,7 @@ const RAMP: { shade: string; txt: string }[] = [
  * action, not a step in the qualification sequence.
  */
 export function LeadFunnel({ leads }: { leads: Lead[] }) {
+  const total = leads.length;
   const counts = FUNNEL_STATUSES.map((status) => leads.filter((l) => l.status === status).length);
   const maxCount = Math.max(...counts, 1);
   const rejectedCount = leads.filter((l) => l.status === "Rejected").length;
@@ -53,7 +54,7 @@ export function LeadFunnel({ leads }: { leads: Lead[] }) {
               {status}
             </div>
             <div className="meta">
-              <b>{count}</b> leads
+              <b>{count}</b> leads <span className="tnum">({total ? Math.round((count / total) * 100) : 0}%)</span>
               {flagged && (
                 <span
                   style={{
@@ -78,7 +79,8 @@ export function LeadFunnel({ leads }: { leads: Lead[] }) {
             Rejected
           </div>
           <div className="meta">
-            <b>{rejectedCount}</b> lead{rejectedCount === 1 ? "" : "s"} did not qualify
+            <b>{rejectedCount}</b> lead{rejectedCount === 1 ? "" : "s"} did not qualify{" "}
+            <span className="tnum">({total ? Math.round((rejectedCount / total) * 100) : 0}%)</span>
           </div>
         </div>
       )}

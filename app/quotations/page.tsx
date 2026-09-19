@@ -1,21 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PageHeader, DesignNote } from "../../components/ui/PageHeader";
 import { StatCard, StatRow, Panel } from "../../components/ui/Card";
 import { Button } from "../../components/ui/Button";
-import { StatusTag } from "../../components/ui/Tag";
+import { StatusTag, ChipGroup, Chip } from "../../components/ui/Tag";
 import { DataTable, Column } from "../../components/ui/DataTable";
 import { QuotationForm } from "../../components/forms/QuotationForm";
 import { useQuotations } from "../../lib/hooks/useQuotations";
-import { Quotation } from "../../lib/types/domain";
+import { Quotation, QUOTATION_STATUSES } from "../../lib/types/domain";
 import { formatInr, formatDate } from "../../lib/format";
 
 export default function QuotationsPage() {
   const router = useRouter();
   const { quotations, createQuotation } = useQuotations();
   const [showForm, setShowForm] = useState(false);
+  const [statusChip, setStatusChip] = useState<string>("All");
 
   const totalValue = quotations.reduce((s, q) => s + q.amount, 0);
   const approved = quotations.filter((q) => q.status === "Approved" || q.status === "Converted").length;
@@ -25,6 +26,14 @@ export default function QuotationsPage() {
     const days = (new Date(q.validUntil).getTime() - Date.now()) / 86_400_000;
     return days > 0 && days <= 7;
   }).length;
+
+  const statusCounts = useMemo(() => {
+    const map: Record<string, number> = {};
+    quotations.forEach((q) => (map[q.status] = (map[q.status] ?? 0) + 1));
+    return map;
+  }, [quotations]);
+
+  const rows = statusChip === "All" ? quotations : quotations.filter((q) => q.status === statusChip);
 
   const columns: Column<Quotation>[] = [
     { key: "quoteNo", header: "Quote No.", render: (q) => (
@@ -61,13 +70,20 @@ export default function QuotationsPage() {
         <StatCard label="Expiring Soon" value={String(expiringSoon)} note="within 7 days" />
       </StatRow>
 
-      <div style={{ marginTop: 16 }}>
+      <ChipGroup>
+        <Chip label={`All ${quotations.length}`} active={statusChip === "All"} onClick={() => setStatusChip("All")} />
+        {QUOTATION_STATUSES.filter((s) => statusCounts[s]).map((s) => (
+          <Chip key={s} label={`${s} ${statusCounts[s]}`} active={statusChip === s} onClick={() => setStatusChip(s)} />
+        ))}
+      </ChipGroup>
+
+      <div style={{ marginTop: 14 }}>
         <Panel title="All Quotations" flush>
           <DataTable
             columns={columns}
-            rows={quotations}
+            rows={rows}
             onRowClick={(q) => router.push(`/quotations/${q.id}`)}
-            emptyTitle="No quotations yet"
+            emptyTitle="No quotations match this filter"
           />
         </Panel>
       </div>

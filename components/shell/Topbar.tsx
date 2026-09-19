@@ -5,6 +5,7 @@ import { useState, KeyboardEvent } from "react";
 import { Icon } from "../ui/Icon";
 import { PAGE_META } from "../../lib/pageMeta";
 import { useLiveCounts } from "../../lib/hooks/useLiveCounts";
+import { UserMenu } from "./UserMenu";
 
 function crumbFor(pathname: string): string {
   const seg = pathname.split("/").filter(Boolean);
@@ -54,7 +55,7 @@ export function Topbar({ onMenuClick }: { onMenuClick: () => void }) {
             <Icon name="bell" size={18} />
           </button>
         </div>
-        <div className="avatar">RK</div>
+        <UserMenu />
       </div>
     </header>
   );
