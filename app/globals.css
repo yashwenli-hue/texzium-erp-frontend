@@ -161,7 +161,7 @@ tbody tr.clickable:hover{background:#FBFBFC}
    already scrolls horizontally (.table-scroll) if this pushes it past the
    viewport, which is preferable to a cramped identity column (design
    review Stage 1.3.2 §1). */
-.lead-id{min-width:225px}
+.lead-id{min-width:184px}
 .lead-id b,.lead-id small{white-space:nowrap}
 .tag{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:700;padding:4px 10px;border-radius:20px;white-space:nowrap}
 .tag::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}

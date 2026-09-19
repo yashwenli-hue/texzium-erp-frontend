@@ -5,7 +5,7 @@ import { PageHeader, DesignNote } from "../../components/ui/PageHeader";
 import { StatCard, StatRow, Panel } from "../../components/ui/Card";
 import { KanbanBoard, KanbanColumnConfig } from "../../components/kanban/KanbanBoard";
 import { Icon } from "../../components/ui/Icon";
-import { LEAD_STATUS_COLOR } from "../../components/ui/Tag";
+import { LEAD_STATUS_STYLE } from "../../components/ui/Tag";
 import { useLeads } from "../../lib/hooks/useLeads";
 import { Lead, LeadStatus, LEAD_BOARD_STATUSES } from "../../lib/types/domain";
 import { formatRelative } from "../../lib/format";
@@ -66,7 +66,7 @@ export default function PipelinePage() {
             getStage={(l) => l.status}
             renderCard={renderCard}
             gridColumns={2}
-            colorMap={LEAD_STATUS_COLOR}
+            colorMap={LEAD_STATUS_STYLE}
             onMove={(id, status) => updateStatus(id, status)}
             onCardClick={(id) => router.push(`/leads/${id}`)}
           />
