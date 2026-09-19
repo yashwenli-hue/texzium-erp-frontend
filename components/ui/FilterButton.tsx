@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "./Icon";
 import { FilterMap } from "../../lib/types/common";
 
@@ -108,10 +108,14 @@ export function FilterBar({
   groups,
   value,
   onChange,
+  trailing,
 }: {
   groups: FilterGroupConfig[];
   value: FilterMap;
   onChange: (next: FilterMap) => void;
+  /** An extra filter control (e.g. DateRangeFilter) rendered in the same row — a
+   * different value shape than the multi-select groups above, so it isn't one of them. */
+  trailing?: ReactNode;
 }) {
   return (
     <div className="filter-bar">
@@ -123,6 +127,127 @@ export function FilterBar({
           onChange={(next) => onChange({ ...value, [g.key]: next.length ? next : undefined })}
         />
       ))}
+      {trailing}
+    </div>
+  );
+}
+
+export interface DateRangeValue {
+  from: string; // "YYYY-MM-DD" or ""
+  to: string; // "YYYY-MM-DD" or ""
+}
+
+function toDateInputValue(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function shortDateLabel(value: string): string {
+  return new Date(`${value}T00:00:00`).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+}
+
+/**
+ * Calendar date-range filter — same trigger/panel language as FilterDropdown
+ * above, but for one continuous range instead of a multi-select list. Uses
+ * native <input type="date"> for the calendar picker, no new dependency.
+ * See design review Stage 1.3.2 §2.
+ */
+export function DateRangeFilter({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: DateRangeValue;
+  onChange: (next: DateRangeValue) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onDocClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("mousedown", onDocClick);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDocClick);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  const active = !!(value.from || value.to);
+  const triggerLabel =
+    value.from && value.to
+      ? `${shortDateLabel(value.from)} – ${shortDateLabel(value.to)}`
+      : value.from
+      ? `From ${shortDateLabel(value.from)}`
+      : value.to
+      ? `Until ${shortDateLabel(value.to)}`
+      : label;
+
+  function applyPreset(preset: "today" | "week" | "month") {
+    const now = new Date();
+    const to = toDateInputValue(now);
+    let from = to;
+    if (preset === "week") {
+      const start = new Date(now);
+      const mondayOffset = (start.getDay() + 6) % 7; // 0 = Monday
+      start.setDate(start.getDate() - mondayOffset);
+      from = toDateInputValue(start);
+    } else if (preset === "month") {
+      from = toDateInputValue(new Date(now.getFullYear(), now.getMonth(), 1));
+    }
+    onChange({ from, to });
+  }
+
+  return (
+    <div className="fd" ref={ref}>
+      <button className={`fd-trigger ${active ? "active" : ""}`} onClick={() => setOpen((o) => !o)}>
+        <Icon name="cal" size={13} />
+        {triggerLabel}
+        <Icon name="down" size={12} />
+      </button>
+      {open && (
+        <div className="fd-panel fd-panel-wide">
+          <div className="fd-presets">
+            <button type="button" onClick={() => applyPreset("today")}>Today</button>
+            <button type="button" onClick={() => applyPreset("week")}>This week</button>
+            <button type="button" onClick={() => applyPreset("month")}>This month</button>
+          </div>
+          <div className="fd-date-row">
+            <label>
+              <span>From</span>
+              <input
+                type="date"
+                value={value.from}
+                max={value.to || undefined}
+                onChange={(e) => onChange({ ...value, from: e.target.value })}
+              />
+            </label>
+            <label>
+              <span>To</span>
+              <input
+                type="date"
+                value={value.to}
+                min={value.from || undefined}
+                onChange={(e) => onChange({ ...value, to: e.target.value })}
+              />
+            </label>
+          </div>
+          {active && (
+            <button className="fd-clear" onClick={() => onChange({ from: "", to: "" })}>
+              Clear date range
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

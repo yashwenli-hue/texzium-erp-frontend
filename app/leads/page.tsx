@@ -11,7 +11,7 @@ import { FollowupTag } from "../../components/ui/FollowupTag";
 import { initials } from "../../components/ui/Who";
 import { DataTable, Column, toggleSortDirection } from "../../components/ui/DataTable";
 import { Pagination, paginate } from "../../components/ui/Button";
-import { FilterBar, ActiveFilterChips, FilterGroupConfig, valuesOf } from "../../components/ui/FilterButton";
+import { FilterBar, ActiveFilterChips, FilterGroupConfig, valuesOf, DateRangeFilter, DateRangeValue } from "../../components/ui/FilterButton";
 import { LeadForm } from "../../components/forms/LeadForm";
 import { useLeads, useLeadSources } from "../../lib/hooks/useLeads";
 import { useTasks } from "../../lib/hooks/useTasks";
@@ -29,6 +29,7 @@ export default function LeadsPage() {
   const { tasks } = useTasks();
   const [showForm, setShowForm] = useState(false);
   const [filters, setFilters] = useState<FilterMap>({});
+  const [dateRange, setDateRange] = useState<DateRangeValue>({ from: "", to: "" });
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<SortState<string>>({ field: "lastActivityAt", direction: "desc" });
   const [page, setPage] = useState(1);
@@ -75,6 +76,18 @@ export default function LeadsPage() {
     if (cityF.length) rows = rows.filter((l) => cityF.includes(l.uiContext?.city ?? ""));
     if (assignmentF.includes("Unassigned")) rows = rows.filter((l) => !l.assignedToId);
 
+    // Filters the same createdAt field that powers the Received column and
+    // its sort — not a separate/invented date source (design review Stage
+    // 1.3.2 §2).
+    if (dateRange.from) {
+      const fromTs = new Date(`${dateRange.from}T00:00:00`).getTime();
+      rows = rows.filter((l) => new Date(l.createdAt).getTime() >= fromTs);
+    }
+    if (dateRange.to) {
+      const toTs = new Date(`${dateRange.to}T23:59:59.999`).getTime();
+      rows = rows.filter((l) => new Date(l.createdAt).getTime() <= toTs);
+    }
+
     if (search.trim()) {
       const q = search.trim().toLowerCase();
       rows = rows.filter(
@@ -92,7 +105,7 @@ export default function LeadsPage() {
       return sort.direction === "asc" ? cmp : -cmp;
     });
     return rows;
-  }, [allLeads, filters, search, sort, categoryBySourceId, followupById]);
+  }, [allLeads, filters, dateRange, search, sort, categoryBySourceId, followupById]);
 
   const pageRows = paginate(filtered, page, PAGE_SIZE);
 
@@ -104,7 +117,7 @@ export default function LeadsPage() {
       render: (l) => (
         <div className="who">
           <div className="av">{initials(l.customerName)}</div>
-          <div>
+          <div className="lead-id">
             <b>{l.customerName}</b>
             <small>{[l.companyName, l.uiContext?.city].filter(Boolean).join(" · ") || l.sourceName}</small>
           </div>
@@ -158,7 +171,18 @@ export default function LeadsPage() {
         />
       </div>
 
-      <FilterBar groups={filterGroups} value={filters} onChange={(f) => { setFilters(f); setPage(1); }} />
+      <FilterBar
+        groups={filterGroups}
+        value={filters}
+        onChange={(f) => { setFilters(f); setPage(1); }}
+        trailing={
+          <DateRangeFilter
+            label="Received date"
+            value={dateRange}
+            onChange={(v) => { setDateRange(v); setPage(1); }}
+          />
+        }
+      />
       <ActiveFilterChips groups={filterGroups} value={filters} onChange={(f) => { setFilters(f); setPage(1); }} />
 
       <div style={{ marginTop: 14 }}>
