@@ -5,6 +5,8 @@ import {
   LeadSourceRecord,
   LeadTimelineEntry,
   LeadUIContext,
+  LeadFollowup,
+  AssignableUser,
   Customer,
   Contact,
   Activity,
@@ -68,14 +70,14 @@ export interface ILeadRepository {
   getById(id: ID): Promise<Lead | null>;
   create(input: CreateLeadInput): Promise<Lead>;
   update(id: ID, input: UpdateLeadInput): Promise<Lead>;
-  /** Lightweight status movement (New/Contacted) — mirrors the lead-status module. */
+  /** Lightweight status movement (NEW/CONTACTED) — mirrors the lead-status module. */
   updateStatus(id: ID, status: LeadStatus): Promise<Lead>;
   /** VERIFIED: AssignLeadDto { leadId, assignedToId } — writes PRE_SALES_ASSIGNED. */
   assign(id: ID, assignedToId: ID, assignedToName: string): Promise<Lead>;
-  /** VERIFIED: PATCH /:id/qualify — writes LEAD_QUALIFIED. Gated by leads.qualify. */
-  qualify(id: ID): Promise<Lead>;
-  /** VERIFIED: PATCH /:id/reject — writes LEAD_REJECTED. Gated by leads.reject. */
-  reject(id: ID, reason?: string): Promise<Lead>;
+  /** VERIFIED: PATCH /:id/qualify, body { salesUserId } — writes LEAD_QUALIFIED, status SALES_ASSIGNED. Gated by leads.qualify. */
+  qualify(id: ID, salesUserId: ID): Promise<Lead>;
+  /** VERIFIED: PATCH /:id/reject, body { reason } — writes LEAD_REJECTED. Gated by leads.reject. */
+  reject(id: ID, reason: string): Promise<Lead>;
   getTimeline(leadId: ID): Promise<LeadTimelineEntry[]>;
   appendTimelineEntry(
     leadId: ID,
@@ -85,6 +87,35 @@ export interface ILeadRepository {
 
 export interface ILeadSourceRepository {
   list(): Promise<LeadSourceRecord[]>;
+}
+
+// VERIFIED CreateFollowupDto: leadId, followupDate, remarks?. See
+// docs/backend-ui-contract.md §5.
+export interface CreateFollowupInput {
+  leadId: ID;
+  followupDate: string; // ISO 8601
+  remarks?: string;
+}
+
+export interface ILeadFollowupRepository {
+  listByLead(leadId: ID): Promise<LeadFollowup[]>;
+  create(input: CreateFollowupInput): Promise<LeadFollowup>;
+  /** VERIFIED: PATCH /:id/complete — completing user comes from the auth token, not the request body. */
+  complete(id: ID): Promise<LeadFollowup>;
+  /** VERIFIED: PATCH /:id/reschedule, body { followupDate } — resets status back to PENDING. */
+  reschedule(id: ID, followupDate: string): Promise<LeadFollowup>;
+  /** VERIFIED: PATCH /:id/cancel. */
+  cancel(id: ID): Promise<LeadFollowup>;
+}
+
+/**
+ * Minimal user lookup backing the Assign/Qualify dropdowns. No RevenueOS-
+ * scoped assignable-user endpoint is confirmed — the real implementation
+ * calls the separate (unguarded) GET /users route as the least invasive
+ * option; see docs/backend-ui-contract.md §21 and the Stage 2A report.
+ */
+export interface IUserRepository {
+  listAssignable(): Promise<AssignableUser[]>;
 }
 
 export interface CreateCustomerInput {
@@ -240,8 +271,14 @@ export interface ISearchRepository {
 
 /** The full set of repositories the app needs. Provided via RepositoryProvider. */
 export interface RevenueOSRepository {
+  /** Which implementation is wired up — lets the few UI spots with a genuine backend
+   * capability gap (note creation, activity logging) adapt honestly instead of
+   * pretending they work the same way against the real API as they do against the mock. */
+  kind: "mock" | "real";
   leads: ILeadRepository;
   leadSources: ILeadSourceRepository;
+  leadFollowups: ILeadFollowupRepository;
+  users: IUserRepository;
   customers: ICustomerRepository;
   contacts: IContactRepository;
   activities: IActivityRepository;

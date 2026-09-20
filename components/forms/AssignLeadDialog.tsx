@@ -5,17 +5,7 @@ import { Modal } from "../ui/Modal";
 import { SelectField } from "../ui/FormField";
 import { Button } from "../ui/Button";
 import { useToast } from "../ui/Toast";
-
-// UI ASSUMPTION: no Users/assignable-staff endpoint is confirmed yet
-// (docs/backend-ui-contract.md §21). This mock roster stands in for it so
-// the Assign workflow (AssignLeadDto { leadId, assignedToId }) can be
-// exercised now; replace with a real user lookup once confirmed.
-export const MOCK_ASSIGNABLE_USERS = [
-  { id: "U1", name: "Anita S." },
-  { id: "U2", name: "Rohit M." },
-  { id: "U3", name: "Vikram J." },
-  { id: "U4", name: "Priya N." },
-];
+import { useAssignableUsers } from "../../lib/hooks/useAssignableUsers";
 
 export function AssignLeadDialog({
   currentAssigneeId,
@@ -27,12 +17,15 @@ export function AssignLeadDialog({
   onSubmit: (assignedToId: string, assignedToName: string) => Promise<unknown>;
 }) {
   const toast = useToast();
-  const [userId, setUserId] = useState(currentAssigneeId ?? MOCK_ASSIGNABLE_USERS[0].id);
+  const { users, loading: usersLoading } = useAssignableUsers();
+  const [userId, setUserId] = useState(currentAssigneeId ?? "");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const effectiveUserId = userId || users[0]?.id || "";
+
   async function handleSubmit() {
-    const user = MOCK_ASSIGNABLE_USERS.find((u) => u.id === userId);
+    const user = users.find((u) => u.id === effectiveUserId);
     if (!user) return;
     setSubmitting(true);
     setError(null);
@@ -56,7 +49,7 @@ export function AssignLeadDialog({
           <Button variant="ghost" onClick={onClose} disabled={submitting}>
             Cancel
           </Button>
-          <Button variant="primary" onClick={handleSubmit} disabled={submitting}>
+          <Button variant="primary" onClick={handleSubmit} disabled={submitting || usersLoading}>
             {submitting ? "Assigning…" : "Assign"}
           </Button>
         </>
@@ -64,9 +57,10 @@ export function AssignLeadDialog({
     >
       <SelectField
         label="Assign to"
-        value={userId}
+        value={effectiveUserId}
         onChange={(e) => setUserId(e.target.value)}
-        options={MOCK_ASSIGNABLE_USERS.map((u) => ({ value: u.id, label: u.name }))}
+        disabled={usersLoading}
+        options={users.map((u) => ({ value: u.id, label: u.name }))}
       />
       {error && <p style={{ color: "var(--bad)", fontSize: 12.5 }}>{error}</p>}
     </Modal>

@@ -14,26 +14,23 @@ import { DesignNote } from "../../../components/ui/PageHeader";
 import { DocumentTrail } from "../../../components/ui/DocumentTrail";
 import { NoteForm } from "../../../components/forms/NoteForm";
 import { NoteDetailModal } from "../../../components/forms/NoteDetailModal";
-import { ActivityForm } from "../../../components/forms/ActivityForm";
-import { TaskForm } from "../../../components/forms/TaskForm";
 import { AssignLeadDialog } from "../../../components/forms/AssignLeadDialog";
 import { EditLeadDialog } from "../../../components/forms/EditLeadDialog";
+import { QualifyLeadDialog } from "../../../components/forms/QualifyLeadDialog";
+import { FollowupForm } from "../../../components/forms/FollowupForm";
 import { OpportunityForm } from "../../../components/forms/OpportunityForm";
 import { ConfirmDialog } from "../../../components/ui/ConfirmDialog";
 import { useLeadDetail } from "../../../lib/hooks/useLeads";
 import { useNotesByRelated } from "../../../lib/hooks/useNotes";
+import { useLeadFollowups } from "../../../lib/hooks/useLeadFollowups";
 import { useQuotations } from "../../../lib/hooks/useQuotations";
 import { useOpportunities } from "../../../lib/hooks/useOpportunities";
-import { useTasks } from "../../../lib/hooks/useTasks";
 import { useRepository } from "../../../lib/repository/RepositoryProvider";
 import { useToast } from "../../../components/ui/Toast";
 import { initials } from "../../../components/ui/Who";
 import { formatInr, formatDateTime } from "../../../lib/format";
-import { nextFollowupFor } from "../../../lib/followup";
-import { Quotation, Opportunity, Note } from "../../../lib/types/domain";
-
-const ACTIVITY_TYPES = ["Call", "Email", "Meeting", "WhatsApp"] as const;
-const ACTIVITY_ICONS: Record<string, string> = { Call: "phone", Email: "mail", Meeting: "cal", WhatsApp: "wa" };
+import { nextPendingFollowup } from "../../../lib/followup";
+import { isQualifiedLeadStatus, LeadFollowup, Quotation, Opportunity, Note } from "../../../lib/types/domain";
 
 function goBackOrTo(router: ReturnType<typeof useRouter>, fallback: string) {
   if (typeof window !== "undefined" && window.history.length > 1) {
@@ -43,25 +40,31 @@ function goBackOrTo(router: ReturnType<typeof useRouter>, fallback: string) {
   }
 }
 
+const FOLLOWUP_STATUS_STYLE: Record<LeadFollowup["status"], { bg: string; fg: string }> = {
+  PENDING: { bg: "var(--info-bg)", fg: "var(--info)" },
+  COMPLETED: { bg: "var(--good-bg)", fg: "var(--good)" },
+  CANCELLED: { bg: "var(--line-2)", fg: "var(--muted)" },
+};
+
 export default function LeadDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const toast = useToast();
   const id = params?.id;
-  const { lead, timeline, loading, appendActivity, assignLead, qualifyLead, rejectLead, updateLead } = useLeadDetail(id);
+  const { lead, timeline, loading, assignLead, qualifyLead, rejectLead, updateLead } = useLeadDetail(id);
   const { notes, refetch: refetchNotes } = useNotesByRelated(id);
+  const { followups, createFollowup, completeFollowup, rescheduleFollowup, cancelFollowup } = useLeadFollowups(id);
   const { quotations } = useQuotations();
   const { opportunities, createOpportunity } = useOpportunities();
-  const { tasks, createTask } = useTasks();
   const repo = useRepository();
+  const isReal = repo.kind === "real";
   const [showNoteForm, setShowNoteForm] = useState(false);
-  const [showActivityForm, setShowActivityForm] = useState(false);
-  const [showTaskForm, setShowTaskForm] = useState(false);
   const [showAssign, setShowAssign] = useState(false);
   const [showQualify, setShowQualify] = useState(false);
   const [showReject, setShowReject] = useState(false);
   const [showConvert, setShowConvert] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
+  const [followupDialog, setFollowupDialog] = useState<{ mode: "create" | "reschedule"; target?: LeadFollowup } | null>(null);
   const [activeNote, setActiveNote] = useState<Note | null>(null);
 
   const relatedOpportunities = useMemo(
@@ -69,21 +72,7 @@ export default function LeadDetailPage() {
     [opportunities, id]
   );
   const primaryOpportunity = relatedOpportunities[0];
-
-  // Presentation-only call/activity counts, derived from this lead's own
-  // timeline entries (appendActivity writes "Call: …", "Email: …" etc.) —
-  // NOT a stored backend callCount field. See docs/backend-ui-contract.md §20.
-  const activityCounts = useMemo(() => {
-    const counts: Record<string, number> = { Call: 0, Email: 0, Meeting: 0, WhatsApp: 0 };
-    for (const t of timeline) {
-      for (const type of ACTIVITY_TYPES) {
-        if (t.title.startsWith(`${type}:`)) counts[type] += 1;
-      }
-    }
-    return counts;
-  }, [timeline]);
-
-  const followup = useMemo(() => (id ? nextFollowupFor(id, tasks) : { urgency: "None" as const, dueAt: null }), [id, tasks]);
+  const nextFollowup = useMemo(() => nextPendingFollowup(followups), [followups]);
 
   if (loading && !lead) {
     return (
@@ -111,8 +100,8 @@ export default function LeadDetailPage() {
 
   const opportunityIds = new Set(relatedOpportunities.map((o) => o.id));
   const relatedQuotes = quotations.filter((q) => q.opportunityId && opportunityIds.has(q.opportunityId));
-  const canQualify = lead.status !== "Qualified" && lead.status !== "Rejected";
-  const canReject = lead.status !== "Rejected";
+  const canQualify = !isQualifiedLeadStatus(lead.status) && lead.status !== "REJECTED";
+  const canReject = lead.status !== "REJECTED";
 
   const quoteColumns: Column<Quotation>[] = [
     { key: "quoteNo", header: "No.", render: (q) => q.quoteNo },
@@ -125,6 +114,12 @@ export default function LeadDetailPage() {
     { key: "stage", header: "Stage", render: (o) => <StatusTag status={o.stage} /> },
     { key: "expectedValue", header: "Value", render: (o) => formatInr(o.expectedValue) },
   ];
+
+  // Real notes are read-only (no create endpoint exists — docs/backend-ui-contract.md
+  // §20); mock keeps the original cross-entity Note demo experience.
+  const displayNotes = isReal
+    ? (lead.notes ?? []).map((n) => ({ id: n.id, text: n.note, createdAt: n.createdAt, authorName: "", pinned: false }))
+    : notes.map((n) => ({ id: n.id, text: n.text, createdAt: n.createdAt, authorName: n.authorName, pinned: n.pinned }));
 
   return (
     <div className="page">
@@ -154,7 +149,7 @@ export default function LeadDetailPage() {
                 <SourceBadge source={lead.sourceName} size={18} />
                 <Tag color="n">{lead.sourceName}</Tag>
                 <Tag color="n">{lead.assignedToName ? `Assigned: ${lead.assignedToName}` : "Unassigned"}</Tag>
-                <LeadScoreTag score={lead.score} suffix="lead" />
+                {lead.score && <LeadScoreTag score={lead.score} suffix="lead" />}
               </div>
               <QuickActions phone={lead.phone} email={lead.email} contactName={lead.customerName} />
               <div className="lead-action-row">
@@ -176,8 +171,8 @@ export default function LeadDetailPage() {
               <div className="f">
                 <label>Next Follow-up</label>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <FollowupTag urgency={followup.urgency} dueAt={followup.dueAt} />
-                  <button className="iconlink" style={{ fontSize: 11.5 }} onClick={() => setShowTaskForm(true)}>
+                  <FollowupTag urgency={nextFollowup.urgency} dueAt={nextFollowup.dueAt} />
+                  <button className="iconlink" style={{ fontSize: 11.5 }} onClick={() => setFollowupDialog({ mode: "create" })}>
                     <Icon name="plus" size={12} /> Schedule
                   </button>
                 </div>
@@ -208,7 +203,7 @@ export default function LeadDetailPage() {
               />
               {!primaryOpportunity && (
                 <div style={{ marginTop: 10 }}>
-                  {lead.status === "Qualified" ? (
+                  {isQualifiedLeadStatus(lead.status) ? (
                     <Button variant="primary" icon="brief" onClick={() => setShowConvert(true)}>
                       Convert to Opportunity
                     </Button>
@@ -222,24 +217,49 @@ export default function LeadDetailPage() {
             </div>
           </div>
 
-          <Panel
-            title="Activity & History"
-            flush
-            extraHead={
-              <a className="more" href="#" onClick={(e) => { e.preventDefault(); setShowActivityForm(true); }}>
-                <Icon name="plus" size={14} /> Log Activity
-              </a>
-            }
-          >
-            <div className="activity-summary">
-              {ACTIVITY_TYPES.map((type) => (
-                <div className="as-item" key={type}>
-                  <Icon name={ACTIVITY_ICONS[type]} size={14} />
-                  <b>{activityCounts[type]}</b>
-                  <span>{type}{activityCounts[type] === 1 ? "" : "s"}</span>
-                </div>
-              ))}
-            </div>
+          <Panel title="Follow-ups" flush>
+            {followups.length === 0 ? (
+              <p style={{ color: "var(--muted)", fontSize: 13, padding: "4px 0 12px" }}>No follow-ups scheduled yet.</p>
+            ) : (
+              <div className="tl">
+                {followups.map((f) => (
+                  <div className="tl-item" key={f.id}>
+                    <div className="dot"><Icon name="cal" size={14} /></div>
+                    <div className="body">
+                      <div className="r1">
+                        <b>{formatDateTime(f.followupDate)}</b>
+                        <span
+                          className="tag"
+                          style={{ background: FOLLOWUP_STATUS_STYLE[f.status].bg, color: FOLLOWUP_STATUS_STYLE[f.status].fg }}
+                        >
+                          {f.status}
+                        </span>
+                      </div>
+                      {f.remarks && <p>{f.remarks}</p>}
+                      {f.status === "PENDING" && (
+                        <div style={{ display: "flex", gap: 12, marginTop: 6 }}>
+                          <a className="more" href="#" onClick={(e) => { e.preventDefault(); completeFollowup(f.id); }}>
+                            <Icon name="check" size={13} /> Complete
+                          </a>
+                          <a className="more" href="#" onClick={(e) => { e.preventDefault(); setFollowupDialog({ mode: "reschedule", target: f }); }}>
+                            <Icon name="clock" size={13} /> Reschedule
+                          </a>
+                          <a className="more" href="#" onClick={(e) => { e.preventDefault(); cancelFollowup(f.id); }}>
+                            <Icon name="close" size={13} /> Cancel
+                          </a>
+                        </div>
+                      )}
+                      {f.status === "COMPLETED" && f.completedByName && (
+                        <p style={{ color: "var(--faint)", fontSize: 11.5 }}>Completed by {f.completedByName}</p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Panel>
+
+          <Panel title="Activity & History" flush>
             <div className="tl">
               {timeline.length === 0 && (
                 <p style={{ color: "var(--muted)", fontSize: 13, padding: "4px 0 12px" }}>No activity logged yet.</p>
@@ -252,7 +272,8 @@ export default function LeadDetailPage() {
                       <b>{t.title}</b>
                       <span className="when">{formatDateTime(t.occurredAt)}</span>
                     </div>
-                    <p>{t.actorName}</p>
+                    {t.detail && <p>{t.detail}</p>}
+                    {t.actorName && <p>{t.actorName}</p>}
                   </div>
                 </div>
               ))}
@@ -282,21 +303,28 @@ export default function LeadDetailPage() {
           <Panel
             title="Notes"
             extraHead={
-              <a className="more" href="#" onClick={(e) => { e.preventDefault(); setShowNoteForm(true); }}>
-                <Icon name="plus" size={14} /> Add
-              </a>
+              isReal ? undefined : (
+                <a className="more" href="#" onClick={(e) => { e.preventDefault(); setShowNoteForm(true); }}>
+                  <Icon name="plus" size={14} /> Add
+                </a>
+              )
             }
           >
             <p style={{ color: "var(--faint)", fontSize: 11.5, marginBottom: 10 }}>
-              General context that stays useful across every call and meeting — not a record of a
-              specific interaction. Log what happened on a call or email above instead.
+              {isReal
+                ? "Notes recorded against this lead in the connected backend. Note creation isn't available from RevenueOS yet."
+                : "General context that stays useful across every call and meeting — not a record of a specific interaction. Log what happened on a call or email above instead."}
             </p>
-            {notes.length === 0 ? (
+            {displayNotes.length === 0 ? (
               <p style={{ color: "var(--muted)", fontSize: 13 }}>No notes yet for this lead.</p>
             ) : (
               <div className="notes-grid" style={{ gridTemplateColumns: "1fr" }}>
-                {notes.map((n) => (
-                  <div className={`note clickable ${n.pinned ? "pinned" : ""}`} key={n.id} onClick={() => setActiveNote(n)}>
+                {displayNotes.map((n) => (
+                  <div
+                    className={`note ${isReal ? "" : "clickable"} ${n.pinned ? "pinned" : ""}`}
+                    key={n.id}
+                    onClick={isReal ? undefined : () => setActiveNote(notes.find((x) => x.id === n.id) ?? null)}
+                  >
                     {n.pinned && (
                       <div style={{ display: "flex", alignItems: "center", gap: 5, color: "var(--m)", fontSize: 11, fontWeight: 700 }}>
                         <Icon name="pin" size={14} /> PINNED
@@ -304,7 +332,7 @@ export default function LeadDetailPage() {
                     )}
                     <div className="txt">{n.text}</div>
                     <div className="foot">
-                      <small>{n.authorName} · {formatDateTime(n.createdAt)}</small>
+                      <small>{[n.authorName, formatDateTime(n.createdAt)].filter(Boolean).join(" · ")}</small>
                     </div>
                   </div>
                 ))}
@@ -316,8 +344,8 @@ export default function LeadDetailPage() {
 
       <DesignNote>
         <b>Design note.</b> Assign, Qualify and Reject are explicit gated actions — each mirrors a
-        dedicated backend endpoint with its own permission. Call/activity counts above the timeline are
-        computed from this lead&apos;s own logged activity, not a stored backend field.
+        dedicated backend endpoint with its own permission. Follow-ups use the backend&apos;s own
+        PENDING/COMPLETED/CANCELLED lifecycle, not local task data.
       </DesignNote>
 
       {showNoteForm && (
@@ -336,31 +364,6 @@ export default function LeadDetailPage() {
           onUpdate={(noteId, input) => repo.notes.update(noteId, input)}
         />
       )}
-      {showActivityForm && (
-        <ActivityForm
-          onClose={() => setShowActivityForm(false)}
-          onSubmit={async (input) => {
-            await appendActivity(
-              input.type === "Call" ? "phone" : input.type === "Email" ? "mail" : input.type === "WhatsApp" ? "wa" : input.type === "Meeting" ? "cal" : "pulse",
-              `${input.type}: ${input.note}`,
-              input.ownerName
-            );
-          }}
-          defaultRelatedType="Lead"
-          defaultRelatedName={lead.customerName}
-          defaultRelatedId={lead.id}
-        />
-      )}
-      {showTaskForm && (
-        <TaskForm
-          onClose={() => setShowTaskForm(false)}
-          onSubmit={createTask}
-          defaultLinkedType="Lead"
-          defaultLinkedName={lead.customerName}
-          defaultLinkedId={lead.id}
-          defaultAssigneeName={lead.assignedToName}
-        />
-      )}
       {showAssign && (
         <AssignLeadDialog
           currentAssigneeId={lead.assignedToId}
@@ -376,15 +379,10 @@ export default function LeadDetailPage() {
         />
       )}
       {showQualify && (
-        <ConfirmDialog
-          title="Qualify Lead"
-          body={`Mark ${lead.customerName} as Qualified? This makes it eligible to become an Opportunity.`}
-          confirmLabel="Qualify"
+        <QualifyLeadDialog
+          customerName={lead.customerName}
           onClose={() => setShowQualify(false)}
-          onConfirm={async () => {
-            await qualifyLead();
-            toast.show(`${lead.customerName} qualified`, "check");
-          }}
+          onSubmit={(salesUserId) => qualifyLead(salesUserId)}
         />
       )}
       {showReject && (
@@ -393,10 +391,11 @@ export default function LeadDetailPage() {
           body={`Reject ${lead.customerName}? This closes out the lead — it can no longer be qualified.`}
           confirmLabel="Reject Lead"
           destructive
-          noteLabel="Reason (optional)"
+          noteLabel="Reason"
+          noteRequired
           onClose={() => setShowReject(false)}
           onConfirm={async (reason) => {
-            await rejectLead(reason);
+            await rejectLead(reason!);
             toast.show(`${lead.customerName} rejected`, "close");
           }}
         />
@@ -406,6 +405,18 @@ export default function LeadDetailPage() {
           defaultLeadId={lead.id}
           onClose={() => setShowConvert(false)}
           onSubmit={(input) => createOpportunity(input)}
+        />
+      )}
+      {followupDialog && (
+        <FollowupForm
+          mode={followupDialog.mode}
+          initialDate={followupDialog.target?.followupDate}
+          onClose={() => setFollowupDialog(null)}
+          onSubmit={(followupDate, remarks) =>
+            followupDialog.mode === "create"
+              ? createFollowup({ leadId: lead.id, followupDate, remarks })
+              : rescheduleFollowup(followupDialog.target!.id, followupDate)
+          }
         />
       )}
     </div>

@@ -1,7 +1,7 @@
-import { Lead } from "../../lib/types/domain";
+import { Lead, isQualifiedLeadStatus } from "../../lib/types/domain";
 import { Icon } from "./Icon";
 
-const FUNNEL_STATUSES: Lead["status"][] = ["New", "Contacted", "Qualified"];
+const FUNNEL_LABELS = ["New", "Contacted", "Qualified"];
 const RAMP: { shade: string; txt: string }[] = [
   { shade: "#A7F3D0", txt: "#065F46" },
   { shade: "#34D399", txt: "#fff" },
@@ -14,13 +14,19 @@ const RAMP: { shade: string; txt: string }[] = [
  * stages (a Lead's lifecycle ends at Qualified or Rejected; see
  * lib/types/domain.ts). Rejected leads are called out as a separate
  * leakage stat rather than a funnel stage, since rejection is a gated
- * action, not a step in the qualification sequence.
+ * action, not a step in the qualification sequence. "Qualified" counts
+ * both the enum's own QUALIFIED value and SALES_ASSIGNED — the status the
+ * real qualify() action actually sets (see isQualifiedLeadStatus).
  */
 export function LeadFunnel({ leads }: { leads: Lead[] }) {
   const total = leads.length;
-  const counts = FUNNEL_STATUSES.map((status) => leads.filter((l) => l.status === status).length);
+  const counts = [
+    leads.filter((l) => l.status === "NEW").length,
+    leads.filter((l) => l.status === "CONTACTED" || l.status === "PRE_SALES_ASSIGNED").length,
+    leads.filter((l) => isQualifiedLeadStatus(l.status)).length,
+  ];
   const maxCount = Math.max(...counts, 1);
-  const rejectedCount = leads.filter((l) => l.status === "Rejected").length;
+  const rejectedCount = leads.filter((l) => l.status === "REJECTED").length;
 
   let worstIdx = -1;
   let worstDrop = -Infinity;
@@ -36,13 +42,13 @@ export function LeadFunnel({ leads }: { leads: Lead[] }) {
 
   return (
     <div className="funnel">
-      {FUNNEL_STATUSES.map((status, i) => {
+      {FUNNEL_LABELS.map((label, i) => {
         const count = counts[i];
         const pct = count === 0 ? 4 : Math.max(8, (count / maxCount) * 100);
         const flagged = i === worstIdx && worstDrop > 0;
         const ramp = RAMP[i];
         return (
-          <div className="f" key={status}>
+          <div className="f" key={label}>
             <div
               className="bx"
               style={{
@@ -51,7 +57,7 @@ export function LeadFunnel({ leads }: { leads: Lead[] }) {
                 color: ramp.txt,
               }}
             >
-              {status}
+              {label}
             </div>
             <div className="meta">
               <b>{count}</b> leads <span className="tnum">({total ? Math.round((count / total) * 100) : 0}%)</span>

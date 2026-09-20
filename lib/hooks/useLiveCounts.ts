@@ -1,7 +1,9 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
+import { usePathname } from "next/navigation";
 import { db } from "../repository/mock/db";
+import { useRepository } from "../repository/RepositoryProvider";
 
 /**
  * Powers the sidebar/topbar badge counts (Leads count, open Tasks count,
@@ -11,29 +13,38 @@ import { db } from "../repository/mock/db";
  * subscription to reflect mutations made on whatever page is currently
  * active without a manual refetch trigger.
  *
- * NOTE — this is the one hook in the app that reaches into
- * `lib/repository/mock/db` directly rather than going through the
- * repository interfaces. That is a deliberate, contained exception:
- * a real backend has no equivalent in-memory store to subscribe to.
- * When the real API is wired in, reimplement this hook's internals using
- * whatever live-count strategy fits (a lightweight polling endpoint, a
- * websocket/SSE event, or simply deriving counts from data already fetched
- * by React Query/SWR's cache). The RETURN SHAPE below is the contract the
- * Sidebar/Topbar components depend on — keep it stable and no component
- * changes are needed.
+ * Leads/Opportunities (the two Stage 2A entities) go through the repository
+ * instead of the mock `db` directly, so this reflects real backend counts
+ * once the real repository is wired in — refetched on every route change
+ * (there's no live push/subscription mechanism against a plain REST
+ * backend, so this is "accurate as of your last navigation", not
+ * millisecond-live). Every other entity here is still out of Stage 2A's
+ * scope and keeps reading the mock store's live subscription directly.
  */
 export function useLiveCounts() {
-  const leads = useSyncExternalStore(db.leads.subscribe, db.leads.getSnapshot, db.leads.getSnapshot);
+  const repo = useRepository();
+  const pathname = usePathname();
+  const [leadsCount, setLeadsCount] = useState(0);
+  const [opportunitiesCount, setOpportunitiesCount] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    repo.leads.list().then((page) => {
+      if (!cancelled) setLeadsCount(page.total);
+    });
+    repo.opportunities.list().then((page) => {
+      if (!cancelled) setOpportunitiesCount(page.total);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [repo, pathname]);
+
   const tasks = useSyncExternalStore(db.tasks.subscribe, db.tasks.getSnapshot, db.tasks.getSnapshot);
   const notifications = useSyncExternalStore(
     db.notifications.subscribe,
     db.notifications.getSnapshot,
     db.notifications.getSnapshot
-  );
-  const opportunities = useSyncExternalStore(
-    db.opportunities.subscribe,
-    db.opportunities.getSnapshot,
-    db.opportunities.getSnapshot
   );
   const quotations = useSyncExternalStore(
     db.quotations.subscribe,
@@ -53,10 +64,10 @@ export function useLiveCounts() {
   const notes = useSyncExternalStore(db.notes.subscribe, db.notes.getSnapshot, db.notes.getSnapshot);
 
   return {
-    leadsCount: leads.length,
+    leadsCount,
     openTasksCount: tasks.filter((t) => !t.done).length,
     unreadNotificationsCount: notifications.filter((n) => n.unread).length,
-    opportunitiesCount: opportunities.length,
+    opportunitiesCount,
     quotationsCount: quotations.length,
     customersCount: customers.length,
     contactsCount: contacts.length,

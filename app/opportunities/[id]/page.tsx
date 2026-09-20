@@ -175,9 +175,9 @@ export default function OpportunityDetailPage() {
       </div>
 
       <DesignNote>
-        <b>Design note.</b> Stage movement (forward, backward, or Lost) is UI-only for now — no backend
-        PATCH route for Opportunity stage is confirmed yet (docs/backend-ui-contract.md §2), so this
-        exercises the stepper and confirmation flow against the local mock store only.
+        <b>Design note.</b> Stage movement (forward, backward, or Lost) is UI-only — no backend PATCH
+        route for Opportunity stage exists (docs/backend-ui-contract.md §7, §17). It&apos;s saved in your
+        browser only, not the connected backend, so it won&apos;t follow this opportunity to another device.
       </DesignNote>
 
       {pendingAction && (

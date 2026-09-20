@@ -14,7 +14,7 @@ import { useLeads } from "../../lib/hooks/useLeads";
 import { useOpportunities } from "../../lib/hooks/useOpportunities";
 import { useTasks } from "../../lib/hooks/useTasks";
 import { useQuotations } from "../../lib/hooks/useQuotations";
-import { Opportunity, OpportunityStage, OPPORTUNITY_STEPS } from "../../lib/types/domain";
+import { Opportunity, OpportunityStage, OPPORTUNITY_STEPS, isQualifiedLeadStatus } from "../../lib/types/domain";
 import { formatInr, formatRelative } from "../../lib/format";
 import { classifyFollowup } from "../../lib/followup";
 
@@ -57,9 +57,9 @@ export default function DashboardPage() {
     () => opportunities.filter((o) => o.stage === "Won").reduce((s, o) => s + o.expectedValue, 0),
     [opportunities]
   );
-  const openLeadsCount = leads.filter((l) => l.status !== "Rejected").length;
+  const openLeadsCount = leads.filter((l) => l.status !== "REJECTED").length;
   const qualificationRate = leads.length
-    ? Math.round((leads.filter((l) => l.status === "Qualified").length / leads.length) * 100)
+    ? Math.round((leads.filter((l) => isQualifiedLeadStatus(l.status)).length / leads.length) * 100)
     : 0;
 
   // MOCK/UI-ONLY prioritization surface — follow-up urgency is derived from
@@ -88,7 +88,7 @@ export default function DashboardPage() {
     }
 
     for (const l of leads) {
-      if (l.status === "New" && !l.assignedToId) {
+      if (l.status === "NEW" && !l.assignedToId) {
         items.push({
           id: `unassigned-${l.id}`,
           icon: "user",

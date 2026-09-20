@@ -12,18 +12,62 @@ import { ID } from "./common";
  * ============================================================================
  */
 
-// UI ASSUMPTION: verified timeline actions include LEAD_QUALIFIED and
-// LEAD_REJECTED as distinct, permission-gated events (leads.qualify /
-// leads.reject) separate from ordinary status movement — so "Qualified" and
-// "Rejected" are reachable only through the dedicated Qualify/Reject actions,
-// never a casual drag on the pipeline board. Exact backend enum values are
-// NOT confirmed; see docs/backend-ui-contract.md §3, §21.
-export type LeadStatus = "New" | "Contacted" | "Qualified" | "Rejected";
+// VERIFIED: the deployed Prisma `LeadStatus` enum (prisma/schema.prisma on
+// the backend). These are the exact values the API accepts/returns — not the
+// prototype's invented New/Contacted/Qualified/Proposal/Negotiation/Won/Lost
+// labels. LEAD_QUALIFIED and LEAD_REJECTED remain distinct, permission-gated
+// events (leads.qualify / leads.reject) reachable only through the dedicated
+// Qualify/Reject actions, never a casual drag on the pipeline board — the
+// real qualify() action sets status to SALES_ASSIGNED (not "QUALIFIED"),
+// confirmed in lead-assignments.service.ts. See docs/backend-ui-contract.md §3.
+export type LeadStatus =
+  | "NEW"
+  | "ASSIGNED"
+  | "CONTACTED"
+  | "QUALIFIED"
+  | "PROPOSAL_SENT"
+  | "NEGOTIATION"
+  | "WON"
+  | "LOST"
+  | "PRE_SALES_ASSIGNED"
+  | "SALES_ASSIGNED"
+  | "REJECTED";
 
-export const LEAD_STATUSES: LeadStatus[] = ["New", "Contacted", "Qualified", "Rejected"];
+export const LEAD_STATUSES: LeadStatus[] = [
+  "NEW",
+  "ASSIGNED",
+  "CONTACTED",
+  "QUALIFIED",
+  "PROPOSAL_SENT",
+  "NEGOTIATION",
+  "WON",
+  "LOST",
+  "PRE_SALES_ASSIGNED",
+  "SALES_ASSIGNED",
+  "REJECTED",
+];
 
-/** Freely draggable on the Lead Pipeline board — Qualified/Rejected are gated actions, not drag targets. */
-export const LEAD_BOARD_STATUSES: LeadStatus[] = ["New", "Contacted"];
+/** Freely draggable on the Lead Pipeline board — Qualify/Reject are gated actions, not drag targets. */
+export const LEAD_BOARD_STATUSES: LeadStatus[] = ["NEW", "CONTACTED"];
+
+/** "PRE_SALES_ASSIGNED" -> "Pre Sales Assigned". Shared by status badges and timeline action labels. */
+export function titleCaseFromConstant(value: string): string {
+  return value
+    .toLowerCase()
+    .split("_")
+    .map((w) => (w ? w.charAt(0).toUpperCase() + w.slice(1) : w))
+    .join(" ");
+}
+
+/** Presentation label for a raw backend status value, e.g. "PRE_SALES_ASSIGNED" -> "Pre Sales Assigned". */
+export function formatLeadStatus(status: string): string {
+  return titleCaseFromConstant(status);
+}
+
+/** The real qualify() action sets status to SALES_ASSIGNED, not the enum's own QUALIFIED value — both read as "qualified" for UI gating (e.g. eligible to become an Opportunity). */
+export function isQualifiedLeadStatus(status: LeadStatus): boolean {
+  return status === "QUALIFIED" || status === "SALES_ASSIGNED";
+}
 
 // Frontend-only lead-scoring heuristic for presentation/prioritization.
 // No backend equivalent — never treat as authoritative.
@@ -58,6 +102,34 @@ export interface LeadUIContext {
   city?: string;
 }
 
+// VERIFIED: LeadFollowup { id, leadId, followupDate, remarks?, status,
+// completedAt?, completedById?, createdAt, updatedAt }. completedByName is
+// denormalized for display — the real complete/reschedule/cancel/list
+// responses include a selected `completedBy` user, not a raw scalar field.
+// See docs/backend-ui-contract.md §5.
+export type LeadFollowupStatus = "PENDING" | "COMPLETED" | "CANCELLED";
+
+export interface LeadFollowup {
+  id: ID;
+  leadId: ID;
+  followupDate: string; // ISO 8601
+  remarks?: string;
+  status: LeadFollowupStatus;
+  completedAt?: string | null;
+  completedByName?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Minimal real-user shape needed to populate the Assign/Qualify dropdowns —
+// see AssignLeadDialog/QualifyLeadDialog. Sourced from GET /users (outside
+// the RevenueOS module; no RevenueOS-scoped assignable-user lookup is
+// confirmed — see docs/backend-ui-contract.md §21 and the Stage 2A report).
+export interface AssignableUser {
+  id: ID;
+  name: string;
+}
+
 // VERIFIED CreateLeadDto: leadCode?, customerName, companyName?, email?,
 // phone, alternatePhone?, sourceId. See docs/backend-ui-contract.md §3.
 export interface Lead {
@@ -70,7 +142,8 @@ export interface Lead {
   sourceId: ID;
   sourceName: string; // denormalized — VERIFIED: lead list/detail includes the source relation
   status: LeadStatus;
-  score: LeadScore;
+  /** Frontend-only heuristic with no backend basis at all — leave unset for real leads rather than fabricate it. */
+  score?: LeadScore;
   // Unset until the dedicated Assign action fires (AssignLeadDto / PRE_SALES_ASSIGNED).
   assignedToId?: ID;
   assignedToName?: string;
@@ -79,6 +152,20 @@ export interface Lead {
   lastActivityAt: string; // ISO 8601
   /** MOCK/UI-ONLY — see LeadUIContext. Not part of the verified Lead contract. */
   uiContext?: LeadUIContext;
+  /** VERIFIED: both lead list and lead detail embed the followups relation. */
+  followups?: LeadFollowup[];
+  /** VERIFIED: lead detail (not list) embeds the LeadNote relation; there is no create endpoint for it yet. */
+  notes?: LeadNoteEntry[];
+}
+
+// VERIFIED: LeadNote { id, leadId, note, createdAt } — Lead-scoped only, and
+// read-only from the frontend: no backend endpoint creates one. See
+// docs/backend-ui-contract.md §20.
+export interface LeadNoteEntry {
+  id: ID;
+  leadId: ID;
+  note: string;
+  createdAt: string;
 }
 
 export interface LeadTimelineEntry {
@@ -186,9 +273,11 @@ export interface Note {
   pinned: boolean;
 }
 
-// UI ASSUMPTION: not a confirmed backend enum. VERIFIED is only that an
-// Opportunity carries expectedValue/probability/expectedCloseDate and a
-// backend-owned status; see docs/backend-ui-contract.md §7, §21.
+// VERIFIED: the backend's own Opportunity.status is a plain String
+// defaulting to "OPEN", with no enum and no mutation endpoint anywhere in
+// the codebase — it never changes. `stage` below is therefore a client-side
+// pipeline concept only, held in the browser (see realOpportunityRepository),
+// not a projection of that backend field. See docs/backend-ui-contract.md §7, §17.
 export type OpportunityStage =
   | "Qualified"
   | "Proposal"

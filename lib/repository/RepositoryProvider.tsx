@@ -3,16 +3,19 @@
 import { createContext, useContext, useMemo, ReactNode } from "react";
 import { RevenueOSRepository } from "./interfaces";
 import { createMockRepository } from "./mock/mockRepository";
-// When ready: import { createRealRepository } from "./real/realRepository";
+import { createRealRepository } from "./real/realRepository";
 
 const RepositoryContext = createContext<RevenueOSRepository | null>(null);
 
 export function RepositoryProvider({ children }: { children: ReactNode }) {
-  // SINGLE SWAP POINT: replace createMockRepository() with
-  // createRealRepository() (or branch on process.env.NEXT_PUBLIC_USE_MOCK)
-  // once the real backend integration is ready. Nothing else in the app
-  // needs to change.
-  const repository = useMemo(() => createMockRepository(), []);
+  // SINGLE SWAP POINT. Stage 2A (Leads + Opportunities) is wired to the real
+  // backend by default; set NEXT_PUBLIC_USE_MOCK=1 to fall back to the fully
+  // in-memory mock for isolated UI/UX development. Nothing else in the app
+  // needs to change either way.
+  const repository = useMemo(
+    () => (process.env.NEXT_PUBLIC_USE_MOCK === "1" ? createMockRepository() : createRealRepository()),
+    []
+  );
 
   return (
     <RepositoryContext.Provider value={repository}>

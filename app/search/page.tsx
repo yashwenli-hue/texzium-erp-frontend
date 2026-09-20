@@ -6,6 +6,7 @@ import { PageHeader, DesignNote } from "../../components/ui/PageHeader";
 import { Icon } from "../../components/ui/Icon";
 import { useSearch } from "../../lib/hooks/useSearch";
 import { formatInr } from "../../lib/format";
+import { formatLeadStatus } from "../../lib/types/domain";
 
 function highlight(text: string, term: string) {
   if (!term.trim()) return text;
@@ -74,7 +75,7 @@ function SearchInner() {
                   <div className="ic"><Icon name="funnel" size={16} /></div>
                   <div className="body">
                     <b>{highlight(l.customerName, term)}</b>
-                    <small>{l.companyName ?? l.sourceName} · {l.status} · {l.assignedToName ?? "Unassigned"}</small>
+                    <small>{l.companyName ?? l.sourceName} · {formatLeadStatus(l.status)} · {l.assignedToName ?? "Unassigned"}</small>
                   </div>
                 </div>
               ))}

@@ -1,6 +1,8 @@
 import { RevenueOSRepository } from "../interfaces";
 import { MockLeadRepository } from "./mockLeadRepository";
 import { MockLeadSourceRepository } from "./mockLeadSourceRepository";
+import { MockLeadFollowupRepository } from "./mockLeadFollowupRepository";
+import { MockUserRepository } from "./mockUserRepository";
 import { MockCustomerRepository } from "./mockCustomerRepository";
 import { MockContactRepository } from "./mockContactRepository";
 import { MockActivityRepository } from "./mockActivityRepository";
@@ -20,8 +22,11 @@ import { MockSearchRepository } from "./mockSearchRepository";
  */
 export function createMockRepository(): RevenueOSRepository {
   return {
+    kind: "mock",
     leads: new MockLeadRepository(),
     leadSources: new MockLeadSourceRepository(),
+    leadFollowups: new MockLeadFollowupRepository(),
+    users: new MockUserRepository(),
     customers: new MockCustomerRepository(),
     contacts: new MockContactRepository(),
     activities: new MockActivityRepository(),

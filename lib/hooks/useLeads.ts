@@ -50,15 +50,15 @@ export function useLeads() {
   );
 
   const qualifyLead = useCallback(
-    async (id: string) => {
-      await repo.leads.qualify(id);
+    async (id: string, salesUserId: string) => {
+      await repo.leads.qualify(id, salesUserId);
       refetch();
     },
     [repo, refetch]
   );
 
   const rejectLead = useCallback(
-    async (id: string, reason?: string) => {
+    async (id: string, reason: string) => {
       await repo.leads.reject(id, reason);
       refetch();
     },
@@ -124,15 +124,18 @@ export function useLeadDetail(id: string | undefined) {
     [id, repo, refetch, refetchTimeline]
   );
 
-  const qualifyLead = useCallback(async () => {
-    if (!id) return;
-    await repo.leads.qualify(id);
-    refetch();
-    refetchTimeline();
-  }, [id, repo, refetch, refetchTimeline]);
+  const qualifyLead = useCallback(
+    async (salesUserId: string) => {
+      if (!id) return;
+      await repo.leads.qualify(id, salesUserId);
+      refetch();
+      refetchTimeline();
+    },
+    [id, repo, refetch, refetchTimeline]
+  );
 
   const rejectLead = useCallback(
-    async (reason?: string) => {
+    async (reason: string) => {
       if (!id) return;
       await repo.leads.reject(id, reason);
       refetch();

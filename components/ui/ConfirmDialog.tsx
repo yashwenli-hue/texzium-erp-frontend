@@ -17,6 +17,7 @@ export function ConfirmDialog({
   confirmLabel,
   destructive,
   noteLabel,
+  noteRequired,
   onConfirm,
   onClose,
 }: {
@@ -25,6 +26,8 @@ export function ConfirmDialog({
   confirmLabel: string;
   destructive?: boolean;
   noteLabel?: string;
+  /** When true, `note` is required before onConfirm fires — e.g. the backend requires a rejection reason. */
+  noteRequired?: boolean;
   onConfirm: (note?: string) => Promise<unknown>;
   onClose: () => void;
 }) {
@@ -33,6 +36,10 @@ export function ConfirmDialog({
   const [error, setError] = useState<string | null>(null);
 
   async function handleConfirm() {
+    if (noteRequired && !note.trim()) {
+      setError(`${noteLabel ?? "This field"} is required.`);
+      return;
+    }
     setSubmitting(true);
     setError(null);
     try {
@@ -69,9 +76,10 @@ export function ConfirmDialog({
       {noteLabel && (
         <TextAreaField
           label={noteLabel}
+          required={noteRequired}
           value={note}
           onChange={(e) => setNote(e.target.value)}
-          placeholder="Optional — add context for the record"
+          placeholder={noteRequired ? "Required — add context for the record" : "Optional — add context for the record"}
         />
       )}
       {error && <p style={{ color: "var(--bad)", fontSize: 12.5 }}>{error}</p>}

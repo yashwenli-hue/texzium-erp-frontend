@@ -7,12 +7,12 @@ import { KanbanBoard, KanbanColumnConfig } from "../../components/kanban/KanbanB
 import { Icon } from "../../components/ui/Icon";
 import { LEAD_STATUS_STYLE } from "../../components/ui/Tag";
 import { useLeads } from "../../lib/hooks/useLeads";
-import { Lead, LeadStatus, LEAD_BOARD_STATUSES } from "../../lib/types/domain";
+import { Lead, LeadStatus, LEAD_BOARD_STATUSES, formatLeadStatus, isQualifiedLeadStatus } from "../../lib/types/domain";
 import { formatRelative } from "../../lib/format";
 
 const BOARD_COLUMNS: KanbanColumnConfig<LeadStatus>[] = LEAD_BOARD_STATUSES.map((status) => ({
   key: status,
-  label: status,
+  label: formatLeadStatus(status),
 }));
 
 export default function PipelinePage() {
@@ -20,10 +20,10 @@ export default function PipelinePage() {
   const { leads, updateStatus } = useLeads();
 
   const boardLeads = leads.filter((l) => LEAD_BOARD_STATUSES.includes(l.status));
-  const newCount = leads.filter((l) => l.status === "New").length;
-  const contactedCount = leads.filter((l) => l.status === "Contacted").length;
-  const qualifiedCount = leads.filter((l) => l.status === "Qualified").length;
-  const rejectedCount = leads.filter((l) => l.status === "Rejected").length;
+  const newCount = leads.filter((l) => l.status === "NEW").length;
+  const contactedCount = leads.filter((l) => l.status === "CONTACTED").length;
+  const qualifiedCount = leads.filter((l) => isQualifiedLeadStatus(l.status)).length;
+  const rejectedCount = leads.filter((l) => l.status === "REJECTED").length;
   const qualificationRate = leads.length ? Math.round((qualifiedCount / leads.length) * 100) : 0;
 
   function renderCard(lead: Lead) {

@@ -1,5 +1,5 @@
 import { ID, ListQuery, Page } from "../../types/common";
-import { Opportunity, OpportunityStage } from "../../types/domain";
+import { Opportunity, OpportunityStage, isQualifiedLeadStatus } from "../../types/domain";
 import {
   IOpportunityRepository,
   CreateOpportunityInput,
@@ -23,7 +23,7 @@ export class MockOpportunityRepository implements IOpportunityRepository {
   async create(input: CreateOpportunityInput): Promise<Opportunity> {
     const lead = db.leads.getById(input.leadId);
     if (!lead) throw new Error(`Lead ${input.leadId} not found`);
-    if (lead.status !== "Qualified") {
+    if (!isQualifiedLeadStatus(lead.status)) {
       throw new Error("Only a qualified lead can become an opportunity");
     }
     const now = new Date().toISOString();

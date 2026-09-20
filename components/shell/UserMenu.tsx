@@ -1,8 +1,17 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Icon } from "../ui/Icon";
 import { useToast } from "../ui/Toast";
+import { useAuth } from "../../lib/auth/AuthContext";
+
+function initialsFromEmail(email: string): string {
+  const local = email.split("@")[0] ?? "";
+  const parts = local.split(/[._-]/).filter(Boolean);
+  const letters = parts.length >= 2 ? [parts[0][0], parts[1][0]] : [local[0], local[1]];
+  return letters.filter(Boolean).join("").toUpperCase() || "?";
+}
 
 interface MenuPos {
   right: number;
@@ -20,6 +29,8 @@ interface MenuPos {
  */
 export function UserMenu() {
   const toast = useToast();
+  const router = useRouter();
+  const { user, logout } = useAuth();
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<MenuPos | null>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
@@ -51,9 +62,15 @@ export function UserMenu() {
     setOpen((o) => !o);
   }
 
-  function action(label: string, icon: string) {
+  function placeholderAction(label: string, icon: string) {
     setOpen(false);
     toast.show(`${label} isn't connected yet — this is a placeholder for now.`, icon);
+  }
+
+  function signOut() {
+    setOpen(false);
+    logout();
+    router.replace("/login");
   }
 
   return (
@@ -65,19 +82,25 @@ export function UserMenu() {
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label="Account menu"
+        title={user?.email}
       >
-        RK
+        {user ? initialsFromEmail(user.email) : "?"}
       </button>
       {open && pos && (
         <div className="user-menu" ref={menuRef} role="menu" style={{ right: pos.right, top: pos.top }}>
-          <button className="user-menu-item" role="menuitem" onClick={() => action("View Profile", "user")}>
+          {user && (
+            <div style={{ padding: "8px 14px 10px", fontSize: 12, color: "var(--muted)", borderBottom: "1px solid var(--line)" }}>
+              {user.email}
+            </div>
+          )}
+          <button className="user-menu-item" role="menuitem" onClick={() => placeholderAction("View Profile", "user")}>
             <Icon name="user" size={15} /> View Profile
           </button>
-          <button className="user-menu-item" role="menuitem" onClick={() => action("Account & Settings", "edit")}>
+          <button className="user-menu-item" role="menuitem" onClick={() => placeholderAction("Account & Settings", "edit")}>
             <Icon name="edit" size={15} /> Account &amp; Settings
           </button>
           <div className="user-menu-divider" />
-          <button className="user-menu-item danger" role="menuitem" onClick={() => action("Sign out", "close")}>
+          <button className="user-menu-item danger" role="menuitem" onClick={signOut}>
             <Icon name="close" size={15} /> Sign Out
           </button>
         </div>

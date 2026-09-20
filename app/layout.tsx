@@ -3,7 +3,8 @@ import { Plus_Jakarta_Sans, Inter } from "next/font/google";
 import "./globals.css";
 import { RepositoryProvider } from "../lib/repository/RepositoryProvider";
 import { ToastProvider } from "../components/ui/Toast";
-import { AppShell } from "../components/shell/AppShell";
+import { AuthProvider } from "../lib/auth/AuthContext";
+import { RootShell } from "../components/shell/RootShell";
 
 const jakarta = Plus_Jakarta_Sans({
   subsets: ["latin"],
@@ -28,11 +29,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={`${jakarta.variable} ${inter.variable}`}>
       <body>
-        <RepositoryProvider>
-          <ToastProvider>
-            <AppShell>{children}</AppShell>
-          </ToastProvider>
-        </RepositoryProvider>
+        <AuthProvider>
+          <RepositoryProvider>
+            <ToastProvider>
+              <RootShell>{children}</RootShell>
+            </ToastProvider>
+          </RepositoryProvider>
+        </AuthProvider>
       </body>
     </html>
   );

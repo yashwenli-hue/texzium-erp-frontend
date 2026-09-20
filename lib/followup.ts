@@ -1,4 +1,4 @@
-import { Task } from "./types/domain";
+import { Task, LeadFollowup } from "./types/domain";
 
 /**
  * MOCK/UI-ONLY presentation concept. The verified backend has a dedicated
@@ -40,6 +40,16 @@ export function nextFollowupFor(linkedId: string, tasks: Task[]): FollowupInfo {
   const next = open[0];
   if (!next) return { urgency: "None", dueAt: null };
   return { urgency: classifyFollowup(next.dueAt), dueAt: next.dueAt, taskTitle: next.title };
+}
+
+/** Nearest PENDING LeadFollowup for a lead — the real backend equivalent of nextFollowupFor, sourced from LeadFollowup rather than the generic mock Task list. */
+export function nextPendingFollowup(followups: LeadFollowup[] | undefined): FollowupInfo {
+  const pending = (followups ?? [])
+    .filter((f) => f.status === "PENDING")
+    .sort((a, b) => (a.followupDate < b.followupDate ? -1 : 1));
+  const next = pending[0];
+  if (!next) return { urgency: "None", dueAt: null };
+  return { urgency: classifyFollowup(next.followupDate), dueAt: next.followupDate };
 }
 
 export function followupCountsFor(linkedIds: string[], tasks: Task[]) {

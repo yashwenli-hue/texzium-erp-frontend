@@ -7,6 +7,7 @@ import { Button } from "../ui/Button";
 import { useToast } from "../ui/Toast";
 import { CreateOpportunityInput } from "../../lib/repository/interfaces";
 import { useLeads } from "../../lib/hooks/useLeads";
+import { isQualifiedLeadStatus } from "../../lib/types/domain";
 
 /**
  * Field-for-field mirror of the VERIFIED CreateOpportunityDto: leadId,
@@ -26,7 +27,7 @@ export function OpportunityForm({
 }) {
   const toast = useToast();
   const { leads, loading: leadsLoading } = useLeads();
-  const qualifiedLeads = useMemo(() => leads.filter((l) => l.status === "Qualified"), [leads]);
+  const qualifiedLeads = useMemo(() => leads.filter((l) => isQualifiedLeadStatus(l.status)), [leads]);
 
   const [leadId, setLeadId] = useState(defaultLeadId ?? "");
   const [title, setTitle] = useState("");

@@ -14,10 +14,9 @@ import { Pagination, paginate } from "../../components/ui/Button";
 import { FilterBar, ActiveFilterChips, FilterGroupConfig, valuesOf, DateRangeFilter, DateRangeValue } from "../../components/ui/FilterButton";
 import { LeadForm } from "../../components/forms/LeadForm";
 import { useLeads, useLeadSources } from "../../lib/hooks/useLeads";
-import { useTasks } from "../../lib/hooks/useTasks";
-import { Lead } from "../../lib/types/domain";
+import { Lead, formatLeadStatus } from "../../lib/types/domain";
 import { formatRelative, formatDate } from "../../lib/format";
-import { nextFollowupFor, FollowupInfo } from "../../lib/followup";
+import { nextPendingFollowup, FollowupInfo } from "../../lib/followup";
 import { FilterMap, SortState } from "../../lib/types/common";
 
 const PAGE_SIZE = 8;
@@ -26,7 +25,6 @@ export default function LeadsPage() {
   const router = useRouter();
   const { leads: allLeads, loading, createLead } = useLeads();
   const { sources } = useLeadSources();
-  const { tasks } = useTasks();
   const [showForm, setShowForm] = useState(false);
   const [filters, setFilters] = useState<FilterMap>({});
   const [dateRange, setDateRange] = useState<DateRangeValue>({ from: "", to: "" });
@@ -37,9 +35,9 @@ export default function LeadsPage() {
   const categoryBySourceId = useMemo(() => new Map(sources.map((s) => [s.id, s.category])), [sources]);
   const followupById = useMemo(() => {
     const map = new Map<string, FollowupInfo>();
-    for (const l of allLeads) map.set(l.id, nextFollowupFor(l.id, tasks));
+    for (const l of allLeads) map.set(l.id, nextPendingFollowup(l.followups));
     return map;
-  }, [allLeads, tasks]);
+  }, [allLeads]);
 
   const sourceOptions = useMemo(() => [...new Set(allLeads.map((l) => l.sourceName))].sort(), [allLeads]);
   const sourceTypeOptions = useMemo(
@@ -50,15 +48,22 @@ export default function LeadsPage() {
     () => [...new Set(allLeads.map((l) => l.uiContext?.city).filter((c): c is string => !!c))].sort(),
     [allLeads]
   );
+  const statusOptions = useMemo(
+    () => [...new Set(allLeads.map((l) => formatLeadStatus(l.status)))].sort(),
+    [allLeads]
+  );
 
+  // Groups with zero options (e.g. Source Type/City have no backend basis once
+  // real leads have no uiContext/source-category data) are dropped rather than
+  // shown as a permanently-empty dropdown.
   const filterGroups: FilterGroupConfig[] = [
-    { key: "status", label: "Status", options: ["New", "Contacted", "Qualified", "Rejected"] },
+    { key: "status", label: "Status", options: statusOptions },
     { key: "source", label: "Source", options: sourceOptions },
     { key: "sourceType", label: "Source Type", options: sourceTypeOptions },
     { key: "followup", label: "Follow-up", options: ["Overdue", "Due Today", "Tomorrow", "Scheduled", "None"] },
     { key: "city", label: "City", options: cityOptions },
     { key: "assignment", label: "Assignment", options: ["Unassigned"] },
-  ];
+  ].filter((g) => g.options.length > 0);
 
   const filtered = useMemo(() => {
     let rows = [...allLeads];
@@ -69,7 +74,7 @@ export default function LeadsPage() {
     const cityF = valuesOf(filters, "city");
     const assignmentF = valuesOf(filters, "assignment");
 
-    if (statusF.length) rows = rows.filter((l) => statusF.includes(l.status));
+    if (statusF.length) rows = rows.filter((l) => statusF.includes(formatLeadStatus(l.status)));
     if (sourceF.length) rows = rows.filter((l) => sourceF.includes(l.sourceName));
     if (sourceTypeF.length) rows = rows.filter((l) => sourceTypeF.includes(categoryBySourceId.get(l.sourceId) ?? ""));
     if (followupF.length) rows = rows.filter((l) => followupF.includes(followupById.get(l.id)?.urgency ?? "None"));
@@ -131,7 +136,7 @@ export default function LeadsPage() {
       header: "Product / Interest",
       render: (l) => l.uiContext?.productInterest ?? <span style={{ color: "var(--faint)" }}>—</span>,
     },
-    { key: "score", header: "Score", render: (l) => <LeadScoreTag score={l.score} /> },
+    { key: "score", header: "Score", render: (l) => (l.score ? <LeadScoreTag score={l.score} /> : <span style={{ color: "var(--faint)" }}>—</span>) },
     { key: "status", header: "Status", render: (l) => <LeadStatusTag status={l.status} /> },
     {
       key: "followup",
@@ -214,8 +219,8 @@ export default function LeadsPage() {
       </div>
 
       <DesignNote>
-        <b>Design note.</b> Follow-up urgency and Product/Interest are presentation-only (derived from
-        mock Task data and a UI-only lead field respectively — see lib/followup.ts and LeadUIContext in
+        <b>Design note.</b> Follow-up urgency is derived from each lead&apos;s own LeadFollowup records;
+        Product/Interest is a UI-only lead field with no backend equivalent yet (see LeadUIContext in
         lib/types/domain.ts). Click any row to open the full Lead workspace.
       </DesignNote>
 

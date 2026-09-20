@@ -1,4 +1,4 @@
-import { LeadStatus } from "../../lib/types/domain";
+import { LeadStatus, formatLeadStatus } from "../../lib/types/domain";
 
 export type TagColor = "g" | "w" | "b" | "i" | "n";
 
@@ -43,30 +43,36 @@ export function StatusTag({ status }: { status: string }) {
   return <Tag color={STAGE_COLOR[status] ?? "n"}>{status}</Tag>;
 }
 
-// Dedicated lifecycle palette for the verified Lead statuses (LEAD_STATUSES
-// in lib/types/domain.ts) — its own hue per stage, separate from the
-// shared STAGE_COLOR palette above and from Score's own red/amber/blue
-// (see LEAD_SCORE_STYLE below). New/blue and Qualified/green read as the
-// natural "entry" and "success" cues; Contacted gets teal, a hue neither
-// Score nor Follow-up use anywhere. Every stage — including Rejected — uses
-// the same restrained light-tint-with-dark-text construction as the rest
-// of the app's badges (design review Stage 1.3 patch 05 §3 explicitly
-// rules out a large solid saturated fill, even for a terminal state like
-// Rejected). No new status values are introduced, only presentation color,
-// and the text label always renders alongside it so nothing depends on
-// color alone.
+// Dedicated lifecycle palette for the verified backend LeadStatus enum
+// (LEAD_STATUSES in lib/types/domain.ts) — its own hue per stage, separate
+// from the shared STAGE_COLOR palette above and from Score's own red/amber/
+// blue (see LEAD_SCORE_STYLE below). Blue/entry, teal/in-progress, green/
+// qualified-success, amber/proposal, violet/negotiation, red/lost and
+// indigo/rejected read as natural cues; every stage uses the same
+// restrained light-tint-with-dark-text construction as the rest of the
+// app's badges (design review Stage 1.3 patch 05 §3 explicitly rules out a
+// large solid saturated fill, even for a terminal state). No new status
+// values are introduced, only presentation color — text always renders
+// alongside it so nothing depends on color alone.
 export const LEAD_STATUS_STYLE: Record<LeadStatus, { bg: string; fg: string }> = {
-  New: { bg: "#DBEAFE", fg: "#1E3A8A" },
-  Contacted: { bg: "#CCFBF1", fg: "#0F766E" },
-  Qualified: { bg: "#D1FAE5", fg: "#065F46" },
-  Rejected: { bg: "#E0E7FF", fg: "#3730A3" },
+  NEW: { bg: "#DBEAFE", fg: "#1E3A8A" },
+  ASSIGNED: { bg: "#CCFBF1", fg: "#0F766E" },
+  CONTACTED: { bg: "#CCFBF1", fg: "#0F766E" },
+  PRE_SALES_ASSIGNED: { bg: "#CCFBF1", fg: "#0F766E" },
+  QUALIFIED: { bg: "#D1FAE5", fg: "#065F46" },
+  SALES_ASSIGNED: { bg: "#D1FAE5", fg: "#065F46" },
+  PROPOSAL_SENT: { bg: "#FEF3C7", fg: "#92400E" },
+  NEGOTIATION: { bg: "#EDE9FE", fg: "#5B21B6" },
+  WON: { bg: "#D1FAE5", fg: "#065F46" },
+  LOST: { bg: "#FEE2E2", fg: "#991B1B" },
+  REJECTED: { bg: "#E0E7FF", fg: "#3730A3" },
 };
 
 export function LeadStatusTag({ status }: { status: string }) {
   const style = LEAD_STATUS_STYLE[status as LeadStatus] ?? { bg: "var(--line-2)", fg: "var(--muted)" };
   return (
     <span className="tag" style={{ background: style.bg, color: style.fg }}>
-      {status}
+      {formatLeadStatus(status)}
     </span>
   );
 }
