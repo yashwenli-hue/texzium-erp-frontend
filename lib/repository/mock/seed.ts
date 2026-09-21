@@ -9,6 +9,7 @@ import {
   Note,
   Opportunity,
   Quotation,
+  ProformaInvoice,
   AppNotification,
 } from "../../types/domain";
 
@@ -193,6 +194,18 @@ export const SEED_QUOTATIONS: Quotation[] = [
   { id: "Q6", quoteNo: "QT-3371", customerName: "Reliance Industries", opportunityId: "O6", opportunityName: "Bulk Procurement Contract", amount: 4_200_000, status: "DRAFT", validUntil: daysFromNow(30), ownerName: "Anita S.", createdAt: daysAgo(2), version: 1, revisions: [{ version: 1, amount: 4_200_000, createdAt: daysAgo(2) }] },
   { id: "Q7", quoteNo: "QT-3415", customerName: "Tata Projects", opportunityId: "O7", opportunityName: "Warehouse Automation", amount: 2_850_000, status: "APPROVED", validUntil: daysFromNow(22), ownerName: "Rohit M.", createdAt: daysAgo(1), version: 1, revisions: [{ version: 1, amount: 2_850_000, createdAt: daysAgo(1) }] },
   { id: "Q8", quoteNo: "QT-3385", customerName: "Havells India", opportunityId: "O8", opportunityName: "Switchgear Replacement Order", amount: 5_200_000, status: "APPROVED", validUntil: daysAgo(1), ownerName: "Priya N.", createdAt: daysAgo(8), version: 1, revisions: [{ version: 1, amount: 5_200_000, createdAt: daysAgo(8) }] },
+];
+
+// ---------------------------------------------------------------------------
+// PROFORMA INVOICES
+// Only sourced from already-Approved mock quotations (Q3, Q7, Q8), mirroring
+// the verified backend rule that proforma invoices originate from quotations
+// (docs/backend-ui-contract.md §9). One PENDING and one APPROVED for demo
+// variety; Q8 intentionally has none yet, so "Create Proforma" has a real
+// empty case to exercise from Quotation Detail.
+export const SEED_PROFORMA_INVOICES: ProformaInvoice[] = [
+  { id: "PF1", proformaNumber: "PI-1042", quotationId: "Q3", quoteNo: "QT-3390", customerName: "JSW Steel", opportunityId: "O3", opportunityName: "Factory Automation Retrofit", issueDate: daysAgo(4), totalAmount: 8_500_000, status: "APPROVED", validityDate: daysFromNow(10), remarks: "Final commercial confirmation before Sales Order.", ownerName: "Rohit M.", createdAt: daysAgo(4) },
+  { id: "PF2", proformaNumber: "PI-1058", quotationId: "Q7", quoteNo: "QT-3415", customerName: "Tata Projects", opportunityId: "O7", opportunityName: "Warehouse Automation", issueDate: daysAgo(1), totalAmount: 2_850_000, status: "PENDING", validityDate: daysFromNow(20), ownerName: "Rohit M.", createdAt: daysAgo(1) },
 ];
 
 // ---------------------------------------------------------------------------

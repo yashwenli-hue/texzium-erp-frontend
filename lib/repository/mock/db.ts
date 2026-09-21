@@ -11,6 +11,7 @@ import {
   Note,
   Opportunity,
   Quotation,
+  ProformaInvoice,
   AppNotification,
 } from "../../types/domain";
 import {
@@ -24,6 +25,7 @@ import {
   SEED_NOTES,
   SEED_OPPORTUNITIES,
   SEED_QUOTATIONS,
+  SEED_PROFORMA_INVOICES,
   SEED_NOTIFICATIONS,
 } from "./seed";
 
@@ -54,5 +56,6 @@ export const db = {
   // intentionally keep the original "resets on refresh" mock behavior.
   opportunities: new EntityStore<Opportunity>(SEED_OPPORTUNITIES, "revenueos.mock.opportunities"),
   quotations: new EntityStore<Quotation>(SEED_QUOTATIONS),
+  proformaInvoices: new EntityStore<ProformaInvoice>(SEED_PROFORMA_INVOICES),
   notifications: new EntityStore<AppNotification>(SEED_NOTIFICATIONS),
 };

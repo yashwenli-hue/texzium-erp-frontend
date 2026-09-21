@@ -1,4 +1,4 @@
-import { LeadStatus, formatLeadStatus, formatQuotationStatus } from "../../lib/types/domain";
+import { LeadStatus, formatLeadStatus, formatQuotationStatus, formatProformaInvoiceStatus } from "../../lib/types/domain";
 
 export type TagColor = "g" | "w" | "b" | "i" | "n";
 
@@ -51,6 +51,16 @@ export const QUOTATION_STATUS_STYLE: Record<string, TagColor> = {
 
 export function QuotationStatusTag({ status }: { status: string }) {
   return <Tag color={QUOTATION_STATUS_STYLE[status] ?? "n"}>{formatQuotationStatus(status)}</Tag>;
+}
+
+// Proforma Invoice status — only two reachable backend values (PENDING/APPROVED).
+export const PROFORMA_INVOICE_STATUS_STYLE: Record<string, TagColor> = {
+  PENDING: "w",
+  APPROVED: "g",
+};
+
+export function ProformaInvoiceStatusTag({ status }: { status: string }) {
+  return <Tag color={PROFORMA_INVOICE_STATUS_STYLE[status] ?? "n"}>{formatProformaInvoiceStatus(status)}</Tag>;
 }
 
 // Dedicated lifecycle palette for the verified backend LeadStatus enum

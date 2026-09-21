@@ -10,6 +10,8 @@ import {
   Opportunity,
   Quotation,
   QuotationStatus,
+  ProformaInvoice,
+  ProformaInvoiceStatus,
   InventoryItemOption,
   GstRegistrationOption,
   titleCaseFromConstant,
@@ -257,5 +259,47 @@ export function mapQuotation(raw: BackendQuotation, opportunityById: Map<string,
     totalAmount: raw.totalAmount,
     taxType: raw.taxType ?? undefined,
     placeOfSupply: raw.placeOfSupply ?? undefined,
+  };
+}
+
+export interface BackendProformaInvoice {
+  id: string;
+  proformaNumber?: string | null;
+  quotationId: string;
+  issueDate: string;
+  totalAmount: number;
+  customerStatus: string;
+  validityDate?: string | null;
+  remarks?: string | null;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+/**
+ * Cross-references an already-resolved Quotation map (the same fully
+ * enriched Quotation objects the Quotations screen itself uses) to fill in
+ * customerName/opportunityName/ownerName — GET /proforma-invoices only
+ * nests the raw Quotation (no customerName field exists on it directly).
+ * See docs/backend-ui-contract.md §9.
+ */
+export function mapProformaInvoice(raw: BackendProformaInvoice, quotationById: Map<string, Quotation>): ProformaInvoice {
+  const q = quotationById.get(raw.quotationId);
+  return {
+    id: raw.id,
+    // No verified code path ever sets proformaNumber — fall back to a
+    // short, honestly-labeled id reference rather than fabricating one.
+    proformaNumber: raw.proformaNumber || `#${raw.id.slice(0, 8).toUpperCase()}`,
+    quotationId: raw.quotationId,
+    quoteNo: q?.quoteNo ?? "—",
+    customerName: q?.customerName ?? "—",
+    opportunityId: q?.opportunityId,
+    opportunityName: q?.opportunityName ?? "—",
+    issueDate: raw.issueDate,
+    totalAmount: raw.totalAmount,
+    status: raw.customerStatus as ProformaInvoiceStatus,
+    validityDate: raw.validityDate ?? null,
+    remarks: raw.remarks ?? undefined,
+    ownerName: q?.ownerName ?? "Unassigned",
+    createdAt: raw.createdAt,
   };
 }

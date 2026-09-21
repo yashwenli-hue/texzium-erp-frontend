@@ -5,6 +5,7 @@ import { RealOpportunityRepository } from "./realOpportunityRepository";
 import { RealLeadFollowupRepository } from "./realLeadFollowupRepository";
 import { RealUserRepository } from "./realUserRepository";
 import { RealQuotationRepository } from "./realQuotationRepository";
+import { RealProformaInvoiceRepository } from "./realProformaInvoiceRepository";
 import { RealInventoryItemRepository } from "./realInventoryItemRepository";
 import { RealSellerGstRepository } from "./realSellerGstRepository";
 import { RealBuyerGstRepository } from "./realBuyerGstRepository";
@@ -27,6 +28,7 @@ import { MockSearchRepository } from "../mock/mockSearchRepository";
 export function createRealRepository(): RevenueOSRepository {
   const users = new RealUserRepository();
   const opportunities = new RealOpportunityRepository(users);
+  const quotations = new RealQuotationRepository(opportunities);
   return {
     kind: "real",
     leads: new RealLeadRepository(),
@@ -34,7 +36,8 @@ export function createRealRepository(): RevenueOSRepository {
     leadFollowups: new RealLeadFollowupRepository(),
     users,
     opportunities,
-    quotations: new RealQuotationRepository(opportunities),
+    quotations,
+    proformaInvoices: new RealProformaInvoiceRepository(quotations),
     inventoryItems: new RealInventoryItemRepository(),
     sellerGstRegistrations: new RealSellerGstRepository(),
     buyerGstRegistrations: new RealBuyerGstRepository(),

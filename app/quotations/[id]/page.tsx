@@ -4,17 +4,21 @@ import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Icon } from "../../../components/ui/Icon";
 import { Panel } from "../../../components/ui/Card";
-import { QuotationStatusTag, Tag } from "../../../components/ui/Tag";
+import { QuotationStatusTag, ProformaInvoiceStatusTag, Tag } from "../../../components/ui/Tag";
 import { Button, EmptyState } from "../../../components/ui/Button";
+import { DataTable, Column } from "../../../components/ui/DataTable";
 import { DesignNote } from "../../../components/ui/PageHeader";
 import { DocumentTrail } from "../../../components/ui/DocumentTrail";
 import { ConfirmDialog } from "../../../components/ui/ConfirmDialog";
 import { QuotationReviseDialog } from "../../../components/forms/QuotationReviseDialog";
+import { ProformaInvoiceForm } from "../../../components/forms/ProformaInvoiceForm";
 import { useQuotationDetail } from "../../../lib/hooks/useQuotations";
+import { useProformaInvoices } from "../../../lib/hooks/useProformaInvoices";
 import { useRepository } from "../../../lib/repository/RepositoryProvider";
 import { useToast } from "../../../components/ui/Toast";
 import { initials } from "../../../components/ui/Who";
 import { formatInr, formatDate, formatDateTime } from "../../../lib/format";
+import { ProformaInvoice } from "../../../lib/types/domain";
 
 function goBackOrTo(router: ReturnType<typeof useRouter>, fallback: string) {
   if (typeof window !== "undefined" && window.history.length > 1) {
@@ -30,11 +34,13 @@ export default function QuotationDetailPage() {
   const toast = useToast();
   const id = params?.id;
   const { quotation, opportunity, loading, error, refetch, reviseQuotation, approveQuotation, convertQuotation } = useQuotationDetail(id);
+  const { proformaInvoices, createProformaInvoice, refetch: refetchProformas } = useProformaInvoices();
   const repo = useRepository();
   const isReal = repo.kind === "real";
   const [showRevise, setShowRevise] = useState(false);
   const [showApprove, setShowApprove] = useState(false);
   const [showConvert, setShowConvert] = useState(false);
+  const [showProformaForm, setShowProformaForm] = useState(false);
 
   if (loading && !quotation) {
     return (
@@ -96,6 +102,18 @@ export default function QuotationDetailPage() {
   // Convert sequence, not a claimed backend restriction.
   const canConvert = quotation.status === "APPROVED";
   const revisions = [...quotation.revisions].sort((a, b) => b.version - a.version);
+  const relatedProformas = proformaInvoices.filter((p) => p.quotationId === quotation.id);
+  // No backend precondition exists on proforma creation (it doesn't even
+  // check the quotation's status) — this mirrors the same documented
+  // Quote-to-Cash sequence assumption as Convert's own gate, not a claimed
+  // backend rule. See docs/revenueos-stage2-plan.md §4.
+  const canCreateProforma = quotation.status === "APPROVED";
+
+  const proformaColumns: Column<ProformaInvoice>[] = [
+    { key: "proformaNumber", header: "No.", render: (p) => p.proformaNumber },
+    { key: "totalAmount", header: "Amount", render: (p) => formatInr(p.totalAmount) },
+    { key: "status", header: "Status", render: (p) => <ProformaInvoiceStatusTag status={p.status} /> },
+  ];
 
   return (
     <div className="page">
@@ -188,11 +206,30 @@ export default function QuotationDetailPage() {
               ))}
             </div>
           </Panel>
+          <Panel
+            title="Related Proforma Invoices"
+            flush
+            extraHead={
+              canCreateProforma ? (
+                <a className="more" href="#" onClick={(e) => { e.preventDefault(); setShowProformaForm(true); }}>
+                  <Icon name="plus" size={14} /> Create Proforma
+                </a>
+              ) : undefined
+            }
+          >
+            <DataTable
+              columns={proformaColumns}
+              rows={relatedProformas}
+              onRowClick={(p) => router.push(`/proforma-invoices/${p.id}`)}
+              emptyTitle="No proforma invoices yet"
+              emptyBody={canCreateProforma ? "Create one to move toward a Sales Order." : "Approve this quotation first."}
+            />
+          </Panel>
           <Panel title="Downstream">
             <p style={{ fontSize: 12.5, color: "var(--muted)" }}>
               {quotation.status === "APPROVED"
-                ? "This quotation is approved and ready to Convert — doing so creates a Sales Order from it. Note: the backend does not change this quotation's own status when converting, so it will keep showing Approved even after conversion."
-                : "Approve this quotation, then Convert to create a Sales Order from it."}
+                ? "This quotation is approved. Create a Proforma Invoice above, and/or Convert directly to a Sales Order — the backend supports both independently and does not require one before the other. Note: the backend does not change this quotation's own status when converting, so it will keep showing Approved even after conversion."
+                : "Approve this quotation to create a Proforma Invoice or Convert it to a Sales Order."}
             </p>
           </Panel>
         </div>
@@ -234,6 +271,19 @@ export default function QuotationDetailPage() {
           onConfirm={async () => {
             await convertQuotation();
             toast.show(`${quotation.quoteNo} converted — Sales Order created`, "check");
+          }}
+        />
+      )}
+      {showProformaForm && (
+        <ProformaInvoiceForm
+          quotationId={quotation.id}
+          quoteNo={quotation.quoteNo}
+          defaultTotalAmount={quotation.totalAmount ?? quotation.amount}
+          onClose={() => setShowProformaForm(false)}
+          onSubmit={async (input) => {
+            const p = await createProformaInvoice(input);
+            refetchProformas();
+            return p;
           }}
         />
       )}

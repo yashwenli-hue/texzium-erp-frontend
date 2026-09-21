@@ -389,6 +389,41 @@ export interface Quotation {
   placeOfSupply?: string;
 }
 
+// VERIFIED: ProformaInvoice.customerStatus is a plain backend String
+// (@default("PENDING")), no Prisma enum. create() leaves it at PENDING;
+// approve() (PATCH /:id/approve) is the only mutation and sets APPROVED.
+// No other status value is ever written by any backend code path — see
+// proforma-invoices.service.ts.
+export type ProformaInvoiceStatus = "PENDING" | "APPROVED";
+
+export const PROFORMA_INVOICE_STATUSES: ProformaInvoiceStatus[] = ["PENDING", "APPROVED"];
+
+export function formatProformaInvoiceStatus(status: string): string {
+  return titleCaseFromConstant(status);
+}
+
+// VERIFIED CreateProformaInvoiceDto: quotationId, issueDate, totalAmount,
+// validityDate?, remarks?. totalAmount is NOT backend-computed here (unlike
+// Quotation, which derives it from HSN/GST) — the backend stores exactly
+// whatever number is sent. See docs/backend-ui-contract.md §9.
+export interface ProformaInvoice {
+  id: ID;
+  /** proformaNumber from the backend, never set by any verified code path — falls back to a short id reference, never a fabricated sequential number. */
+  proformaNumber: string;
+  quotationId: ID;
+  quoteNo: string; // denormalized from the linked quotation, for display
+  customerName: string; // denormalized via quotation -> opportunity -> lead
+  opportunityId?: ID;
+  opportunityName: string;
+  issueDate: string;
+  totalAmount: number;
+  status: ProformaInvoiceStatus;
+  validityDate: string | null;
+  remarks?: string;
+  ownerName: string;
+  createdAt: string;
+}
+
 export type NotificationIcon =
   | "funnel"
   | "file"

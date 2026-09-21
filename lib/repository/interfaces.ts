@@ -18,6 +18,7 @@ import {
   Opportunity,
   OpportunityStage,
   Quotation,
+  ProformaInvoice,
   AppNotification,
 } from "../types/domain";
 
@@ -38,6 +39,7 @@ export type CustomerSortField = "name" | "lifetimeValue" | "customerSince";
 export type ContactSortField = "name" | "lastContactedAt";
 export type OpportunitySortField = "expectedValue" | "probability" | "expectedCloseDate";
 export type QuotationSortField = "amount" | "validUntil" | "createdAt";
+export type ProformaInvoiceSortField = "totalAmount" | "issueDate" | "createdAt";
 export type TaskSortField = "dueAt" | "priority" | "createdAt";
 
 // Mirrors the VERIFIED CreateLeadDto field-for-field. No deal value, owner,
@@ -261,6 +263,26 @@ export interface IQuotationRepository {
   convert(id: ID): Promise<Quotation>;
 }
 
+// Mirrors the VERIFIED CreateProformaInvoiceDto exactly: quotationId,
+// issueDate, totalAmount, validityDate?, remarks?. totalAmount is not
+// backend-computed — the caller supplies it (the UI defaults it from the
+// source Quotation's own backend-computed total). See docs/backend-ui-contract.md §9.
+export interface CreateProformaInvoiceInput {
+  quotationId: ID;
+  issueDate: string; // ISO 8601
+  totalAmount: number;
+  validityDate?: string;
+  remarks?: string;
+}
+
+export interface IProformaInvoiceRepository {
+  list(query?: ListQuery<ProformaInvoiceSortField>): Promise<Page<ProformaInvoice>>;
+  getById(id: ID): Promise<ProformaInvoice | null>;
+  create(input: CreateProformaInvoiceInput): Promise<ProformaInvoice>;
+  /** VERIFIED: `PATCH /:id/approve`, no body — sets customerStatus to APPROVED. No other transition exists. */
+  approve(id: ID): Promise<ProformaInvoice>;
+}
+
 export interface IInventoryItemRepository {
   list(): Promise<InventoryItemOption[]>;
 }
@@ -309,6 +331,7 @@ export interface RevenueOSRepository {
   notes: INoteRepository;
   opportunities: IOpportunityRepository;
   quotations: IQuotationRepository;
+  proformaInvoices: IProformaInvoiceRepository;
   inventoryItems: IInventoryItemRepository;
   sellerGstRegistrations: ISellerGstRepository;
   buyerGstRegistrations: IBuyerGstRepository;
