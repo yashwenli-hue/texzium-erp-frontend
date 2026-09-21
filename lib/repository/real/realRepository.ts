@@ -14,6 +14,8 @@ import { RealPaymentCollectionRepository } from "./realPaymentCollectionReposito
 import { RealCustomerStatementRepository } from "./realCustomerStatementRepository";
 import { RealPaymentLinkRepository } from "./realPaymentLinkRepository";
 import { RealReceiptVoucherRepository } from "./realReceiptVoucherRepository";
+import { RealSalesReportsRepository } from "./realSalesReportsRepository";
+import { RealCollectionsDashboardRepository } from "./realCollectionsDashboardRepository";
 import { RealInventoryItemRepository } from "./realInventoryItemRepository";
 import { RealSellerGstRepository } from "./realSellerGstRepository";
 import { RealBuyerGstRepository } from "./realBuyerGstRepository";
@@ -56,6 +58,8 @@ export function createRealRepository(): RevenueOSRepository {
     customerStatements: new RealCustomerStatementRepository(),
     paymentLinks: new RealPaymentLinkRepository(),
     receiptVouchers: new RealReceiptVoucherRepository(),
+    salesReports: new RealSalesReportsRepository(),
+    collectionsDashboard: new RealCollectionsDashboardRepository(),
     inventoryItems: new RealInventoryItemRepository(),
     sellerGstRegistrations: new RealSellerGstRepository(),
     buyerGstRegistrations: new RealBuyerGstRepository(),

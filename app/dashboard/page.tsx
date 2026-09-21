@@ -6,6 +6,7 @@ import { PageHeader, DesignNote } from "../../components/ui/PageHeader";
 import { StatCard, StatRow, Panel, Cols } from "../../components/ui/Card";
 import { Button } from "../../components/ui/Button";
 import { Icon } from "../../components/ui/Icon";
+import { Tag } from "../../components/ui/Tag";
 import { KanbanBoard, KanbanColumnConfig } from "../../components/kanban/KanbanBoard";
 import { LeadFunnel } from "../../components/ui/Funnel";
 import { SourceBreakdown } from "../../components/ui/SourceBreakdown";
@@ -14,6 +15,9 @@ import { useLeads } from "../../lib/hooks/useLeads";
 import { useOpportunities } from "../../lib/hooks/useOpportunities";
 import { useTasks } from "../../lib/hooks/useTasks";
 import { useQuotations } from "../../lib/hooks/useQuotations";
+import { useCustomers } from "../../lib/hooks/useCustomers";
+import { useQuoteToCashSummary } from "../../lib/hooks/useQuoteToCashSummary";
+import { useFinancialSummary } from "../../lib/hooks/useFinancialSummary";
 import { Opportunity, OpportunityStage, OPPORTUNITY_STEPS, isQualifiedLeadStatus } from "../../lib/types/domain";
 import { formatInr, formatRelative } from "../../lib/format";
 import { classifyFollowup } from "../../lib/followup";
@@ -36,12 +40,32 @@ interface FocusItem {
   href: string;
 }
 
+interface StageState {
+  count: number;
+  loading: boolean;
+  error: Error | null;
+}
+
+/** Each Quote-to-Cash stage shows its own state independently — one failed list must not blank the others. */
+function stageValue(stage: StageState): string {
+  if (stage.error) return "—";
+  if (stage.loading && stage.count === 0) return "…";
+  return String(stage.count);
+}
+
+function stageNote(stage: StageState): string | undefined {
+  return stage.error ? "Unavailable" : undefined;
+}
+
 export default function DashboardPage() {
   const router = useRouter();
   const { leads, createLead } = useLeads();
   const { opportunities, updateStage } = useOpportunities();
   const { tasks } = useTasks();
   const { quotations } = useQuotations();
+  const { customers } = useCustomers();
+  const quoteToCash = useQuoteToCashSummary();
+  const { data: financials, loading: financialsLoading, error: financialsError, refetch: refetchFinancials } = useFinancialSummary();
   const [showLeadForm, setShowLeadForm] = useState(false);
   const [focusExpanded, setFocusExpanded] = useState(false);
 
@@ -152,8 +176,8 @@ export default function DashboardPage() {
 
       <StatRow>
         <StatCard label="Open Leads" value={String(openLeadsCount)} note="not yet rejected" />
-        <StatCard label="Open Pipeline" value={formatInr(openPipelineValue)} note={`${openOpportunities.length} open opportunities`} />
-        <StatCard label="Won Value" value={formatInr(wonValue)} note={`${opportunities.filter((o) => o.stage === "Won").length} deals`} />
+        <StatCard label="Open Pipeline" value={formatInr(openPipelineValue)} note={`${openOpportunities.length} open · stage is local only`} />
+        <StatCard label="Won Value" value={formatInr(wonValue)} note={`${opportunities.filter((o) => o.stage === "Won").length} deals · local only`} />
         <StatCard label="Qualification Rate" value={`${qualificationRate}%`} note="of all leads" />
       </StatRow>
 
@@ -199,6 +223,9 @@ export default function DashboardPage() {
 
       <Cols>
         <Panel title="Opportunity Pipeline" more={{ label: "Open opportunities", onClick: () => router.push("/opportunities") }}>
+          <div style={{ padding: "0 19px 10px" }}>
+            <Tag color="n">Not saved to backend</Tag>
+          </div>
           <KanbanBoard
             columns={SNAPSHOT_COLUMNS}
             items={openOpportunities}
@@ -214,11 +241,72 @@ export default function DashboardPage() {
         </Panel>
       </Cols>
 
+      <Panel title="Quote-to-Cash">
+        <StatRow>
+          <StatCard label="Quotations" value={stageValue(quoteToCash.quotations)} note={stageNote(quoteToCash.quotations)} />
+          <StatCard label="Proforma Invoices" value={stageValue(quoteToCash.proformaInvoices)} note={stageNote(quoteToCash.proformaInvoices)} />
+          <StatCard label="Sales Orders" value={stageValue(quoteToCash.salesOrders)} note={stageNote(quoteToCash.salesOrders)} />
+          <StatCard label="Dispatch Orders" value={stageValue(quoteToCash.dispatchOrders)} note={stageNote(quoteToCash.dispatchOrders)} />
+          <StatCard label="Sales Invoices" value={stageValue(quoteToCash.salesInvoices)} note={stageNote(quoteToCash.salesInvoices)} />
+          <StatCard label="Customers" value={String(customers.length)} note="GET /customers" />
+        </StatRow>
+        <p style={{ fontSize: 11.5, color: "var(--faint)", margin: "10px 19px 0" }}>
+          Operational counts from each stage&apos;s own real list — not a conversion funnel. The backend
+          does not track which quotation led to which sales order, so no stage-to-stage rate is implied.
+        </p>
+      </Panel>
+
+      <Panel title="Revenue & Collections">
+        {financialsLoading && !financials && <div className="skeleton" style={{ height: 120 }} />}
+        {financialsError && (
+          <div style={{ padding: "4px 19px 12px" }}>
+            <p style={{ color: "var(--bad)", fontSize: 12.5 }}>
+              Couldn&apos;t load revenue/collections data: {financialsError.message || "Something went wrong reaching the RevenueOS backend."}
+            </p>
+            <Button variant="ghost" onClick={refetchFinancials}>Retry</Button>
+          </div>
+        )}
+        {financials && (
+          <>
+            <StatRow>
+              <StatCard label="Total Revenue" value={formatInr(financials.revenue.totalRevenue)} note={`tax ${formatInr(financials.revenue.totalTax)}`} />
+              <StatCard label="Outstanding AR" value={formatInr(financials.collections.totalOutstanding)} note={`${financials.collections.totalInvoices} receivables`} />
+              <StatCard label="Collected" value={formatInr(financials.collections.totalCollected)} note="all-time" />
+              <StatCard label="Recovery Rate" value={financials.recoveryRate.recoveryRate} note="collected vs invoiced" />
+            </StatRow>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 20, padding: "12px 19px 0", fontSize: 12.5 }}>
+              <div>
+                <b style={{ color: "var(--text)" }}>AR status</b>{" "}
+                <span style={{ color: "var(--muted)" }}>
+                  Paid {financials.efficiency.paid} · Partial {financials.efficiency.partial} · Pending {financials.efficiency.pending} · Written off {financials.efficiency.writtenOff}
+                </span>
+              </div>
+              <div>
+                <b style={{ color: "var(--text)" }}>Aging</b>{" "}
+                <span style={{ color: "var(--muted)" }}>
+                  0-30d {formatInr(financials.aging.days0to30)} · 31-60d {formatInr(financials.aging.days31to60)} · 61-90d {formatInr(financials.aging.days61to90)} · 90d+ {formatInr(financials.aging.above90)}
+                </span>
+              </div>
+            </div>
+          </>
+        )}
+        <p style={{ fontSize: 11.5, color: "var(--faint)", margin: "12px 19px 0" }}>
+          AR status and balances come from the authoritative AccountsReceivable record, never the sales
+          invoice&apos;s own payment status field (see Stage 2G). Figures are all-time totals — the backend
+          has no date-range filtering on any of these endpoints.
+        </p>
+      </Panel>
+
       <DesignNote>
         <b>Design note.</b> &quot;Today&apos;s Focus&quot; is a presentation-only prioritization built from
         mock Task/Lead/Quotation data — follow-up urgency is not a real backend priority field yet (see
-        lib/followup.ts). Opportunity stage now persists across a refresh via local mock storage (see
-        lib/repository/mock/entityStore.ts) — still not a real backend transition endpoint.
+        lib/followup.ts). Opportunity stage (and the Won Value/Open Pipeline figures derived from it) persists
+        across a refresh via local browser storage only — the backend Opportunity status never leaves
+        &quot;Open&quot; and has no stage-transition endpoint, so none of that is backend truth. Quote-to-Cash
+        and Revenue &amp; Collections above are real, backend-sourced, all-time totals (no endpoint here
+        supports a date range) — intentionally excluded are quotation/lead &quot;conversion rate&quot;,
+        salesperson performance and customer ranking endpoints, each found during investigation to produce
+        naive or misleading numbers rather than true analytics.
       </DesignNote>
 
       {showLeadForm && (

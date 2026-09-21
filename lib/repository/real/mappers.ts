@@ -21,6 +21,11 @@ import {
   ReceiptVoucher,
   Customer,
   CustomerGstRegistration,
+  SalesRevenueSummary,
+  CollectionsSummary,
+  CollectionsAging,
+  CollectionsEfficiency,
+  CollectionsRecoveryRate,
   InventoryItemOption,
   GstRegistrationOption,
   titleCaseFromConstant,
@@ -663,4 +668,62 @@ export function mapCustomer(raw: BackendCustomer): Customer {
     createdAt: raw.createdAt,
     updatedAt: raw.updatedAt,
   };
+}
+
+// Stage 2I — Dashboard & Analytics. These four response shapes already
+// match their domain types field-for-field; mapped explicitly anyway (not
+// passed through as-is) so a future backend field rename is caught by the
+// compiler here rather than silently flowing into the UI.
+
+export interface BackendSalesRevenueSummary {
+  totalRevenue: number;
+  taxableRevenue: number;
+  totalTax: number;
+}
+
+export function mapSalesRevenueSummary(raw: BackendSalesRevenueSummary): SalesRevenueSummary {
+  return { totalRevenue: raw.totalRevenue, taxableRevenue: raw.taxableRevenue, totalTax: raw.totalTax };
+}
+
+export interface BackendCollectionsSummary {
+  totalInvoices: number;
+  totalOutstanding: number;
+  totalCollected: number;
+}
+
+export function mapCollectionsSummary(raw: BackendCollectionsSummary): CollectionsSummary {
+  return { totalInvoices: raw.totalInvoices, totalOutstanding: raw.totalOutstanding, totalCollected: raw.totalCollected };
+}
+
+export interface BackendCollectionsAging {
+  days0to30: number;
+  days31to60: number;
+  days61to90: number;
+  above90: number;
+}
+
+export function mapCollectionsAging(raw: BackendCollectionsAging): CollectionsAging {
+  return { days0to30: raw.days0to30, days31to60: raw.days31to60, days61to90: raw.days61to90, above90: raw.above90 };
+}
+
+export interface BackendCollectionsEfficiency {
+  total: number;
+  paid: number;
+  partial: number;
+  pending: number;
+  writtenOff: number;
+}
+
+export function mapCollectionsEfficiency(raw: BackendCollectionsEfficiency): CollectionsEfficiency {
+  return { total: raw.total, paid: raw.paid, partial: raw.partial, pending: raw.pending, writtenOff: raw.writtenOff };
+}
+
+export interface BackendCollectionsRecoveryRate {
+  totalInvoiceValue: number;
+  totalCollected: number;
+  recoveryRate: string;
+}
+
+export function mapCollectionsRecoveryRate(raw: BackendCollectionsRecoveryRate): CollectionsRecoveryRate {
+  return { totalInvoiceValue: raw.totalInvoiceValue, totalCollected: raw.totalCollected, recoveryRate: raw.recoveryRate };
 }

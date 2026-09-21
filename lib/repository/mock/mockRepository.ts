@@ -19,6 +19,8 @@ import { MockPaymentCollectionRepository } from "./mockPaymentCollectionReposito
 import { MockCustomerStatementRepository } from "./mockCustomerStatementRepository";
 import { MockPaymentLinkRepository } from "./mockPaymentLinkRepository";
 import { MockReceiptVoucherRepository } from "./mockReceiptVoucherRepository";
+import { MockSalesReportsRepository } from "./mockSalesReportsRepository";
+import { MockCollectionsDashboardRepository } from "./mockCollectionsDashboardRepository";
 import { MockInventoryItemRepository } from "./mockInventoryItemRepository";
 import { MockSellerGstRepository } from "./mockSellerGstRepository";
 import { MockBuyerGstRepository } from "./mockBuyerGstRepository";
@@ -55,6 +57,8 @@ export function createMockRepository(): RevenueOSRepository {
     customerStatements: new MockCustomerStatementRepository(),
     paymentLinks: new MockPaymentLinkRepository(),
     receiptVouchers: new MockReceiptVoucherRepository(),
+    salesReports: new MockSalesReportsRepository(),
+    collectionsDashboard: new MockCollectionsDashboardRepository(),
     inventoryItems: new MockInventoryItemRepository(),
     sellerGstRegistrations: new MockSellerGstRepository(),
     buyerGstRegistrations: new MockBuyerGstRepository(),

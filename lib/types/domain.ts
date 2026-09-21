@@ -746,3 +746,54 @@ export interface AppNotification {
   occurredAt: string; // ISO 8601
   unread: boolean;
 }
+
+// ============================================================================
+// STAGE 2I — DASHBOARD & ANALYTICS
+// ============================================================================
+// VERIFIED: GET /sales-reports/revenue-summary sums every SalesInvoice,
+// all-time — no date-range parameter exists on this or any other analytics
+// endpoint in this backend. Do not present this as period-scoped (e.g. "this
+// month") unless it is genuinely recomputed client-side from fetched
+// records with real createdAt values. See the Stage 2I report.
+export interface SalesRevenueSummary {
+  totalRevenue: number;
+  taxableRevenue: number;
+  totalTax: number;
+}
+
+// VERIFIED: GET /collections-dashboard/summary — sums the authoritative
+// AccountsReceivable.balanceAmount/paidAmount fields directly (same rule
+// established in Stage 2G: AccountsReceivable is authoritative for payment
+// state, never SalesInvoice.paymentStatus).
+export interface CollectionsSummary {
+  totalInvoices: number;
+  totalOutstanding: number;
+  totalCollected: number;
+}
+
+// VERIFIED: GET /collections-dashboard/aging — buckets AccountsReceivable
+// balances by days past their dueDate. No above-90 sub-buckets.
+export interface CollectionsAging {
+  days0to30: number;
+  days31to60: number;
+  days61to90: number;
+  above90: number;
+}
+
+// VERIFIED: GET /collections-dashboard/efficiency — counts AccountsReceivable
+// rows by their authoritative paymentStatus (PENDING/PARTIAL/PAID/WRITTEN_OFF
+// — see AccountsReceivable). This is the real AR status distribution.
+export interface CollectionsEfficiency {
+  total: number;
+  paid: number;
+  partial: number;
+  pending: number;
+  writtenOff: number;
+}
+
+// VERIFIED: GET /collections-dashboard/recovery-rate.
+export interface CollectionsRecoveryRate {
+  totalInvoiceValue: number;
+  totalCollected: number;
+  recoveryRate: string; // backend returns a formatted "NN.NN%" string, not a number
+}

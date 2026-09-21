@@ -13,19 +13,24 @@ import { useRepository } from "../repository/RepositoryProvider";
  * subscription to reflect mutations made on whatever page is currently
  * active without a manual refetch trigger.
  *
- * Leads/Opportunities (the two Stage 2A entities) go through the repository
- * instead of the mock `db` directly, so this reflects real backend counts
- * once the real repository is wired in — refetched on every route change
- * (there's no live push/subscription mechanism against a plain REST
+ * Leads, Opportunities, Quotations, and (since Stage 2H) Customers all go
+ * through the repository instead of the mock `db` directly, so each
+ * reflects real backend counts in connected mode — refetched on every route
+ * change (there's no live push/subscription mechanism against a plain REST
  * backend, so this is "accurate as of your last navigation", not
- * millisecond-live). Every other entity here is still out of Stage 2A's
- * scope and keeps reading the mock store's live subscription directly.
+ * millisecond-live). Stage 2I fixed a real bug here: quotationsCount and
+ * customersCount used to read the mock singleton store unconditionally,
+ * even in connected mode, left over from when those entities were still
+ * mock-only. Contacts/Tasks/Notifications/Notes have no real repository at
+ * all yet and correctly keep reading the mock store's live subscription.
  */
 export function useLiveCounts() {
   const repo = useRepository();
   const pathname = usePathname();
   const [leadsCount, setLeadsCount] = useState(0);
   const [opportunitiesCount, setOpportunitiesCount] = useState(0);
+  const [quotationsCount, setQuotationsCount] = useState(0);
+  const [customersCount, setCustomersCount] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -34,6 +39,12 @@ export function useLiveCounts() {
     });
     repo.opportunities.list().then((page) => {
       if (!cancelled) setOpportunitiesCount(page.total);
+    });
+    repo.quotations.list().then((page) => {
+      if (!cancelled) setQuotationsCount(page.total);
+    });
+    repo.customers.list().then((page) => {
+      if (!cancelled) setCustomersCount(page.total);
     });
     return () => {
       cancelled = true;
@@ -45,16 +56,6 @@ export function useLiveCounts() {
     db.notifications.subscribe,
     db.notifications.getSnapshot,
     db.notifications.getSnapshot
-  );
-  const quotations = useSyncExternalStore(
-    db.quotations.subscribe,
-    db.quotations.getSnapshot,
-    db.quotations.getSnapshot
-  );
-  const customers = useSyncExternalStore(
-    db.customers.subscribe,
-    db.customers.getSnapshot,
-    db.customers.getSnapshot
   );
   const contacts = useSyncExternalStore(
     db.contacts.subscribe,
@@ -68,8 +69,8 @@ export function useLiveCounts() {
     openTasksCount: tasks.filter((t) => !t.done).length,
     unreadNotificationsCount: notifications.filter((n) => n.unread).length,
     opportunitiesCount,
-    quotationsCount: quotations.length,
-    customersCount: customers.length,
+    quotationsCount,
+    customersCount,
     contactsCount: contacts.length,
     notesCount: notes.length,
   };

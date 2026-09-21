@@ -27,6 +27,11 @@ import {
   CustomerStatement,
   PaymentLinkResult,
   ReceiptVoucher,
+  SalesRevenueSummary,
+  CollectionsSummary,
+  CollectionsAging,
+  CollectionsEfficiency,
+  CollectionsRecoveryRate,
   AppNotification,
 } from "../types/domain";
 
@@ -400,6 +405,29 @@ export interface IReceiptVoucherRepository {
   generate(paymentCollectionId: ID): Promise<ReceiptVoucher>;
 }
 
+// VERIFIED: GET /sales-reports/revenue-summary only. The sales-reports
+// controller exposes many more endpoints (funnel, customer-revenue,
+// lead-conversion, quotation-conversion, lost-opportunities,
+// salesperson-performance, product/HSN/category reports) — deliberately not
+// exposed here. Each was investigated and found unsuitable to surface as
+// authoritative analytics as-is (naive ratios, an always-empty list, a
+// mislabeled/duplicate metric); see the Stage 2I report.
+export interface ISalesReportsRepository {
+  revenueSummary(): Promise<SalesRevenueSummary>;
+}
+
+// VERIFIED: GET /collections-dashboard/{summary,aging,efficiency,recovery-rate}.
+// `high-risk` and `customer-ranking` also exist on this controller but are
+// deliberately not exposed here — customer-ranking sums a running
+// CustomerLedger balance column and produces mathematically misleading
+// totals (confirmed empirically); see the Stage 2I report.
+export interface ICollectionsDashboardRepository {
+  summary(): Promise<CollectionsSummary>;
+  aging(): Promise<CollectionsAging>;
+  efficiency(): Promise<CollectionsEfficiency>;
+  recoveryRate(): Promise<CollectionsRecoveryRate>;
+}
+
 export interface IInventoryItemRepository {
   list(): Promise<InventoryItemOption[]>;
 }
@@ -457,6 +485,8 @@ export interface RevenueOSRepository {
   customerStatements: ICustomerStatementRepository;
   paymentLinks: IPaymentLinkRepository;
   receiptVouchers: IReceiptVoucherRepository;
+  salesReports: ISalesReportsRepository;
+  collectionsDashboard: ICollectionsDashboardRepository;
   inventoryItems: IInventoryItemRepository;
   sellerGstRegistrations: ISellerGstRepository;
   buyerGstRegistrations: IBuyerGstRepository;
