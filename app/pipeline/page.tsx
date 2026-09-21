@@ -6,7 +6,9 @@ import { StatCard, StatRow, Panel } from "../../components/ui/Card";
 import { KanbanBoard, KanbanColumnConfig } from "../../components/kanban/KanbanBoard";
 import { Icon } from "../../components/ui/Icon";
 import { LEAD_STATUS_STYLE } from "../../components/ui/Tag";
+import { useToast } from "../../components/ui/Toast";
 import { useLeads } from "../../lib/hooks/useLeads";
+import { useAuth } from "../../lib/auth/AuthContext";
 import { Lead, LeadStatus, LEAD_BOARD_STATUSES, formatLeadStatus, isQualifiedLeadStatus } from "../../lib/types/domain";
 import { formatRelative } from "../../lib/format";
 
@@ -17,7 +19,18 @@ const BOARD_COLUMNS: KanbanColumnConfig<LeadStatus>[] = LEAD_BOARD_STATUSES.map(
 
 export default function PipelinePage() {
   const router = useRouter();
+  const toast = useToast();
+  const { hasPermission } = useAuth();
   const { leads, updateStatus } = useLeads();
+  const canUpdateStatus = hasPermission("leads.status.update");
+
+  async function handleMove(id: string, status: LeadStatus) {
+    try {
+      await updateStatus(id, status);
+    } catch (err) {
+      toast.show(err instanceof Error ? err.message : "Could not move this lead. Please try again.", "alert");
+    }
+  }
 
   const boardLeads = leads.filter((l) => LEAD_BOARD_STATUSES.includes(l.status));
   const newCount = leads.filter((l) => l.status === "NEW").length;
@@ -67,7 +80,7 @@ export default function PipelinePage() {
             renderCard={renderCard}
             gridColumns={2}
             colorMap={LEAD_STATUS_STYLE}
-            onMove={(id, status) => updateStatus(id, status)}
+            onMove={canUpdateStatus ? handleMove : undefined}
             onCardClick={(id) => router.push(`/leads/${id}`)}
           />
         </Panel>

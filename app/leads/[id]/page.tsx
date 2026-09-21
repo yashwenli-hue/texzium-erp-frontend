@@ -14,23 +14,29 @@ import { DesignNote } from "../../../components/ui/PageHeader";
 import { DocumentTrail } from "../../../components/ui/DocumentTrail";
 import { NoteForm } from "../../../components/forms/NoteForm";
 import { NoteDetailModal } from "../../../components/forms/NoteDetailModal";
+import { ActivityForm } from "../../../components/forms/ActivityForm";
 import { AssignLeadDialog } from "../../../components/forms/AssignLeadDialog";
 import { EditLeadDialog } from "../../../components/forms/EditLeadDialog";
 import { QualifyLeadDialog } from "../../../components/forms/QualifyLeadDialog";
 import { FollowupForm } from "../../../components/forms/FollowupForm";
 import { OpportunityForm } from "../../../components/forms/OpportunityForm";
 import { ConfirmDialog } from "../../../components/ui/ConfirmDialog";
+import { EmptyState } from "../../../components/ui/Button";
 import { useLeadDetail } from "../../../lib/hooks/useLeads";
 import { useNotesByRelated } from "../../../lib/hooks/useNotes";
 import { useLeadFollowups } from "../../../lib/hooks/useLeadFollowups";
 import { useQuotations } from "../../../lib/hooks/useQuotations";
 import { useOpportunities } from "../../../lib/hooks/useOpportunities";
 import { useRepository } from "../../../lib/repository/RepositoryProvider";
+import { useAuth } from "../../../lib/auth/AuthContext";
 import { useToast } from "../../../components/ui/Toast";
 import { initials } from "../../../components/ui/Who";
 import { formatInr, formatDateTime } from "../../../lib/format";
 import { nextPendingFollowup } from "../../../lib/followup";
 import { isQualifiedLeadStatus, LeadFollowup, Quotation, Opportunity, Note } from "../../../lib/types/domain";
+
+const ACTIVITY_TYPES = ["Call", "Email", "Meeting", "WhatsApp"] as const;
+const ACTIVITY_ICONS: Record<string, string> = { Call: "phone", Email: "mail", Meeting: "cal", WhatsApp: "wa" };
 
 function goBackOrTo(router: ReturnType<typeof useRouter>, fallback: string) {
   if (typeof window !== "undefined" && window.history.length > 1) {
@@ -51,14 +57,16 @@ export default function LeadDetailPage() {
   const router = useRouter();
   const toast = useToast();
   const id = params?.id;
-  const { lead, timeline, loading, assignLead, qualifyLead, rejectLead, updateLead } = useLeadDetail(id);
+  const { lead, timeline, loading, error, refetch, appendActivity, assignLead, qualifyLead, rejectLead, updateLead } = useLeadDetail(id);
   const { notes, refetch: refetchNotes } = useNotesByRelated(id);
   const { followups, createFollowup, completeFollowup, rescheduleFollowup, cancelFollowup } = useLeadFollowups(id);
   const { quotations } = useQuotations();
   const { opportunities, createOpportunity } = useOpportunities();
   const repo = useRepository();
+  const { hasPermission } = useAuth();
   const isReal = repo.kind === "real";
   const [showNoteForm, setShowNoteForm] = useState(false);
+  const [showActivityForm, setShowActivityForm] = useState(false);
   const [showAssign, setShowAssign] = useState(false);
   const [showQualify, setShowQualify] = useState(false);
   const [showReject, setShowReject] = useState(false);
@@ -74,11 +82,48 @@ export default function LeadDetailPage() {
   const primaryOpportunity = relatedOpportunities[0];
   const nextFollowup = useMemo(() => nextPendingFollowup(followups), [followups]);
 
+  // Mock-only prioritization surface — see the Activity & History panel below.
+  // Real timeline action codes never start with these prefixes, so this is
+  // always 0 for a real lead; the panel itself is gated on !isReal anyway.
+  const activityCounts = useMemo(() => {
+    const counts: Record<string, number> = { Call: 0, Email: 0, Meeting: 0, WhatsApp: 0 };
+    for (const t of timeline) {
+      for (const type of ACTIVITY_TYPES) {
+        if (t.title.startsWith(`${type}:`)) counts[type] += 1;
+      }
+    }
+    return counts;
+  }, [timeline]);
+
   if (loading && !lead) {
     return (
       <div className="page">
         <div className="skeleton" style={{ height: 220, marginBottom: 16 }} />
         <div className="skeleton" style={{ height: 300 }} />
+      </div>
+    );
+  }
+
+  // A fetch failure (403/network/5xx) is not the same as a genuine 404 — only
+  // getById() resolving to null means the lead truly doesn't exist.
+  if (error) {
+    return (
+      <div className="page">
+        <a className="back-link" onClick={() => goBackOrTo(router, "/leads")}>
+          <Icon name="back" size={14} /> Back to Leads
+        </a>
+        <Panel title="Couldn't load this lead">
+          <EmptyState
+            icon="alert"
+            title="Something went wrong"
+            body={error.message || "Something went wrong reaching the RevenueOS backend. Please try again."}
+            action={
+              <Button variant="ghost" onClick={refetch}>
+                Retry
+              </Button>
+            }
+          />
+        </Panel>
       </div>
     );
   }
@@ -135,9 +180,11 @@ export default function LeadDetailPage() {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
                     <h3>{lead.customerName}</h3>
-                    <button className="iconlink" onClick={() => setShowEdit(true)} aria-label="Edit lead">
-                      <Icon name="edit" size={14} /> Edit
-                    </button>
+                    {hasPermission("leads.edit") && (
+                      <button className="iconlink" onClick={() => setShowEdit(true)} aria-label="Edit lead">
+                        <Icon name="edit" size={14} /> Edit
+                      </button>
+                    )}
                   </div>
                   <div className="co">
                     {[lead.companyName, lead.uiContext?.city].filter(Boolean).join(" · ") || "No company on file"}
@@ -153,13 +200,32 @@ export default function LeadDetailPage() {
               </div>
               <QuickActions phone={lead.phone} email={lead.email} contactName={lead.customerName} />
               <div className="lead-action-row">
-                <Button variant="ghost" icon="user" onClick={() => setShowAssign(true)}>
+                <Button
+                  variant="ghost"
+                  icon="user"
+                  onClick={() => setShowAssign(true)}
+                  disabled={!hasPermission("leads.assign")}
+                  title={hasPermission("leads.assign") ? undefined : "You don't have permission to assign leads"}
+                >
                   {lead.assignedToId ? "Reassign" : "Assign"}
                 </Button>
-                <Button variant="ghost" icon="check" onClick={() => setShowQualify(true)} disabled={!canQualify}>
+                <Button
+                  variant="ghost"
+                  icon="check"
+                  onClick={() => setShowQualify(true)}
+                  disabled={!canQualify || !hasPermission("leads.qualify")}
+                  title={hasPermission("leads.qualify") ? undefined : "You don't have permission to qualify leads"}
+                >
                   Qualify
                 </Button>
-                <Button variant="ghost" className="danger-ghost" icon="close" onClick={() => setShowReject(true)} disabled={!canReject}>
+                <Button
+                  variant="ghost"
+                  className="danger-ghost"
+                  icon="close"
+                  onClick={() => setShowReject(true)}
+                  disabled={!canReject || !hasPermission("leads.reject")}
+                  title={hasPermission("leads.reject") ? undefined : "You don't have permission to reject leads"}
+                >
                   Reject
                 </Button>
               </div>
@@ -172,9 +238,11 @@ export default function LeadDetailPage() {
                 <label>Next Follow-up</label>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <FollowupTag urgency={nextFollowup.urgency} dueAt={nextFollowup.dueAt} />
-                  <button className="iconlink" style={{ fontSize: 11.5 }} onClick={() => setFollowupDialog({ mode: "create" })}>
-                    <Icon name="plus" size={12} /> Schedule
-                  </button>
+                  {hasPermission("leads.followups.create") && (
+                    <button className="iconlink" style={{ fontSize: 11.5 }} onClick={() => setFollowupDialog({ mode: "create" })}>
+                      <Icon name="plus" size={12} /> Schedule
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -236,15 +304,39 @@ export default function LeadDetailPage() {
                         </span>
                       </div>
                       {f.remarks && <p>{f.remarks}</p>}
-                      {f.status === "PENDING" && (
+                      {f.status === "PENDING" && hasPermission("leads.followups.create") && (
                         <div style={{ display: "flex", gap: 12, marginTop: 6 }}>
-                          <a className="more" href="#" onClick={(e) => { e.preventDefault(); completeFollowup(f.id); }}>
+                          <a
+                            className="more"
+                            href="#"
+                            onClick={async (e) => {
+                              e.preventDefault();
+                              try {
+                                await completeFollowup(f.id);
+                                toast.show("Follow-up completed", "check");
+                              } catch (err) {
+                                toast.show(err instanceof Error ? err.message : "Could not complete this follow-up. Please try again.", "alert");
+                              }
+                            }}
+                          >
                             <Icon name="check" size={13} /> Complete
                           </a>
                           <a className="more" href="#" onClick={(e) => { e.preventDefault(); setFollowupDialog({ mode: "reschedule", target: f }); }}>
                             <Icon name="clock" size={13} /> Reschedule
                           </a>
-                          <a className="more" href="#" onClick={(e) => { e.preventDefault(); cancelFollowup(f.id); }}>
+                          <a
+                            className="more"
+                            href="#"
+                            onClick={async (e) => {
+                              e.preventDefault();
+                              try {
+                                await cancelFollowup(f.id);
+                                toast.show("Follow-up cancelled", "close");
+                              } catch (err) {
+                                toast.show(err instanceof Error ? err.message : "Could not cancel this follow-up. Please try again.", "alert");
+                              }
+                            }}
+                          >
                             <Icon name="close" size={13} /> Cancel
                           </a>
                         </div>
@@ -259,7 +351,28 @@ export default function LeadDetailPage() {
             )}
           </Panel>
 
-          <Panel title="Activity & History" flush>
+          <Panel
+            title="Activity & History"
+            flush
+            extraHead={
+              !isReal ? (
+                <a className="more" href="#" onClick={(e) => { e.preventDefault(); setShowActivityForm(true); }}>
+                  <Icon name="plus" size={14} /> Log Activity
+                </a>
+              ) : undefined
+            }
+          >
+            {!isReal && (
+              <div className="activity-summary">
+                {ACTIVITY_TYPES.map((type) => (
+                  <div className="as-item" key={type}>
+                    <Icon name={ACTIVITY_ICONS[type]} size={14} />
+                    <b>{activityCounts[type]}</b>
+                    <span>{type}{activityCounts[type] === 1 ? "" : "s"}</span>
+                  </div>
+                ))}
+              </div>
+            )}
             <div className="tl">
               {timeline.length === 0 && (
                 <p style={{ color: "var(--muted)", fontSize: 13, padding: "4px 0 12px" }}>No activity logged yet.</p>
@@ -362,6 +475,21 @@ export default function LeadDetailPage() {
           note={activeNote}
           onClose={() => { setActiveNote(null); refetchNotes(); }}
           onUpdate={(noteId, input) => repo.notes.update(noteId, input)}
+        />
+      )}
+      {showActivityForm && (
+        <ActivityForm
+          onClose={() => setShowActivityForm(false)}
+          onSubmit={async (input) => {
+            await appendActivity(
+              input.type === "Call" ? "phone" : input.type === "Email" ? "mail" : input.type === "WhatsApp" ? "wa" : input.type === "Meeting" ? "cal" : "pulse",
+              `${input.type}: ${input.note}`,
+              input.ownerName
+            );
+          }}
+          defaultRelatedType="Lead"
+          defaultRelatedName={lead.customerName}
+          defaultRelatedId={lead.id}
         />
       )}
       {showAssign && (

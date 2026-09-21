@@ -65,7 +65,7 @@ export function LeadForm({
       toast.show(`Lead "${customerName.trim()}" created`, "check");
       onClose();
     } catch (err) {
-      setErrors({ form: "Something went wrong creating the lead. Please try again." });
+      setErrors({ form: err instanceof Error ? err.message : "Something went wrong creating the lead. Please try again." });
     } finally {
       setSubmitting(false);
     }

@@ -65,8 +65,8 @@ export function EditLeadDialog({
       });
       toast.show("Lead updated", "check");
       onClose();
-    } catch {
-      setErrors({ form: "Something went wrong saving these changes. Please try again." });
+    } catch (err) {
+      setErrors({ form: err instanceof Error ? err.message : "Something went wrong saving these changes. Please try again." });
     } finally {
       setSubmitting(false);
     }

@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PageHeader, DesignNote } from "../../components/ui/PageHeader";
 import { Panel } from "../../components/ui/Card";
-import { Button } from "../../components/ui/Button";
+import { Button, EmptyState } from "../../components/ui/Button";
 import { LeadStatusTag, LeadScoreTag } from "../../components/ui/Tag";
 import { SourceTag } from "../../components/ui/SourceBadge";
 import { FollowupTag } from "../../components/ui/FollowupTag";
@@ -14,6 +14,7 @@ import { Pagination, paginate } from "../../components/ui/Button";
 import { FilterBar, ActiveFilterChips, FilterGroupConfig, valuesOf, DateRangeFilter, DateRangeValue } from "../../components/ui/FilterButton";
 import { LeadForm } from "../../components/forms/LeadForm";
 import { useLeads, useLeadSources } from "../../lib/hooks/useLeads";
+import { useAuth } from "../../lib/auth/AuthContext";
 import { Lead, formatLeadStatus } from "../../lib/types/domain";
 import { formatRelative, formatDate } from "../../lib/format";
 import { nextPendingFollowup, FollowupInfo } from "../../lib/followup";
@@ -23,8 +24,9 @@ const PAGE_SIZE = 8;
 
 export default function LeadsPage() {
   const router = useRouter();
-  const { leads: allLeads, loading, createLead } = useLeads();
+  const { leads: allLeads, loading, error, createLead, refetch } = useLeads();
   const { sources } = useLeadSources();
+  const { hasPermission } = useAuth();
   const [showForm, setShowForm] = useState(false);
   const [filters, setFilters] = useState<FilterMap>({});
   const [dateRange, setDateRange] = useState<DateRangeValue>({ from: "", to: "" });
@@ -167,6 +169,32 @@ export default function LeadsPage() {
     );
   }
 
+  // A failed fetch must not read as "zero leads" — that's the DataTable's own
+  // empty state below, reserved for a genuine successful zero-result response.
+  if (error && allLeads.length === 0) {
+    return (
+      <div className="page">
+        <PageHeader
+          eyebrow="RevenueOS · Pipeline · Leads"
+          title="Leads"
+          subtitle="Every inbound and outbound lead, from first contact to qualification."
+        />
+        <Panel title="Lead Master">
+          <EmptyState
+            icon="alert"
+            title="Couldn't load leads"
+            body={error.message || "Something went wrong reaching the RevenueOS backend. Please try again."}
+            action={
+              <Button variant="ghost" onClick={refetch}>
+                Retry
+              </Button>
+            }
+          />
+        </Panel>
+      </div>
+    );
+  }
+
   return (
     <div className="page">
       <PageHeader
@@ -174,7 +202,13 @@ export default function LeadsPage() {
         title="Leads"
         subtitle="Every inbound and outbound lead, from first contact to qualification."
         cta={
-          <Button variant="primary" icon="plus" onClick={() => setShowForm(true)}>
+          <Button
+            variant="primary"
+            icon="plus"
+            onClick={() => setShowForm(true)}
+            disabled={!hasPermission("leads.create")}
+            title={hasPermission("leads.create") ? undefined : "You don't have permission to create leads"}
+          >
             New Lead
           </Button>
         }
