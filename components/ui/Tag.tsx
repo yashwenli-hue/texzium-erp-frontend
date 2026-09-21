@@ -1,4 +1,4 @@
-import { LeadStatus, formatLeadStatus, formatQuotationStatus, formatProformaInvoiceStatus, formatSalesOrderStatus, formatSalesInvoiceStatus } from "../../lib/types/domain";
+import { LeadStatus, formatLeadStatus, formatQuotationStatus, formatProformaInvoiceStatus, formatSalesOrderStatus, formatSalesInvoiceStatus, formatAccountsReceivableStatus } from "../../lib/types/domain";
 
 export type TagColor = "g" | "w" | "b" | "i" | "n";
 
@@ -92,10 +92,11 @@ export function SalesInvoiceStatusTag({ status }: { status: string }) {
   return <Tag color={SALES_INVOICE_STATUS_STYLE[status] ?? "n"}>{formatSalesInvoiceStatus(status)}</Tag>;
 }
 
-// Sales Invoice paymentStatus is a distinct, real field (PENDING/PAID
-// observed) driven by the AccountsReceivable side effect the backend
-// creates alongside every invoice — shown as read-only information, since
-// building payment-collection actions is out of scope here.
+// SalesInvoice.paymentStatus itself — kept only for completeness/reference.
+// NOT authoritative and NOT used anywhere in the app: the live payment flow
+// never updates this field (confirmed empirically — real PAID/WRITTEN_OFF
+// AccountsReceivable records still show their linked SalesInvoice stuck at
+// PENDING here). See AccountsReceivableStatusTag below for the real one.
 export const PAYMENT_STATUS_STYLE: Record<string, TagColor> = {
   PENDING: "w",
   PAID: "g",
@@ -103,6 +104,22 @@ export const PAYMENT_STATUS_STYLE: Record<string, TagColor> = {
 
 export function PaymentStatusTag({ status }: { status: string }) {
   return <Tag color={PAYMENT_STATUS_STYLE[status] ?? "n"}>{formatSalesInvoiceStatus(status)}</Tag>;
+}
+
+// AccountsReceivable.paymentStatus — the ONE authoritative payment status in
+// the app (see AccountsReceivable in lib/types/domain.ts). Reachable values:
+// PENDING, PARTIAL, PAID (live payment-collections flow), WRITTEN_OFF
+// (bad-debt-writeoff — not integrated this stage, shown honestly via
+// fallback tint if ever encountered in real data).
+export const ACCOUNTS_RECEIVABLE_STATUS_STYLE: Record<string, TagColor> = {
+  PENDING: "w",
+  PARTIAL: "i",
+  PAID: "g",
+  WRITTEN_OFF: "b",
+};
+
+export function AccountsReceivableStatusTag({ status }: { status: string }) {
+  return <Tag color={ACCOUNTS_RECEIVABLE_STATUS_STYLE[status] ?? "n"}>{formatAccountsReceivableStatus(status)}</Tag>;
 }
 
 // Dedicated lifecycle palette for the verified backend LeadStatus enum

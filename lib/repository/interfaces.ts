@@ -22,6 +22,11 @@ import {
   SalesOrder,
   SalesInvoice,
   DispatchOrderOption,
+  AccountsReceivable,
+  RecordPaymentResult,
+  CustomerStatement,
+  PaymentLinkResult,
+  ReceiptVoucher,
   AppNotification,
 } from "../types/domain";
 
@@ -45,6 +50,7 @@ export type QuotationSortField = "amount" | "validUntil" | "createdAt";
 export type ProformaInvoiceSortField = "totalAmount" | "issueDate" | "createdAt";
 export type SalesOrderSortField = "totalAmount" | "orderDate" | "createdAt";
 export type SalesInvoiceSortField = "totalAmount" | "invoiceDate" | "createdAt";
+export type AccountsReceivableSortField = "balanceAmount" | "dueDate" | "createdAt";
 export type TaskSortField = "dueAt" | "priority" | "createdAt";
 
 // Mirrors the VERIFIED CreateLeadDto field-for-field. No deal value, owner,
@@ -344,6 +350,56 @@ export interface IDispatchOrderRepository {
   list(): Promise<DispatchOrderOption[]>;
 }
 
+// VERIFIED: GET /accounts-receivable only — no GET /:id exists, so
+// getBySalesInvoiceId() list-scans, same pattern as every other "no detail
+// endpoint" resource in this app. There is a separate POST
+// /accounts-receivable route, but it is an independent creation path (would
+// create a duplicate AR row rather than update one) — deliberately not
+// exposed here; AccountsReceivable rows are only ever created as a side
+// effect of Sales Invoice creation. See the Stage 2G report.
+export interface IAccountsReceivableRepository {
+  list(query?: ListQuery<AccountsReceivableSortField>): Promise<Page<AccountsReceivable>>;
+  getBySalesInvoiceId(salesInvoiceId: ID): Promise<AccountsReceivable | null>;
+}
+
+// Mirrors the VERIFIED CreatePaymentCollectionDto exactly: salesInvoiceId,
+// paymentDate, amountReceived, paymentMode, referenceNo — all required.
+export interface CreatePaymentCollectionInput {
+  salesInvoiceId: ID;
+  paymentDate: string; // ISO 8601
+  amountReceived: number;
+  paymentMode: string;
+  referenceNo: string;
+}
+
+// VERIFIED: POST /payment-collections only — no GET/list exists for this
+// resource at all (confirmed empirically: GET /payment-collections returns
+// 404). create() is therefore the repository's only method; nothing else
+// is honestly offerable. See the Stage 2G report.
+export interface IPaymentCollectionRepository {
+  create(input: CreatePaymentCollectionInput): Promise<RecordPaymentResult>;
+}
+
+// VERIFIED: GET /customer-statements/:customerName — derives entirely from
+// CustomerLedger. See CustomerStatement in lib/types/domain.ts.
+export interface ICustomerStatementRepository {
+  get(customerName: string): Promise<CustomerStatement>;
+}
+
+// VERIFIED: POST /payment-links/:salesInvoiceId/generate. See
+// PaymentLinkResult in lib/types/domain.ts for why `mode` is read from the
+// real response rather than assumed.
+export interface IPaymentLinkRepository {
+  generate(salesInvoiceId: ID): Promise<PaymentLinkResult>;
+}
+
+// VERIFIED: POST /receipt-vouchers/:paymentCollectionId/generate. Only
+// callable with a PaymentCollection id obtained from that payment's own
+// creation response — see PaymentCollectionRecord in lib/types/domain.ts.
+export interface IReceiptVoucherRepository {
+  generate(paymentCollectionId: ID): Promise<ReceiptVoucher>;
+}
+
 export interface IInventoryItemRepository {
   list(): Promise<InventoryItemOption[]>;
 }
@@ -396,6 +452,11 @@ export interface RevenueOSRepository {
   salesOrders: ISalesOrderRepository;
   salesInvoices: ISalesInvoiceRepository;
   dispatchOrders: IDispatchOrderRepository;
+  accountsReceivable: IAccountsReceivableRepository;
+  paymentCollections: IPaymentCollectionRepository;
+  customerStatements: ICustomerStatementRepository;
+  paymentLinks: IPaymentLinkRepository;
+  receiptVouchers: IReceiptVoucherRepository;
   inventoryItems: IInventoryItemRepository;
   sellerGstRegistrations: ISellerGstRepository;
   buyerGstRegistrations: IBuyerGstRepository;

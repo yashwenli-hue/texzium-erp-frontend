@@ -15,6 +15,10 @@ import {
   SalesOrder,
   SalesInvoice,
   DispatchOrderOption,
+  AccountsReceivable,
+  PaymentCollectionRecord,
+  CustomerStatement,
+  ReceiptVoucher,
   InventoryItemOption,
   GstRegistrationOption,
   titleCaseFromConstant,
@@ -452,6 +456,125 @@ export function mapSalesInvoice(raw: BackendSalesInvoice, salesOrderById: Map<st
     totalAmount: raw.totalAmount,
     status: raw.status,
     paymentStatus: raw.paymentStatus,
+    remarks: raw.remarks ?? undefined,
+    createdAt: raw.createdAt,
+  };
+}
+
+export interface BackendAccountsReceivable {
+  id: string;
+  salesInvoiceId: string;
+  dueDate: string;
+  outstandingAmount: number;
+  paidAmount: number;
+  balanceAmount: number;
+  paymentStatus: string;
+  createdAt: string;
+  updatedAt?: string;
+  /** Only present on GET /accounts-receivable — the POST /payment-collections response's updatedReceivable has no nested salesInvoice. */
+  salesInvoice?: { id: string; invoiceNumber?: string | null; customerName?: string | null } | null;
+}
+
+export function mapAccountsReceivable(raw: BackendAccountsReceivable): AccountsReceivable {
+  return {
+    id: raw.id,
+    salesInvoiceId: raw.salesInvoiceId,
+    invoiceNumber: raw.salesInvoice
+      ? raw.salesInvoice.invoiceNumber || `#${raw.salesInvoice.id.slice(0, 8).toUpperCase()}`
+      : undefined,
+    customerName: raw.salesInvoice?.customerName ?? undefined,
+    dueDate: raw.dueDate,
+    outstandingAmount: raw.outstandingAmount,
+    paidAmount: raw.paidAmount,
+    balanceAmount: raw.balanceAmount,
+    paymentStatus: raw.paymentStatus,
+    createdAt: raw.createdAt,
+  };
+}
+
+export interface BackendPaymentCollectionRecord {
+  id: string;
+  accountsReceivableId: string;
+  paymentDate: string;
+  amount: number;
+  paymentMode: string;
+  referenceNumber?: string | null;
+  remarks?: string | null;
+  createdAt: string;
+}
+
+export function mapPaymentCollectionRecord(raw: BackendPaymentCollectionRecord): PaymentCollectionRecord {
+  return {
+    id: raw.id,
+    accountsReceivableId: raw.accountsReceivableId,
+    paymentDate: raw.paymentDate,
+    amount: raw.amount,
+    paymentMode: raw.paymentMode,
+    referenceNumber: raw.referenceNumber ?? undefined,
+    remarks: raw.remarks ?? undefined,
+    createdAt: raw.createdAt,
+  };
+}
+
+export interface BackendCustomerStatementEntry {
+  id: string;
+  customerName: string;
+  salesInvoiceId: string;
+  debitAmount: number;
+  creditAmount: number;
+  balanceAmount: number;
+  entryDate: string;
+  remarks?: string | null;
+  createdAt: string;
+}
+
+export interface BackendCustomerStatement {
+  customerName: string;
+  openingBalance: number;
+  closingBalance: number;
+  entries: BackendCustomerStatementEntry[];
+}
+
+export function mapCustomerStatement(raw: BackendCustomerStatement): CustomerStatement {
+  return {
+    customerName: raw.customerName,
+    openingBalance: raw.openingBalance,
+    closingBalance: raw.closingBalance,
+    entries: raw.entries.map((e) => ({
+      id: e.id,
+      customerName: e.customerName,
+      salesInvoiceId: e.salesInvoiceId,
+      debitAmount: e.debitAmount,
+      creditAmount: e.creditAmount,
+      balanceAmount: e.balanceAmount,
+      entryDate: e.entryDate,
+      remarks: e.remarks ?? undefined,
+      createdAt: e.createdAt,
+    })),
+  };
+}
+
+export interface BackendReceiptVoucher {
+  id: string;
+  receiptNumber?: string | null;
+  paymentCollectionId: string;
+  receiptDate: string;
+  amountReceived: number;
+  paymentMode: string;
+  referenceNo?: string | null;
+  remarks?: string | null;
+  createdAt: string;
+}
+
+export function mapReceiptVoucher(raw: BackendReceiptVoucher): ReceiptVoucher {
+  return {
+    id: raw.id,
+    receiptNumber: raw.receiptNumber ?? undefined,
+    paymentCollectionId: raw.paymentCollectionId,
+    receiptDate: raw.receiptDate,
+    amountReceived: raw.amountReceived,
+    paymentMode: raw.paymentMode,
+    referenceNo: raw.referenceNo ?? undefined,
     remarks: raw.remarks ?? undefined,
     createdAt: raw.createdAt,
   };

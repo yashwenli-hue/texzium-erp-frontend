@@ -1,15 +1,25 @@
 "use client";
 
+import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Icon } from "../../../components/ui/Icon";
 import { Panel } from "../../../components/ui/Card";
-import { SalesInvoiceStatusTag, PaymentStatusTag, Tag } from "../../../components/ui/Tag";
+import { SalesInvoiceStatusTag, AccountsReceivableStatusTag, Tag } from "../../../components/ui/Tag";
 import { Button, EmptyState } from "../../../components/ui/Button";
+import { DataTable, Column } from "../../../components/ui/DataTable";
 import { DesignNote } from "../../../components/ui/PageHeader";
 import { DocumentTrail } from "../../../components/ui/DocumentTrail";
+import { RecordPaymentForm } from "../../../components/forms/RecordPaymentForm";
 import { useSalesInvoiceDetail } from "../../../lib/hooks/useSalesInvoices";
+import { useAccountsReceivableForInvoice } from "../../../lib/hooks/useAccountsReceivable";
+import { useRecordPayment } from "../../../lib/hooks/usePaymentCollections";
+import { useCustomerStatement } from "../../../lib/hooks/useCustomerStatement";
+import { usePaymentLink } from "../../../lib/hooks/usePaymentLinks";
+import { useReceiptVoucher } from "../../../lib/hooks/useReceiptVouchers";
+import { useToast } from "../../../components/ui/Toast";
 import { initials } from "../../../components/ui/Who";
 import { formatInr, formatDate } from "../../../lib/format";
+import { CustomerStatementEntry, PaymentCollectionRecord, PaymentLinkResult, ReceiptVoucher } from "../../../lib/types/domain";
 
 function goBackOrTo(router: ReturnType<typeof useRouter>, fallback: string) {
   if (typeof window !== "undefined" && window.history.length > 1) {
@@ -23,7 +33,50 @@ export default function SalesInvoiceDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const id = params?.id;
+  const toast = useToast();
   const { invoice, salesOrder, proforma, quotation, opportunity, loading, error, refetch } = useSalesInvoiceDetail(id);
+  const { accountsReceivable, loading: arLoading, error: arError, refetch: refetchAr } = useAccountsReceivableForInvoice(id);
+  const { recordPayment } = useRecordPayment();
+  const { statement, loading: statementLoading, error: statementError, refetch: refetchStatement } = useCustomerStatement(invoice?.customerName);
+  const { generate: generatePaymentLink } = usePaymentLink();
+  const { generate: generateReceipt } = useReceiptVoucher();
+
+  const [showRecordPayment, setShowRecordPayment] = useState(false);
+  const [lastPayment, setLastPayment] = useState<PaymentCollectionRecord | null>(null);
+  const [receiptVoucher, setReceiptVoucher] = useState<ReceiptVoucher | null>(null);
+  const [generatingReceipt, setGeneratingReceipt] = useState(false);
+  const [receiptError, setReceiptError] = useState<string | null>(null);
+  const [paymentLink, setPaymentLink] = useState<PaymentLinkResult | null>(null);
+  const [generatingLink, setGeneratingLink] = useState(false);
+  const [linkError, setLinkError] = useState<string | null>(null);
+
+  async function handleGeneratePaymentLink() {
+    if (!id) return;
+    setGeneratingLink(true);
+    setLinkError(null);
+    try {
+      const result = await generatePaymentLink(id);
+      setPaymentLink(result);
+    } catch (err) {
+      setLinkError(err instanceof Error ? err.message : "Something went wrong generating payment instructions.");
+    } finally {
+      setGeneratingLink(false);
+    }
+  }
+
+  async function handleGenerateReceipt() {
+    if (!lastPayment) return;
+    setGeneratingReceipt(true);
+    setReceiptError(null);
+    try {
+      const voucher = await generateReceipt(lastPayment.id);
+      setReceiptVoucher(voucher);
+    } catch (err) {
+      setReceiptError(err instanceof Error ? err.message : "Something went wrong generating the receipt.");
+    } finally {
+      setGeneratingReceipt(false);
+    }
+  }
 
   if (loading && !invoice) {
     return (
@@ -75,6 +128,15 @@ export default function SalesInvoiceDetailPage() {
   }
 
   const hasGstSplit = (invoice.cgstAmount ?? 0) > 0 || (invoice.sgstAmount ?? 0) > 0 || (invoice.igstAmount ?? 0) > 0;
+  const isOverpaid = accountsReceivable !== null && accountsReceivable !== undefined && accountsReceivable.balanceAmount < 0;
+
+  const statementColumns: Column<CustomerStatementEntry>[] = [
+    { key: "entryDate", header: "Date", render: (e) => formatDate(e.entryDate) },
+    { key: "debitAmount", header: "Debit", render: (e) => (e.debitAmount > 0 ? formatInr(e.debitAmount) : "—") },
+    { key: "creditAmount", header: "Credit", render: (e) => (e.creditAmount > 0 ? formatInr(e.creditAmount) : "—") },
+    { key: "balanceAmount", header: "Balance", render: (e) => formatInr(e.balanceAmount) },
+    { key: "remarks", header: "Remarks", render: (e) => e.remarks ?? "—" },
+  ];
 
   return (
     <div className="page">
@@ -93,7 +155,7 @@ export default function SalesInvoiceDetailPage() {
             </div>
             <div className="tagrow">
               <SalesInvoiceStatusTag status={invoice.status} />
-              {invoice.paymentStatus && <PaymentStatusTag status={invoice.paymentStatus} />}
+              {accountsReceivable && <AccountsReceivableStatusTag status={accountsReceivable.paymentStatus} />}
               <Tag color="n">{formatInr(invoice.totalAmount)}</Tag>
             </div>
           </div>
@@ -145,12 +207,113 @@ export default function SalesInvoiceDetailPage() {
               </div>
             </Panel>
           )}
-          <Panel title="Downstream">
-            <p style={{ fontSize: 12.5, color: "var(--muted)" }}>
-              This invoice is posted — the backend has already created the linked Accounts Receivable and
-              Customer Ledger entries. Payment collection and receivable tracking are a separate,
-              not-yet-integrated RevenueOS area; the {invoice.paymentStatus ? "payment status above" : "payment status"} reflects real backend data, but no collection action is offered here.
-            </p>
+          <Panel title="Accounts Receivable">
+            {arLoading && !accountsReceivable && <div className="skeleton" style={{ height: 120 }} />}
+            {arError && (
+              <EmptyState
+                icon="alert"
+                title="Couldn't load Accounts Receivable"
+                body={arError.message || "Something went wrong reaching the RevenueOS backend."}
+                action={<Button variant="ghost" onClick={refetchAr}>Retry</Button>}
+              />
+            )}
+            {!arLoading && !arError && !accountsReceivable && (
+              <p style={{ fontSize: 12.5, color: "var(--muted)" }}>
+                No Accounts Receivable record was found for this invoice.
+              </p>
+            )}
+            {accountsReceivable && (
+              <>
+                <div className="info-grid" style={{ padding: 0 }}>
+                  <div className="f"><label>Invoice Total</label><div>{formatInr(invoice.totalAmount)}</div></div>
+                  <div className="f"><label>Paid</label><div>{formatInr(accountsReceivable.paidAmount)}</div></div>
+                  <div className="f"><label>Outstanding Balance</label><div style={isOverpaid ? { color: "var(--bad)" } : undefined}><b>{formatInr(accountsReceivable.balanceAmount)}</b></div></div>
+                  <div className="f"><label>Due Date</label><div>{formatDate(accountsReceivable.dueDate)}</div></div>
+                </div>
+                <p style={{ fontSize: 11, color: "var(--faint)", margin: "8px 0 0" }}>
+                  Paid amount, balance and status come from the real Accounts Receivable record linked to this
+                  invoice — not from the invoice&apos;s own (stale) payment status field.
+                </p>
+                {isOverpaid && (
+                  <p style={{ fontSize: 12, color: "var(--bad)", marginTop: 8 }}>
+                    This balance is negative — more has been recorded as paid than was ever outstanding. The
+                    backend does not clamp overpayment at zero, so this is shown exactly as returned.
+                  </p>
+                )}
+                <div className="lead-action-row" style={{ marginTop: 12 }}>
+                  <Button variant="primary" icon="cash" onClick={() => setShowRecordPayment(true)}>
+                    Record Payment
+                  </Button>
+                  <Button variant="ghost" icon="receipt" onClick={handleGeneratePaymentLink} disabled={generatingLink}>
+                    {generatingLink ? "Generating…" : "Payment Instructions"}
+                  </Button>
+                </div>
+                {linkError && <p style={{ color: "var(--bad)", fontSize: 12.5, marginTop: 8 }}>{linkError}</p>}
+                {paymentLink && (
+                  <div style={{ marginTop: 10, padding: "10px 12px", background: "var(--line-2)", borderRadius: 8, fontSize: 12.5 }}>
+                    {paymentLink.mode === "ONLINE" ? (
+                      <>
+                        <div><b>Online payment link</b> ({paymentLink.gateway})</div>
+                        <div style={{ wordBreak: "break-all" }}>{paymentLink.paymentLink}</div>
+                      </>
+                    ) : (
+                      <>
+                        <div><b>Manual bank transfer</b> — {formatInr(paymentLink.amount)}</div>
+                        <div>{paymentLink.bankName} · {paymentLink.accountName}</div>
+                        <div>A/C {paymentLink.accountNumber} · IFSC {paymentLink.ifscCode}</div>
+                        {paymentLink.upiId && <div>UPI: {paymentLink.upiId}</div>}
+                      </>
+                    )}
+                  </div>
+                )}
+                {lastPayment && (
+                  <div style={{ marginTop: 12, padding: "10px 12px", background: "var(--good-bg)", borderRadius: 8, fontSize: 12.5 }}>
+                    <div><b>Payment just recorded</b> — {formatInr(lastPayment.amount)} via {lastPayment.paymentMode}</div>
+                    {!receiptVoucher ? (
+                      <Button variant="ghost" onClick={handleGenerateReceipt} disabled={generatingReceipt} style={{ marginTop: 6 }}>
+                        {generatingReceipt ? "Generating…" : "Generate Receipt"}
+                      </Button>
+                    ) : (
+                      <div style={{ marginTop: 6 }}>
+                        <div>Receipt <b>{receiptVoucher.receiptNumber}</b></div>
+                        <div>{formatInr(receiptVoucher.amountReceived)} · {receiptVoucher.paymentMode} · Ref {receiptVoucher.referenceNo}</div>
+                      </div>
+                    )}
+                    {receiptError && <p style={{ color: "var(--bad)", fontSize: 12, marginTop: 6 }}>{receiptError}</p>}
+                    <p style={{ fontSize: 11, color: "var(--faint)", marginTop: 6 }}>
+                      Only available immediately after this payment — the backend has no way to look up a
+                      past payment to generate a receipt for later.
+                    </p>
+                  </div>
+                )}
+              </>
+            )}
+          </Panel>
+          <Panel title="Customer Collection History" flush>
+            {statementLoading && !statement && <div className="skeleton" style={{ height: 100, margin: 16 }} />}
+            {statementError && (
+              <div style={{ padding: 16 }}>
+                <EmptyState
+                  icon="alert"
+                  title="Couldn't load collection history"
+                  body={statementError.message || "Something went wrong reaching the RevenueOS backend."}
+                />
+              </div>
+            )}
+            {statement && statement.entries.length === 0 && (
+              <p style={{ fontSize: 12.5, color: "var(--muted)", padding: 16 }}>
+                No ledger activity found for {invoice.customerName}.
+              </p>
+            )}
+            {statement && statement.entries.length > 0 && (
+              <>
+                <div className="info-grid" style={{ padding: "12px 19px 0" }}>
+                  <div className="f"><label>Opening Balance</label><div>{formatInr(statement.openingBalance)}</div></div>
+                  <div className="f"><label>Closing Balance</label><div>{formatInr(statement.closingBalance)}</div></div>
+                </div>
+                <DataTable columns={statementColumns} rows={statement.entries} emptyTitle="No ledger activity" />
+              </>
+            )}
           </Panel>
         </div>
       </div>
@@ -161,8 +324,32 @@ export default function SalesInvoiceDetailPage() {
         total are entirely backend-computed (a flat 18% assumption on the sales order&apos;s own total,
         confirmed by reading sales-invoices.service.ts directly — not a real HSN-rate calculation). There is
         no verified endpoint to edit, cancel, or otherwise transition this invoice&apos;s status from this
-        screen.
+        screen. Record Payment calls the VERIFIED <code>POST /payment-collections</code> route — the real
+        source of truth for paid amount, balance and status is the linked Accounts Receivable record, never
+        this invoice&apos;s own <code>paymentStatus</code> field (confirmed stale: real PAID/WRITTEN_OFF
+        Accounts Receivable records still show their invoice stuck at Pending). There is no way to list past
+        payments — Generate Receipt only works immediately after recording one, using the id from that
+        payment&apos;s own response, and Collection History above is read from the real Customer Ledger, not
+        from individual payment records (payment mode only appears inside its free-text remarks).
       </DesignNote>
+
+      {showRecordPayment && accountsReceivable && (
+        <RecordPaymentForm
+          salesInvoiceId={invoice.id}
+          invoiceNumber={invoice.invoiceNumber}
+          outstandingBalance={accountsReceivable.balanceAmount}
+          onClose={() => setShowRecordPayment(false)}
+          onSubmit={async (input) => {
+            const result = await recordPayment(input);
+            setLastPayment(result.paymentRecord);
+            setReceiptVoucher(null);
+            setReceiptError(null);
+            refetchAr();
+            refetchStatement();
+            return result;
+          }}
+        />
+      )}
     </div>
   );
 }

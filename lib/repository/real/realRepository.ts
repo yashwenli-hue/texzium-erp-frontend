@@ -9,6 +9,11 @@ import { RealProformaInvoiceRepository } from "./realProformaInvoiceRepository";
 import { RealSalesOrderRepository } from "./realSalesOrderRepository";
 import { RealSalesInvoiceRepository } from "./realSalesInvoiceRepository";
 import { RealDispatchOrderRepository } from "./realDispatchOrderRepository";
+import { RealAccountsReceivableRepository } from "./realAccountsReceivableRepository";
+import { RealPaymentCollectionRepository } from "./realPaymentCollectionRepository";
+import { RealCustomerStatementRepository } from "./realCustomerStatementRepository";
+import { RealPaymentLinkRepository } from "./realPaymentLinkRepository";
+import { RealReceiptVoucherRepository } from "./realReceiptVoucherRepository";
 import { RealInventoryItemRepository } from "./realInventoryItemRepository";
 import { RealSellerGstRepository } from "./realSellerGstRepository";
 import { RealBuyerGstRepository } from "./realBuyerGstRepository";
@@ -45,6 +50,11 @@ export function createRealRepository(): RevenueOSRepository {
     salesOrders,
     salesInvoices: new RealSalesInvoiceRepository(salesOrders),
     dispatchOrders: new RealDispatchOrderRepository(),
+    accountsReceivable: new RealAccountsReceivableRepository(),
+    paymentCollections: new RealPaymentCollectionRepository(),
+    customerStatements: new RealCustomerStatementRepository(),
+    paymentLinks: new RealPaymentLinkRepository(),
+    receiptVouchers: new RealReceiptVoucherRepository(),
     inventoryItems: new RealInventoryItemRepository(),
     sellerGstRegistrations: new RealSellerGstRepository(),
     buyerGstRegistrations: new RealBuyerGstRepository(),

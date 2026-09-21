@@ -14,6 +14,11 @@ import { MockProformaInvoiceRepository } from "./mockProformaInvoiceRepository";
 import { MockSalesOrderRepository } from "./mockSalesOrderRepository";
 import { MockSalesInvoiceRepository } from "./mockSalesInvoiceRepository";
 import { MockDispatchOrderRepository } from "./mockDispatchOrderRepository";
+import { MockAccountsReceivableRepository } from "./mockAccountsReceivableRepository";
+import { MockPaymentCollectionRepository } from "./mockPaymentCollectionRepository";
+import { MockCustomerStatementRepository } from "./mockCustomerStatementRepository";
+import { MockPaymentLinkRepository } from "./mockPaymentLinkRepository";
+import { MockReceiptVoucherRepository } from "./mockReceiptVoucherRepository";
 import { MockInventoryItemRepository } from "./mockInventoryItemRepository";
 import { MockSellerGstRepository } from "./mockSellerGstRepository";
 import { MockBuyerGstRepository } from "./mockBuyerGstRepository";
@@ -45,6 +50,11 @@ export function createMockRepository(): RevenueOSRepository {
     salesOrders: new MockSalesOrderRepository(),
     salesInvoices: new MockSalesInvoiceRepository(),
     dispatchOrders: new MockDispatchOrderRepository(),
+    accountsReceivable: new MockAccountsReceivableRepository(),
+    paymentCollections: new MockPaymentCollectionRepository(),
+    customerStatements: new MockCustomerStatementRepository(),
+    paymentLinks: new MockPaymentLinkRepository(),
+    receiptVouchers: new MockReceiptVoucherRepository(),
     inventoryItems: new MockInventoryItemRepository(),
     sellerGstRegistrations: new MockSellerGstRepository(),
     buyerGstRegistrations: new MockBuyerGstRepository(),

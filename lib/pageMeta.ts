@@ -87,6 +87,6 @@ export const PAGE_META: Record<string, { title: string; subtitle: string }> = {
   "proforma-invoices": { title: "Proforma Invoices", subtitle: "Generated from approved quotations, ahead of a sales order." },
   "sales-orders": { title: "Sales Orders", subtitle: "Multi-gate approval workflow." },
   "sales-invoices": { title: "Sales Invoices", subtitle: "Raised once a sales order is dispatched." },
-  payments: { title: "Payments", subtitle: "Payment collections and collection reminders." },
+  payments: { title: "Payments", subtitle: "Accounts Receivable status per invoice, and recording payments." },
   reports: { title: "Reports", subtitle: "Funnel, revenue, conversion and performance reports." },
 };

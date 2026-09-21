@@ -13,6 +13,8 @@ import {
   SalesOrder,
   SalesInvoice,
   DispatchOrderOption,
+  AccountsReceivable,
+  CustomerStatementEntry,
   AppNotification,
 } from "../../types/domain";
 
@@ -330,6 +332,45 @@ export const SEED_SALES_INVOICES: SalesInvoice[] = [
     status: "POSTED",
     paymentStatus: "PENDING",
     remarks: "Final invoice after dispatch confirmation.",
+    createdAt: daysAgo(4),
+  },
+];
+
+// ---------------------------------------------------------------------------
+// ACCOUNTS RECEIVABLE & CUSTOMER LEDGER
+// One AR record for SI1 (created alongside it, same as the real backend's
+// sales-invoices.service.ts side effect), left fully PENDING/unpaid so
+// Record Payment has a real, exercisable starting state. One matching
+// ledger "Sales invoice posted" entry mirrors the real backend's own
+// customerLedgerEntries side effect — Record Payment appends a "Payment
+// received" credit entry on top of this, same pattern as the real
+// MockPaymentCollectionRepository.
+// ---------------------------------------------------------------------------
+export const SEED_ACCOUNTS_RECEIVABLE: AccountsReceivable[] = [
+  {
+    id: "AR1",
+    salesInvoiceId: "SI1",
+    invoiceNumber: "SI-7701",
+    customerName: "Adani Green",
+    dueDate: daysFromNow(20),
+    outstandingAmount: 12_980_000,
+    paidAmount: 0,
+    balanceAmount: 12_980_000,
+    paymentStatus: "PENDING",
+    createdAt: daysAgo(4),
+  },
+];
+
+export const SEED_CUSTOMER_LEDGER: CustomerStatementEntry[] = [
+  {
+    id: "CL1",
+    customerName: "Adani Green",
+    salesInvoiceId: "SI1",
+    debitAmount: 12_980_000,
+    creditAmount: 0,
+    balanceAmount: 12_980_000,
+    entryDate: daysAgo(4),
+    remarks: "Sales invoice posted SI1",
     createdAt: daysAgo(4),
   },
 ];

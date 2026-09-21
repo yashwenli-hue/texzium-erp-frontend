@@ -569,6 +569,129 @@ export interface SalesInvoice {
   createdAt: string;
 }
 
+// VERIFIED: AccountsReceivable.paymentStatus is a plain backend String
+// (@default("PENDING")). Reachable values, confirmed by reading every write
+// site directly: PENDING (default, on creation alongside a Sales Invoice),
+// PARTIAL/PAID (payment-collections.service.ts, the live POST
+// /payment-collections path), WRITTEN_OFF (bad-debt-writeoff.service.ts —
+// not integrated this stage, see the Stage 2G report). This is the ONLY
+// authoritative payment status in the app. SalesInvoice.paymentStatus is
+// never updated by any live code path and must never be used instead —
+// confirmed empirically: real PAID and WRITTEN_OFF AccountsReceivable
+// records still show their linked SalesInvoice.paymentStatus stuck at
+// PENDING. See the Stage 2G report.
+export function formatAccountsReceivableStatus(status: string): string {
+  return titleCaseFromConstant(status);
+}
+
+// VERIFIED: GET /accounts-receivable nests the raw SalesInvoice (customerName,
+// invoiceNumber). No GET /:id exists — see IAccountsReceivableRepository.
+// outstandingAmount is the amount at creation time (unaffected by payments);
+// paidAmount/balanceAmount are the live, backend-maintained figures. The
+// backend does NOT clamp balanceAmount at zero on overpayment — a negative
+// balanceAmount is real backend output, not a frontend bug, and must be
+// shown honestly rather than clamped client-side. See the Stage 2G report.
+export interface AccountsReceivable {
+  id: ID;
+  salesInvoiceId: ID;
+  invoiceNumber?: string;
+  customerName?: string;
+  dueDate: string;
+  outstandingAmount: number;
+  paidAmount: number;
+  balanceAmount: number;
+  paymentStatus: string;
+  createdAt: string;
+}
+
+// The synchronous response body of POST /payment-collections is the ONLY
+// place a PaymentCollection's own id is ever available — it cannot be
+// looked up afterward through any endpoint. Kept as its own type (rather
+// than folded into AccountsReceivable) to make that ephemerality explicit:
+// a value of this shape is only ever held transiently in component state
+// right after a successful payment, never persisted/refetched.
+export interface PaymentCollectionRecord {
+  id: ID;
+  accountsReceivableId: ID;
+  paymentDate: string;
+  amount: number;
+  paymentMode: string;
+  referenceNumber?: string;
+  remarks?: string;
+  createdAt: string;
+}
+
+export interface RecordPaymentResult {
+  paymentRecord: PaymentCollectionRecord;
+  /** Re-fetch AccountsReceivable via getBySalesInvoiceId() after this for the display-authoritative copy — this one has no nested salesInvoice (see realPaymentCollectionRepository.ts). */
+  updatedReceivable: AccountsReceivable;
+}
+
+// VERIFIED: GET /customer-statements/:customerName derives entirely from
+// CustomerLedger rows for that customer — the same real ledger every Sales
+// Invoice/Payment Collection/Credit Note/Debit Note writes to. Entries have
+// NO PaymentCollection id and no structured payment-mode field — payment
+// mode only ever appears inside the free-text `remarks` (e.g. "Payment
+// received UTR10001"). Do not present these as PaymentCollection records;
+// present as ledger/statement history only. See the Stage 2G report.
+export interface CustomerStatementEntry {
+  id: ID;
+  customerName: string;
+  salesInvoiceId: ID;
+  debitAmount: number;
+  creditAmount: number;
+  balanceAmount: number;
+  entryDate: string;
+  remarks?: string;
+  createdAt: string;
+}
+
+export interface CustomerStatement {
+  customerName: string;
+  openingBalance: number;
+  closingBalance: number;
+  entries: CustomerStatementEntry[];
+}
+
+// VERIFIED: POST /payment-links/:salesInvoiceId/generate. The one real
+// PaymentGatewayConfig row in the backend is inactive, so the live response
+// today is always the MANUAL branch (bank transfer details) — but the
+// service code supports an ONLINE branch too if an active gateway ever
+// exists, so `mode` is read from the real response rather than assumed.
+// `paymentLink` in ONLINE mode is a synthetic URL the backend constructs
+// (`https://pay.{gateway}.com/{invoiceId}`), not a real payment gateway
+// integration — see the Stage 2G report.
+export interface PaymentLinkResult {
+  mode: string;
+  amount: number;
+  gateway?: string;
+  paymentLink?: string;
+  bankName?: string;
+  accountName?: string;
+  accountNumber?: string;
+  ifscCode?: string;
+  upiId?: string;
+}
+
+// VERIFIED: POST /receipt-vouchers/:paymentCollectionId/generate — only
+// reachable immediately after recording a payment, using the id from that
+// payment's own response (see PaymentCollectionRecord). GET
+// /receipt-pdf/:receiptVoucherId exists but writes a PDF to the backend's
+// own server filesystem and returns a local file path, not a downloadable
+// response — there is no way for this frontend to retrieve or display that
+// PDF, so it is not called. See the Stage 2G report.
+export interface ReceiptVoucher {
+  id: ID;
+  receiptNumber?: string;
+  paymentCollectionId: ID;
+  receiptDate: string;
+  amountReceived: number;
+  paymentMode: string;
+  referenceNo?: string;
+  remarks?: string;
+  createdAt: string;
+}
+
 export type NotificationIcon =
   | "funnel"
   | "file"
