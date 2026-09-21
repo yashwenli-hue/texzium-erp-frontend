@@ -27,9 +27,13 @@ export class MockQuotationRepository implements IQuotationRepository {
     if (!opportunity) throw new Error(`Opportunity ${input.opportunityId} not found`);
     quoteCounter += 1;
     const now = new Date().toISOString();
-    // Mock has no HSN/GST-rate master data to replicate the real tax calc —
-    // this is a presentation-only taxable-amount estimate, same spirit as
-    // the real backend's own calculation but without a GST rate applied.
+    // Mock has no HSN/GST-rate master data, so it never computes or sets
+    // taxableAmount/gstPercent/gstAmount/totalAmount — those are backend-
+    // computed real fields only (see Quotation in lib/types/domain.ts).
+    // `amount` here is a plain quantity × unit price presentation estimate,
+    // not a tax calculation. Whether to treat that as authoritative is
+    // decided by repo.kind in the UI, never by which optional fields happen
+    // to be set on the object.
     const amount = input.quantity * input.unitPrice;
     const quotation: Quotation = {
       id: mockId("Q"),
@@ -47,8 +51,6 @@ export class MockQuotationRepository implements IQuotationRepository {
       quoteDate: input.quoteDate,
       quantity: input.quantity,
       unitPrice: input.unitPrice,
-      taxableAmount: amount,
-      totalAmount: amount,
     };
     db.quotations.add(quotation);
     return delay(quotation);

@@ -11,6 +11,7 @@ import { DocumentTrail } from "../../../components/ui/DocumentTrail";
 import { ConfirmDialog } from "../../../components/ui/ConfirmDialog";
 import { QuotationReviseDialog } from "../../../components/forms/QuotationReviseDialog";
 import { useQuotationDetail } from "../../../lib/hooks/useQuotations";
+import { useRepository } from "../../../lib/repository/RepositoryProvider";
 import { useToast } from "../../../components/ui/Toast";
 import { initials } from "../../../components/ui/Who";
 import { formatInr, formatDate, formatDateTime } from "../../../lib/format";
@@ -29,6 +30,8 @@ export default function QuotationDetailPage() {
   const toast = useToast();
   const id = params?.id;
   const { quotation, opportunity, loading, error, refetch, reviseQuotation, approveQuotation, convertQuotation } = useQuotationDetail(id);
+  const repo = useRepository();
+  const isReal = repo.kind === "real";
   const [showRevise, setShowRevise] = useState(false);
   const [showApprove, setShowApprove] = useState(false);
   const [showConvert, setShowConvert] = useState(false);
@@ -81,10 +84,11 @@ export default function QuotationDetailPage() {
     );
   }
 
-  // Real quotations carry backend-computed totalAmount/taxableAmount/etc.;
-  // mock ones don't set these fields at all — presence, not repo.kind, is
-  // the honest discriminator for which breakdown to show.
-  const hasRealAmounts = quotation.totalAmount !== undefined;
+  // Which amounts panel to show is decided by the repository mode, not by
+  // which optional fields happen to be set on the object — mock quotations
+  // never carry real GST/tax figures to render, by design (repo.kind is the
+  // same distinction already used for Lead notes/activity — see
+  // app/leads/[id]/page.tsx).
   const canRevise = quotation.status !== "CONVERTED";
   const canApprove = quotation.status === "DRAFT" || quotation.status === "REVISED";
   // The backend's own convert() has no status precondition at all — this
@@ -136,11 +140,11 @@ export default function QuotationDetailPage() {
             />
           </div>
 
-          {hasRealAmounts ? (
+          {isReal ? (
             <div className="info-grid">
-              <div className="f"><label>Taxable Amount</label><div>{formatInr(quotation.taxableAmount!)}</div></div>
-              <div className="f"><label>GST ({quotation.gstPercent}%{quotation.taxType ? ` · ${quotation.taxType}` : ""})</label><div>{formatInr(quotation.gstAmount!)}</div></div>
-              <div className="f"><label>Total Amount</label><div><b>{formatInr(quotation.totalAmount!)}</b></div></div>
+              <div className="f"><label>Taxable Amount</label><div>{formatInr(quotation.taxableAmount ?? 0)}</div></div>
+              <div className="f"><label>GST ({quotation.gstPercent ?? 0}%{quotation.taxType ? ` · ${quotation.taxType}` : ""})</label><div>{formatInr(quotation.gstAmount ?? 0)}</div></div>
+              <div className="f"><label>Total Amount</label><div><b>{formatInr(quotation.totalAmount ?? quotation.amount)}</b></div></div>
               <div className="f"><label>Quote Date</label><div>{quotation.quoteDate ? formatDate(quotation.quoteDate) : "—"}</div></div>
             </div>
           ) : (
@@ -152,7 +156,7 @@ export default function QuotationDetailPage() {
 
           <div style={{ padding: "0 19px 19px" }}>
             <p style={{ fontSize: 11.5, color: "var(--faint)" }}>
-              {hasRealAmounts
+              {isReal
                 ? "GST, HSN and total calculation are backend-owned — the figures above are exactly what the connected backend returned."
                 : "The amount shown is a frontend presentation estimate. GST, HSN and total calculation are backend-owned per the verified quotation contract — do not treat figures here as final until a real quotation response is connected."}
             </p>
@@ -164,7 +168,7 @@ export default function QuotationDetailPage() {
             <div className="tl" style={{ padding: "14px 19px" }}>
               {revisions.length === 0 && (
                 <p style={{ color: "var(--muted)", fontSize: 13 }}>
-                  {hasRealAmounts
+                  {isReal
                     ? "No persisted version history — the backend's revise operation updates the amount in place rather than keeping prior versions."
                     : "No revisions yet."}
                 </p>
