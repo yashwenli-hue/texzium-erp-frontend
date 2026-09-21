@@ -7,6 +7,8 @@ import {
   LeadUIContext,
   LeadFollowup,
   AssignableUser,
+  InventoryItemOption,
+  GstRegistrationOption,
   Customer,
   Contact,
   Activity,
@@ -225,29 +227,50 @@ export interface IOpportunityRepository {
   updateStage(id: ID, stage: OpportunityStage): Promise<Opportunity>;
 }
 
-// Simplified mock creation input: an opportunity + a presentation amount.
-// The real CreateQuotationDto additionally requires quoteDate,
-// inventoryItemId, quantity, unitPrice, sellerGstId, buyerGstId (backend
-// computes tax/total from those) — none of which have a UI/master-data
-// source yet in this frontend, so quotation creation stays a simplified
-// mock stand-in until Quote-to-Cash masters (inventory, GST) are built.
-// See docs/backend-ui-contract.md §8. customerName/opportunityName/ownerName
-// are always derived from the linked opportunity, mirroring how Opportunity
-// derives its own fields from the linked Lead.
+// Mirrors the VERIFIED CreateQuotationDto exactly: opportunityId, quoteDate,
+// inventoryItemId, quantity, unitPrice, sellerGstId, buyerGstId. The backend
+// computes taxableAmount/gstAmount/totalAmount from these — the frontend
+// never sends or invents a total. customerName/opportunityName/ownerName
+// are always derived from the linked opportunity. See docs/backend-ui-contract.md §8.
 export interface CreateQuotationInput {
   opportunityId: ID;
-  amount: number;
-  validUntil: string | null;
+  quoteDate: string; // ISO 8601
+  inventoryItemId: ID;
+  quantity: number;
+  unitPrice: number;
+  sellerGstId: ID;
+  buyerGstId: ID;
 }
 
 export interface IQuotationRepository {
   list(query?: ListQuery<QuotationSortField>): Promise<Page<Quotation>>;
   getById(id: ID): Promise<Quotation | null>;
   create(input: CreateQuotationInput): Promise<Quotation>;
-  /** VERIFIED operation (`PATCH /:id/revise` sets REVISED). Version/history trail is mock-only. */
+  /** VERIFIED: `PATCH /:id/revise`, body `{ totalAmount }` — sets REVISED. Version/history trail is mock-only. */
   revise(id: ID, amount: number, note?: string): Promise<Quotation>;
-  /** VERIFIED operation (`PATCH /:id/approve` sets APPROVED). */
+  /** VERIFIED: `PATCH /:id/approve`, no body — sets APPROVED. */
   approve(id: ID): Promise<Quotation>;
+  /**
+   * VERIFIED: `POST /:id/convert` — creates a real SalesOrder linked to this
+   * quotation, but does NOT write CONVERTED (or any status) back onto the
+   * Quotation itself; confirmed by reading quotations.service.ts directly.
+   * Returns the quotation as re-fetched after conversion — its status will
+   * still reflect whatever it was before (e.g. APPROVED), which is the
+   * honest backend behavior, not a bug in this mapping.
+   */
+  convert(id: ID): Promise<Quotation>;
+}
+
+export interface IInventoryItemRepository {
+  list(): Promise<InventoryItemOption[]>;
+}
+
+export interface ISellerGstRepository {
+  list(): Promise<GstRegistrationOption[]>;
+}
+
+export interface IBuyerGstRepository {
+  list(): Promise<GstRegistrationOption[]>;
 }
 
 export interface INotificationRepository {
@@ -286,6 +309,9 @@ export interface RevenueOSRepository {
   notes: INoteRepository;
   opportunities: IOpportunityRepository;
   quotations: IQuotationRepository;
+  inventoryItems: IInventoryItemRepository;
+  sellerGstRegistrations: ISellerGstRepository;
+  buyerGstRegistrations: IBuyerGstRepository;
   notifications: INotificationRepository;
   search: ISearchRepository;
 }

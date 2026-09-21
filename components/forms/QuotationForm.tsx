@@ -7,13 +7,16 @@ import { Button } from "../ui/Button";
 import { useToast } from "../ui/Toast";
 import { CreateQuotationInput } from "../../lib/repository/interfaces";
 import { useOpportunities } from "../../lib/hooks/useOpportunities";
+import { useInventoryItems, useSellerGstRegistrations, useBuyerGstRegistrations } from "../../lib/hooks/useQuotationMasters";
+import { formatInr } from "../../lib/format";
 
 /**
- * Simplified mock creation flow — see CreateQuotationInput for why (the
- * real CreateQuotationDto needs inventory/GST masters this frontend
- * doesn't have yet). Customer, opportunity name and owner are always
- * derived from the selected Opportunity; status always starts Draft,
- * matching the verified backend rule.
+ * Field-for-field mirror of the VERIFIED CreateQuotationDto: opportunityId,
+ * quoteDate, inventoryItemId, quantity, unitPrice, sellerGstId, buyerGstId.
+ * The backend computes taxableAmount/GST/total from these — the taxable
+ * amount shown here is a client-side quantity×unitPrice preview only, never
+ * sent as-is and never treated as the final figure. See
+ * docs/backend-ui-contract.md §8.
  */
 export function QuotationForm({
   onClose,
@@ -26,20 +29,40 @@ export function QuotationForm({
 }) {
   const toast = useToast();
   const { opportunities, loading: opportunitiesLoading } = useOpportunities();
+  const { items: inventoryItems, loading: itemsLoading } = useInventoryItems();
+  const { registrations: sellerGstOptions, loading: sellerGstLoading } = useSellerGstRegistrations();
+  const { registrations: buyerGstOptions, loading: buyerGstLoading } = useBuyerGstRegistrations();
+
   const [opportunityId, setOpportunityId] = useState(defaultOpportunityId ?? "");
-  const [amount, setAmount] = useState("");
-  const [validUntil, setValidUntil] = useState("");
+  const [quoteDate, setQuoteDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [inventoryItemId, setInventoryItemId] = useState("");
+  const [quantity, setQuantity] = useState("1");
+  const [unitPrice, setUnitPrice] = useState("");
+  const [sellerGstId, setSellerGstId] = useState("");
+  const [buyerGstId, setBuyerGstId] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
 
   const effectiveOpportunityId = opportunityId || defaultOpportunityId || opportunities[0]?.id || "";
   const selectedOpportunity = opportunities.find((o) => o.id === effectiveOpportunityId);
+  const effectiveInventoryItemId = inventoryItemId || inventoryItems[0]?.id || "";
+  const effectiveSellerGstId = sellerGstId || sellerGstOptions[0]?.id || "";
+  const effectiveBuyerGstId = buyerGstId || buyerGstOptions[0]?.id || "";
+
+  const mastersLoading = opportunitiesLoading || itemsLoading || sellerGstLoading || buyerGstLoading;
+  const taxablePreview = Number(quantity) > 0 && Number(unitPrice) > 0 ? Number(quantity) * Number(unitPrice) : 0;
 
   function validate(): boolean {
     const e: Record<string, string> = {};
     if (!effectiveOpportunityId) e.opportunityId = "Select an opportunity";
-    if (!amount.trim() || isNaN(Number(amount)) || Number(amount) <= 0)
-      e.amount = "Enter a valid amount greater than 0";
+    if (!quoteDate) e.quoteDate = "Quote date is required";
+    if (!effectiveInventoryItemId) e.inventoryItemId = "Select an inventory item";
+    if (!quantity.trim() || isNaN(Number(quantity)) || Number(quantity) <= 0)
+      e.quantity = "Enter a quantity greater than 0";
+    if (!unitPrice.trim() || isNaN(Number(unitPrice)) || Number(unitPrice) <= 0)
+      e.unitPrice = "Enter a unit price greater than 0";
+    if (!effectiveSellerGstId) e.sellerGstId = "Select a seller GST registration";
+    if (!effectiveBuyerGstId) e.buyerGstId = "Select a buyer GST registration";
     setErrors(e);
     return Object.keys(e).length === 0;
   }
@@ -50,8 +73,12 @@ export function QuotationForm({
     try {
       await onSubmit({
         opportunityId: effectiveOpportunityId,
-        amount: Number(amount),
-        validUntil: validUntil ? new Date(validUntil).toISOString() : null,
+        quoteDate: new Date(quoteDate).toISOString(),
+        inventoryItemId: effectiveInventoryItemId,
+        quantity: Number(quantity),
+        unitPrice: Number(unitPrice),
+        sellerGstId: effectiveSellerGstId,
+        buyerGstId: effectiveBuyerGstId,
       });
       toast.show("Quotation created as Draft", "check");
       onClose();
@@ -69,7 +96,7 @@ export function QuotationForm({
       footer={
         <>
           <Button variant="ghost" onClick={onClose} disabled={submitting}>Cancel</Button>
-          <Button variant="primary" onClick={handleSubmit} disabled={submitting}>
+          <Button variant="primary" onClick={handleSubmit} disabled={submitting || mastersLoading}>
             {submitting ? "Creating…" : "Create Quotation"}
           </Button>
         </>
@@ -96,12 +123,47 @@ export function QuotationForm({
             </p>
           )}
           <FieldRow>
-            <TextField label="Amount (₹)" required type="number" min={0} value={amount} onChange={(e) => setAmount(e.target.value)} error={errors.amount} placeholder={selectedOpportunity ? String(selectedOpportunity.expectedValue) : "e.g. 1840000"} />
-            <TextField label="Valid Until" type="date" value={validUntil} onChange={(e) => setValidUntil(e.target.value)} />
+            <TextField label="Quote Date" required type="date" value={quoteDate} onChange={(e) => setQuoteDate(e.target.value)} error={errors.quoteDate} />
+            <SelectField
+              label="Inventory Item"
+              required
+              value={effectiveInventoryItemId}
+              onChange={(e) => setInventoryItemId(e.target.value)}
+              error={errors.inventoryItemId}
+              disabled={itemsLoading}
+              options={inventoryItems.map((i) => ({ value: i.id, label: i.name }))}
+            />
           </FieldRow>
+          <FieldRow>
+            <TextField label="Quantity" required type="number" min={0} value={quantity} onChange={(e) => setQuantity(e.target.value)} error={errors.quantity} />
+            <TextField label="Unit Price (₹)" required type="number" min={0} value={unitPrice} onChange={(e) => setUnitPrice(e.target.value)} error={errors.unitPrice} placeholder="e.g. 92000" />
+          </FieldRow>
+          <SelectField
+            label="Seller GST Registration"
+            required
+            value={effectiveSellerGstId}
+            onChange={(e) => setSellerGstId(e.target.value)}
+            error={errors.sellerGstId}
+            disabled={sellerGstLoading}
+            options={sellerGstOptions.map((g) => ({ value: g.id, label: g.label }))}
+          />
+          <SelectField
+            label="Buyer GST Registration"
+            required
+            value={effectiveBuyerGstId}
+            onChange={(e) => setBuyerGstId(e.target.value)}
+            error={errors.buyerGstId}
+            disabled={buyerGstLoading}
+            options={buyerGstOptions.map((g) => ({ value: g.id, label: g.label }))}
+          />
+          {taxablePreview > 0 && (
+            <p style={{ fontSize: 11.5, color: "var(--faint)" }}>
+              Taxable amount preview: <b>{formatInr(taxablePreview)}</b> (quantity × unit price). GST and
+              the final total are calculated by the backend from the item&apos;s HSN rate once created.
+            </p>
+          )}
           <p style={{ fontSize: 11.5, color: "var(--faint)" }}>
-            Every new quotation starts as <b>Draft</b>. Tax and totals shown here are presentation
-            estimates — the backend is authoritative once connected.
+            Every new quotation starts as <b>Draft</b>.
           </p>
         </>
       )}

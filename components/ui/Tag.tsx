@@ -1,4 +1,4 @@
-import { LeadStatus, formatLeadStatus } from "../../lib/types/domain";
+import { LeadStatus, formatLeadStatus, formatQuotationStatus } from "../../lib/types/domain";
 
 export type TagColor = "g" | "w" | "b" | "i" | "n";
 
@@ -21,10 +21,6 @@ export const STAGE_COLOR: Record<string, TagColor> = {
   Active: "g",
   "At Risk": "w",
   Churned: "b",
-  Draft: "n",
-  Revised: "w",
-  Approved: "g",
-  Converted: "i",
   Rejected: "b",
   "Decision Maker": "i",
   Champion: "g",
@@ -41,6 +37,20 @@ export const STAGE_COLOR: Record<string, TagColor> = {
 
 export function StatusTag({ status }: { status: string }) {
   return <Tag color={STAGE_COLOR[status] ?? "n"}>{status}</Tag>;
+}
+
+// Quotation status is a raw backend value (DRAFT/REVISED/APPROVED/CONVERTED)
+// rather than the Title-Case strings the shared STAGE_COLOR/StatusTag above
+// assume — same "raw value in, formatted label out" pattern as LeadStatusTag.
+export const QUOTATION_STATUS_STYLE: Record<string, TagColor> = {
+  DRAFT: "n",
+  REVISED: "w",
+  APPROVED: "g",
+  CONVERTED: "i",
+};
+
+export function QuotationStatusTag({ status }: { status: string }) {
+  return <Tag color={QUOTATION_STATUS_STYLE[status] ?? "n"}>{formatQuotationStatus(status)}</Tag>;
 }
 
 // Dedicated lifecycle palette for the verified backend LeadStatus enum

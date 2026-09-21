@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Icon } from "../../../components/ui/Icon";
 import { Panel } from "../../../components/ui/Card";
-import { StatusTag, Tag } from "../../../components/ui/Tag";
+import { StatusTag, QuotationStatusTag, Tag } from "../../../components/ui/Tag";
 import { Button, EmptyState } from "../../../components/ui/Button";
 import { DesignNote } from "../../../components/ui/PageHeader";
 import { DocumentTrail } from "../../../components/ui/DocumentTrail";
@@ -15,7 +15,6 @@ import { ConfirmDialog } from "../../../components/ui/ConfirmDialog";
 import { QuotationForm } from "../../../components/forms/QuotationForm";
 import { useOpportunityDetail } from "../../../lib/hooks/useOpportunities";
 import { useQuotations } from "../../../lib/hooks/useQuotations";
-import { useRepository } from "../../../lib/repository/RepositoryProvider";
 import { useToast } from "../../../components/ui/Toast";
 import { initials } from "../../../components/ui/Who";
 import { formatInr, formatDate } from "../../../lib/format";
@@ -38,8 +37,6 @@ export default function OpportunityDetailPage() {
   const id = params?.id;
   const { opportunity, lead, loading, error, updateStage, refetch } = useOpportunityDetail(id);
   const { quotations, createQuotation, refetch: refetchQuotations } = useQuotations();
-  const repo = useRepository();
-  const isReal = repo.kind === "real";
   const [pendingAction, setPendingAction] = useState<StageAction | null>(null);
   const [showQuotationForm, setShowQuotationForm] = useState(false);
 
@@ -116,7 +113,7 @@ export default function OpportunityDetailPage() {
   const quoteColumns: Column<Quotation>[] = [
     { key: "quoteNo", header: "No.", render: (q) => `${q.quoteNo} · V${q.version}` },
     { key: "amount", header: "Amount", render: (q) => formatInr(q.amount) },
-    { key: "status", header: "Status", render: (q) => <StatusTag status={q.status} /> },
+    { key: "status", header: "Status", render: (q) => <QuotationStatusTag status={q.status} /> },
   ];
 
   return (
@@ -187,25 +184,17 @@ export default function OpportunityDetailPage() {
             title="Related Quotations"
             flush
             extraHead={
-              isReal ? undefined : (
-                <a className="more" href="#" onClick={(e) => { e.preventDefault(); setShowQuotationForm(true); }}>
-                  <Icon name="plus" size={14} /> Create Quotation
-                </a>
-              )
+              <a className="more" href="#" onClick={(e) => { e.preventDefault(); setShowQuotationForm(true); }}>
+                <Icon name="plus" size={14} /> Create Quotation
+              </a>
             }
           >
-            {isReal ? (
-              <p style={{ color: "var(--faint)", fontSize: 11.5, padding: "0 19px 10px" }}>
-                Quotation data isn&apos;t exposed by the connected backend&apos;s Opportunity endpoint yet
-                (docs/backend-ui-contract.md §7) — Quotations integration is a later milestone.
-              </p>
-            ) : null}
             <DataTable
               columns={quoteColumns}
-              rows={isReal ? [] : relatedQuotes}
+              rows={relatedQuotes}
               onRowClick={(q) => router.push(`/quotations/${q.id}`)}
               emptyTitle="No quotations yet"
-              emptyBody={isReal ? "Quotations aren't part of Stage 2B." : "Create one to move this opportunity toward Quote-to-Cash."}
+              emptyBody="Create one to move this opportunity toward Quote-to-Cash."
             />
           </Panel>
         </div>

@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Icon } from "../../../components/ui/Icon";
 import { Panel } from "../../../components/ui/Card";
-import { StatusTag, LeadStatusTag, LeadScoreTag, Tag } from "../../../components/ui/Tag";
+import { StatusTag, QuotationStatusTag, LeadStatusTag, LeadScoreTag, Tag } from "../../../components/ui/Tag";
 import { SourceBadge } from "../../../components/ui/SourceBadge";
 import { FollowupTag } from "../../../components/ui/FollowupTag";
 import { QuickActions } from "../../../components/ui/QuickActions";
@@ -151,7 +151,7 @@ export default function LeadDetailPage() {
   const quoteColumns: Column<Quotation>[] = [
     { key: "quoteNo", header: "No.", render: (q) => q.quoteNo },
     { key: "amount", header: "Amount", render: (q) => `${formatInr(q.amount)} · V${q.version}` },
-    { key: "status", header: "Status", render: (q) => <StatusTag status={q.status} /> },
+    { key: "status", header: "Status", render: (q) => <QuotationStatusTag status={q.status} /> },
   ];
 
   const oppColumns: Column<Opportunity>[] = [

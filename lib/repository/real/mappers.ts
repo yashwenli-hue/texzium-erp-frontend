@@ -7,6 +7,11 @@ import {
   LeadStatus,
   LeadTimelineEntry,
   AssignableUser,
+  Opportunity,
+  Quotation,
+  QuotationStatus,
+  InventoryItemOption,
+  GstRegistrationOption,
   titleCaseFromConstant,
 } from "../../types/domain";
 
@@ -168,5 +173,89 @@ export function mapLead(raw: BackendLead): Lead {
     lastActivityAt: raw.updatedAt,
     followups: raw.followups?.map(mapLeadFollowup),
     notes: raw.notes?.map(mapLeadNote),
+  };
+}
+
+export interface BackendInventoryItem {
+  id: string;
+  productName: string;
+  sku?: string;
+}
+
+export function mapInventoryItem(raw: BackendInventoryItem): InventoryItemOption {
+  return { id: raw.id, name: raw.sku ? `${raw.productName} (${raw.sku})` : raw.productName };
+}
+
+export interface BackendGstRegistration {
+  id: string;
+  gstin: string;
+  legalName: string;
+  branchName?: string | null;
+  stateCode: string;
+}
+
+/** Shared shape/label rule for both GET /company-gst (seller) and GET /customer-gst (buyer) — identically-shaped GST registration records. */
+export function mapGstRegistration(raw: BackendGstRegistration): GstRegistrationOption {
+  return {
+    id: raw.id,
+    label: raw.branchName ? `${raw.legalName} — ${raw.gstin} (${raw.branchName})` : `${raw.legalName} — ${raw.gstin}`,
+    stateCode: raw.stateCode,
+  };
+}
+
+export interface BackendQuotation {
+  id: string;
+  quotationCode?: string | null;
+  opportunityId: string;
+  quoteDate: string;
+  quantity?: number;
+  unitPrice?: number;
+  sellerGstId?: string | null;
+  buyerGstId?: string | null;
+  placeOfSupply?: string | null;
+  taxType?: string | null;
+  taxableAmount: number;
+  gstPercent: number;
+  gstAmount: number;
+  totalAmount: number;
+  status: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+/**
+ * Maps a real Quotation, cross-referencing an already-resolved Opportunity
+ * map for customerName/opportunityName/ownerName — GET /quotations only
+ * nests the raw Opportunity (no customerName field exists on it directly;
+ * that's a frontend-derived field from the linked Lead), so the caller
+ * supplies the same fully-resolved Opportunity list the Opportunities
+ * screen itself uses. See docs/backend-ui-contract.md §8.
+ */
+export function mapQuotation(raw: BackendQuotation, opportunityById: Map<string, Opportunity>): Quotation {
+  const opp = opportunityById.get(raw.opportunityId);
+  return {
+    id: raw.id,
+    // No verified code path ever sets quotationCode — fall back to a short,
+    // honestly-labeled id reference rather than fabricating a sequence number.
+    quoteNo: raw.quotationCode || `#${raw.id.slice(0, 8).toUpperCase()}`,
+    customerName: opp?.customerName ?? "—",
+    opportunityId: raw.opportunityId,
+    opportunityName: opp?.title ?? "—",
+    amount: raw.totalAmount,
+    status: raw.status as QuotationStatus,
+    validUntil: null,
+    ownerName: opp?.ownerName ?? "Unassigned",
+    createdAt: raw.createdAt,
+    version: 1,
+    revisions: [],
+    quoteDate: raw.quoteDate,
+    quantity: raw.quantity,
+    unitPrice: raw.unitPrice,
+    taxableAmount: raw.taxableAmount,
+    gstPercent: raw.gstPercent,
+    gstAmount: raw.gstAmount,
+    totalAmount: raw.totalAmount,
+    taxType: raw.taxType ?? undefined,
+    placeOfSupply: raw.placeOfSupply ?? undefined,
   };
 }

@@ -59,5 +59,11 @@ export function useQuotationDetail(id: string | undefined) {
     refetch();
   }, [id, repo, refetch]);
 
-  return { quotation, opportunity, loading, error, reviseQuotation, approveQuotation, refetch };
+  const convertQuotation = useCallback(async () => {
+    if (!id) return;
+    await repo.quotations.convert(id);
+    refetch();
+  }, [id, repo, refetch]);
+
+  return { quotation, opportunity, loading, error, reviseQuotation, approveQuotation, convertQuotation, refetch };
 }

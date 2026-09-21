@@ -4,38 +4,45 @@ import { RealLeadSourceRepository } from "./realLeadSourceRepository";
 import { RealOpportunityRepository } from "./realOpportunityRepository";
 import { RealLeadFollowupRepository } from "./realLeadFollowupRepository";
 import { RealUserRepository } from "./realUserRepository";
+import { RealQuotationRepository } from "./realQuotationRepository";
+import { RealInventoryItemRepository } from "./realInventoryItemRepository";
+import { RealSellerGstRepository } from "./realSellerGstRepository";
+import { RealBuyerGstRepository } from "./realBuyerGstRepository";
 import { MockCustomerRepository } from "../mock/mockCustomerRepository";
 import { MockContactRepository } from "../mock/mockContactRepository";
 import { MockActivityRepository } from "../mock/mockActivityRepository";
 import { MockTaskRepository } from "../mock/mockTaskRepository";
 import { MockNoteRepository } from "../mock/mockNoteRepository";
-import { MockQuotationRepository } from "../mock/mockQuotationRepository";
 import { MockNotificationRepository } from "../mock/mockNotificationRepository";
 import { MockSearchRepository } from "../mock/mockSearchRepository";
 
 /**
- * Stage 2A wires up Leads and Opportunities (+ their supporting LeadSources,
- * LeadFollowups and the assignable-Users lookup) against the real backend.
- * Everything else (Customers, Contacts, Activities, Tasks, Notes,
- * Quotations, Notifications, Search) is out of this milestone's scope
- * (docs/revenueos-stage2a-leads-opportunities.md §24) and stays on the mock
- * implementation — same pattern as createMockRepository(), just per-entity.
+ * Stage 2A wired up Leads and Opportunities; Stage 2C adds Quotations
+ * (+ their supporting Inventory Item / Seller GST / Buyer GST master-data
+ * lookups) against the real backend. Everything else (Customers, Contacts,
+ * Activities, Tasks, Notes, Notifications, Search) remains out of scope and
+ * stays on the mock implementation — same pattern as createMockRepository(),
+ * just per-entity.
  */
 export function createRealRepository(): RevenueOSRepository {
   const users = new RealUserRepository();
+  const opportunities = new RealOpportunityRepository(users);
   return {
     kind: "real",
     leads: new RealLeadRepository(),
     leadSources: new RealLeadSourceRepository(),
     leadFollowups: new RealLeadFollowupRepository(),
     users,
-    opportunities: new RealOpportunityRepository(users),
+    opportunities,
+    quotations: new RealQuotationRepository(opportunities),
+    inventoryItems: new RealInventoryItemRepository(),
+    sellerGstRegistrations: new RealSellerGstRepository(),
+    buyerGstRegistrations: new RealBuyerGstRepository(),
     customers: new MockCustomerRepository(),
     contacts: new MockContactRepository(),
     activities: new MockActivityRepository(),
     tasks: new MockTaskRepository(),
     notes: new MockNoteRepository(),
-    quotations: new MockQuotationRepository(),
     notifications: new MockNotificationRepository(),
     search: new MockSearchRepository(),
   };

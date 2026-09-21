@@ -179,20 +179,20 @@ export const SEED_OPPORTUNITIES: Opportunity[] = [
 // QuotationRevision. One quotation per opportunity, so every quotation has
 // a real, consistent Lead → Opportunity → Quotation chain.
 export const SEED_QUOTATIONS: Quotation[] = [
-  { id: "Q1", quoteNo: "QT-3398", customerName: "GreenVolt Energy", opportunityId: "O1", opportunityName: "5MW Rooftop EPC — GreenVolt", amount: 6_400_000, status: "Draft", validUntil: daysFromNow(20), ownerName: "Anita S.", createdAt: daysAgo(4), version: 1, revisions: [{ version: 1, amount: 6_400_000, createdAt: daysAgo(4) }] },
-  { id: "Q2", quoteNo: "QT-3402", customerName: "Sterling Pumps", opportunityId: "O2", opportunityName: "Hydraulic Systems Upgrade", amount: 1_840_000, status: "Revised", validUntil: daysFromNow(15), ownerName: "Rohit M.", createdAt: daysAgo(6), version: 2, revisions: [
+  { id: "Q1", quoteNo: "QT-3398", customerName: "GreenVolt Energy", opportunityId: "O1", opportunityName: "5MW Rooftop EPC — GreenVolt", amount: 6_400_000, status: "DRAFT", validUntil: daysFromNow(20), ownerName: "Anita S.", createdAt: daysAgo(4), version: 1, revisions: [{ version: 1, amount: 6_400_000, createdAt: daysAgo(4) }] },
+  { id: "Q2", quoteNo: "QT-3402", customerName: "Sterling Pumps", opportunityId: "O2", opportunityName: "Hydraulic Systems Upgrade", amount: 1_840_000, status: "REVISED", validUntil: daysFromNow(15), ownerName: "Rohit M.", createdAt: daysAgo(6), version: 2, revisions: [
     { version: 1, amount: 2_000_000, createdAt: daysAgo(6) },
     { version: 2, amount: 1_840_000, createdAt: daysAgo(3), note: "8% discount approved to close the deal faster" },
   ] },
-  { id: "Q3", quoteNo: "QT-3390", customerName: "JSW Steel", opportunityId: "O3", opportunityName: "Factory Automation Retrofit", amount: 8_500_000, status: "Approved", validUntil: daysFromNow(12), ownerName: "Rohit M.", createdAt: daysAgo(5), version: 1, revisions: [{ version: 1, amount: 8_500_000, createdAt: daysAgo(5) }] },
-  { id: "Q4", quoteNo: "QT-3379", customerName: "L&T Infra", opportunityId: "O4", opportunityName: "Control Room Equipment", amount: 3_600_000, status: "Draft", validUntil: daysFromNow(18), ownerName: "Anita S.", createdAt: daysAgo(1), version: 1, revisions: [{ version: 1, amount: 3_600_000, createdAt: daysAgo(1) }] },
-  { id: "Q5", quoteNo: "QT-3406", customerName: "Adani Green", opportunityId: "O5", opportunityName: "Rooftop Solar — Phase 1", amount: 11_000_000, status: "Revised", validUntil: daysFromNow(25), ownerName: "Vikram J.", createdAt: daysAgo(7), version: 2, revisions: [
+  { id: "Q3", quoteNo: "QT-3390", customerName: "JSW Steel", opportunityId: "O3", opportunityName: "Factory Automation Retrofit", amount: 8_500_000, status: "APPROVED", validUntil: daysFromNow(12), ownerName: "Rohit M.", createdAt: daysAgo(5), version: 1, revisions: [{ version: 1, amount: 8_500_000, createdAt: daysAgo(5) }] },
+  { id: "Q4", quoteNo: "QT-3379", customerName: "L&T Infra", opportunityId: "O4", opportunityName: "Control Room Equipment", amount: 3_600_000, status: "DRAFT", validUntil: daysFromNow(18), ownerName: "Anita S.", createdAt: daysAgo(1), version: 1, revisions: [{ version: 1, amount: 3_600_000, createdAt: daysAgo(1) }] },
+  { id: "Q5", quoteNo: "QT-3406", customerName: "Adani Green", opportunityId: "O5", opportunityName: "Rooftop Solar — Phase 1", amount: 11_000_000, status: "REVISED", validUntil: daysFromNow(25), ownerName: "Vikram J.", createdAt: daysAgo(7), version: 2, revisions: [
     { version: 1, amount: 11_500_000, createdAt: daysAgo(7) },
     { version: 2, amount: 11_000_000, createdAt: daysAgo(2), note: "Scope trimmed to Phase 1 only" },
   ] },
-  { id: "Q6", quoteNo: "QT-3371", customerName: "Reliance Industries", opportunityId: "O6", opportunityName: "Bulk Procurement Contract", amount: 4_200_000, status: "Draft", validUntil: daysFromNow(30), ownerName: "Anita S.", createdAt: daysAgo(2), version: 1, revisions: [{ version: 1, amount: 4_200_000, createdAt: daysAgo(2) }] },
-  { id: "Q7", quoteNo: "QT-3415", customerName: "Tata Projects", opportunityId: "O7", opportunityName: "Warehouse Automation", amount: 2_850_000, status: "Approved", validUntil: daysFromNow(22), ownerName: "Rohit M.", createdAt: daysAgo(1), version: 1, revisions: [{ version: 1, amount: 2_850_000, createdAt: daysAgo(1) }] },
-  { id: "Q8", quoteNo: "QT-3385", customerName: "Havells India", opportunityId: "O8", opportunityName: "Switchgear Replacement Order", amount: 5_200_000, status: "Approved", validUntil: daysAgo(1), ownerName: "Priya N.", createdAt: daysAgo(8), version: 1, revisions: [{ version: 1, amount: 5_200_000, createdAt: daysAgo(8) }] },
+  { id: "Q6", quoteNo: "QT-3371", customerName: "Reliance Industries", opportunityId: "O6", opportunityName: "Bulk Procurement Contract", amount: 4_200_000, status: "DRAFT", validUntil: daysFromNow(30), ownerName: "Anita S.", createdAt: daysAgo(2), version: 1, revisions: [{ version: 1, amount: 4_200_000, createdAt: daysAgo(2) }] },
+  { id: "Q7", quoteNo: "QT-3415", customerName: "Tata Projects", opportunityId: "O7", opportunityName: "Warehouse Automation", amount: 2_850_000, status: "APPROVED", validUntil: daysFromNow(22), ownerName: "Rohit M.", createdAt: daysAgo(1), version: 1, revisions: [{ version: 1, amount: 2_850_000, createdAt: daysAgo(1) }] },
+  { id: "Q8", quoteNo: "QT-3385", customerName: "Havells India", opportunityId: "O8", opportunityName: "Switchgear Replacement Order", amount: 5_200_000, status: "APPROVED", validUntil: daysAgo(1), ownerName: "Priya N.", createdAt: daysAgo(8), version: 1, revisions: [{ version: 1, amount: 5_200_000, createdAt: daysAgo(8) }] },
 ];
 
 // ---------------------------------------------------------------------------

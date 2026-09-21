@@ -103,7 +103,7 @@ export default function DashboardPage() {
     }
 
     for (const q of quotations) {
-      if (q.status !== "Draft") continue;
+      if (q.status !== "DRAFT") continue;
       items.push({
         id: `quote-${q.id}`,
         icon: "file",

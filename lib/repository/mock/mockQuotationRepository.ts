@@ -27,19 +27,28 @@ export class MockQuotationRepository implements IQuotationRepository {
     if (!opportunity) throw new Error(`Opportunity ${input.opportunityId} not found`);
     quoteCounter += 1;
     const now = new Date().toISOString();
+    // Mock has no HSN/GST-rate master data to replicate the real tax calc —
+    // this is a presentation-only taxable-amount estimate, same spirit as
+    // the real backend's own calculation but without a GST rate applied.
+    const amount = input.quantity * input.unitPrice;
     const quotation: Quotation = {
       id: mockId("Q"),
       quoteNo: `QT-${quoteCounter}`,
       customerName: opportunity.customerName,
       opportunityId: opportunity.id,
       opportunityName: opportunity.title,
-      amount: input.amount,
-      status: "Draft",
-      validUntil: input.validUntil,
+      amount,
+      status: "DRAFT",
+      validUntil: null,
       ownerName: opportunity.ownerName,
       createdAt: now,
       version: 1,
-      revisions: [{ version: 1, amount: input.amount, createdAt: now }],
+      revisions: [{ version: 1, amount, createdAt: now }],
+      quoteDate: input.quoteDate,
+      quantity: input.quantity,
+      unitPrice: input.unitPrice,
+      taxableAmount: amount,
+      totalAmount: amount,
     };
     db.quotations.add(quotation);
     return delay(quotation);
@@ -52,7 +61,7 @@ export class MockQuotationRepository implements IQuotationRepository {
     const nextVersion = existing.version + 1;
     const updated = db.quotations.update(id, {
       amount,
-      status: "Revised",
+      status: "REVISED",
       version: nextVersion,
       revisions: [...existing.revisions, { version: nextVersion, amount, createdAt: now, note }],
     });
@@ -61,7 +70,17 @@ export class MockQuotationRepository implements IQuotationRepository {
   }
 
   async approve(id: ID): Promise<Quotation> {
-    const updated = db.quotations.update(id, { status: "Approved" });
+    const updated = db.quotations.update(id, { status: "APPROVED" });
+    if (!updated) throw new Error(`Quotation ${id} not found`);
+    return delay(updated);
+  }
+
+  async convert(id: ID): Promise<Quotation> {
+    // Mock-only: unlike the real backend (which creates a SalesOrder but
+    // leaves Quotation.status untouched), the mock has no Sales Order
+    // concept at all, so it's free to show the master plan's documented
+    // terminal state for demo purposes.
+    const updated = db.quotations.update(id, { status: "CONVERTED" });
     if (!updated) throw new Error(`Quotation ${id} not found`);
     return delay(updated);
   }

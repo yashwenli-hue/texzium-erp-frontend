@@ -3,7 +3,7 @@
 import { useParams, useRouter } from "next/navigation";
 import { Icon } from "../../../components/ui/Icon";
 import { Panel } from "../../../components/ui/Card";
-import { StatusTag, Tag } from "../../../components/ui/Tag";
+import { StatusTag, QuotationStatusTag, Tag } from "../../../components/ui/Tag";
 import { DataTable, Column } from "../../../components/ui/DataTable";
 import { DesignNote } from "../../../components/ui/PageHeader";
 import { ContactRowActions } from "../../../components/ui/ContactRowActions";
@@ -53,7 +53,7 @@ export default function CustomerDetailPage() {
     { key: "quoteNo", header: "No.", render: (q) => q.quoteNo },
     { key: "opportunityName", header: "Opportunity", render: (q) => q.opportunityName },
     { key: "amount", header: "Amount", render: (q) => formatInr(q.amount) },
-    { key: "status", header: "Status", render: (q) => <StatusTag status={q.status} /> },
+    { key: "status", header: "Status", render: (q) => <QuotationStatusTag status={q.status} /> },
     { key: "validUntil", header: "Valid Until", render: (q) => formatDate(q.validUntil) },
   ];
 

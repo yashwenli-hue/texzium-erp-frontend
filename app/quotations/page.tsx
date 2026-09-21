@@ -4,23 +4,23 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PageHeader, DesignNote } from "../../components/ui/PageHeader";
 import { StatCard, StatRow, Panel } from "../../components/ui/Card";
-import { Button } from "../../components/ui/Button";
-import { StatusTag, ChipGroup, Chip } from "../../components/ui/Tag";
+import { Button, EmptyState } from "../../components/ui/Button";
+import { QuotationStatusTag, ChipGroup, Chip } from "../../components/ui/Tag";
 import { DataTable, Column } from "../../components/ui/DataTable";
 import { QuotationForm } from "../../components/forms/QuotationForm";
 import { useQuotations } from "../../lib/hooks/useQuotations";
-import { Quotation, QUOTATION_STATUSES } from "../../lib/types/domain";
+import { Quotation, QUOTATION_STATUSES, formatQuotationStatus } from "../../lib/types/domain";
 import { formatInr, formatDate } from "../../lib/format";
 
 export default function QuotationsPage() {
   const router = useRouter();
-  const { quotations, createQuotation } = useQuotations();
+  const { quotations, loading, error, createQuotation, refetch } = useQuotations();
   const [showForm, setShowForm] = useState(false);
   const [statusChip, setStatusChip] = useState<string>("All");
 
   const totalValue = quotations.reduce((s, q) => s + q.amount, 0);
-  const approved = quotations.filter((q) => q.status === "Approved" || q.status === "Converted").length;
-  const needsAction = quotations.filter((q) => q.status === "Draft" || q.status === "Revised").length;
+  const approved = quotations.filter((q) => q.status === "APPROVED" || q.status === "CONVERTED").length;
+  const needsAction = quotations.filter((q) => q.status === "DRAFT" || q.status === "REVISED").length;
   const expiringSoon = quotations.filter((q) => {
     if (!q.validUntil) return false;
     const days = (new Date(q.validUntil).getTime() - Date.now()) / 86_400_000;
@@ -45,10 +45,45 @@ export default function QuotationsPage() {
     { key: "customerName", header: "Customer", render: (q) => q.customerName },
     { key: "opportunityName", header: "Opportunity", render: (q) => q.opportunityName },
     { key: "amount", header: "Amount", render: (q) => formatInr(q.amount) },
-    { key: "status", header: "Status", render: (q) => <StatusTag status={q.status} /> },
+    { key: "status", header: "Status", render: (q) => <QuotationStatusTag status={q.status} /> },
     { key: "validUntil", header: "Valid Until", render: (q) => formatDate(q.validUntil) },
     { key: "ownerName", header: "Owner", render: (q) => q.ownerName },
   ];
+
+  if (loading && quotations.length === 0) {
+    return (
+      <div className="page">
+        <div className="skeleton" style={{ height: 220, marginBottom: 16 }} />
+        <div className="skeleton" style={{ height: 300 }} />
+      </div>
+    );
+  }
+
+  // A failed fetch must not read as "zero quotations" — that's the
+  // DataTable's own empty state below, reserved for a genuine zero-result response.
+  if (error && quotations.length === 0) {
+    return (
+      <div className="page">
+        <PageHeader
+          eyebrow="RevenueOS · Quote to Cash · Quotations"
+          title="Quotations"
+          subtitle="Every quote raised, its version, and how close it is to becoming revenue."
+        />
+        <Panel title="All Quotations">
+          <EmptyState
+            icon="alert"
+            title="Couldn't load quotations"
+            body={error.message || "Something went wrong reaching the RevenueOS backend. Please try again."}
+            action={
+              <Button variant="ghost" onClick={refetch}>
+                Retry
+              </Button>
+            }
+          />
+        </Panel>
+      </div>
+    );
+  }
 
   return (
     <div className="page">
@@ -73,7 +108,7 @@ export default function QuotationsPage() {
       <ChipGroup>
         <Chip label={`All ${quotations.length}`} active={statusChip === "All"} onClick={() => setStatusChip("All")} />
         {QUOTATION_STATUSES.filter((s) => statusCounts[s]).map((s) => (
-          <Chip key={s} label={`${s} ${statusCounts[s]}`} active={statusChip === s} onClick={() => setStatusChip(s)} />
+          <Chip key={s} label={`${formatQuotationStatus(s)} ${statusCounts[s]}`} active={statusChip === s} onClick={() => setStatusChip(s)} />
         ))}
       </ChipGroup>
 
@@ -89,9 +124,12 @@ export default function QuotationsPage() {
       </div>
 
       <DesignNote>
-        <b>Design note.</b> Status uses only the verified backend lifecycle — Draft → Revised →
-        Approved → Converted. The V-number badge is a mock/UI-only revision trail (see
-        QuotationRevision in lib/types/domain.ts); click any row to open its full detail and history.
+        <b>Design note.</b> Status uses only the verified backend lifecycle — Draft, Revised and
+        Approved are set by the corresponding backend action; Converted is part of the documented
+        workflow terminology but no backend code path ever writes it onto a quotation (converting
+        creates a Sales Order instead — see the quotation&apos;s own detail page). The V-number badge is a
+        mock/UI-only revision trail (see QuotationRevision in lib/types/domain.ts); click any row to
+        open its full detail.
       </DesignNote>
 
       {showForm && <QuotationForm onClose={() => setShowForm(false)} onSubmit={createQuotation} />}

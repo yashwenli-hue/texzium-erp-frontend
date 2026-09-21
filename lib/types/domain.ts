@@ -130,6 +130,24 @@ export interface AssignableUser {
   name: string;
 }
 
+// Minimal option shapes needed to populate the real Quotation creation form's
+// Inventory Item / Seller GST / Buyer GST pickers — CreateQuotationDto
+// requires all three ids, and none have a RevenueOS-scoped lookup, so these
+// are sourced from GET /inventory (OperationsOS), GET /company-gst and
+// GET /customer-gst (ComplianceOS/RevenueOS) respectively — same "least
+// invasive real option" precedent as AssignableUser/GET /users. See
+// docs/backend-ui-contract.md §8, §21 and the Stage 2C report.
+export interface InventoryItemOption {
+  id: ID;
+  name: string;
+}
+
+export interface GstRegistrationOption {
+  id: ID;
+  label: string;
+  stateCode: string;
+}
+
 // VERIFIED CreateLeadDto: leadCode?, customerName, companyName?, email?,
 // phone, alternatePhone?, sourceId. See docs/backend-ui-contract.md §3.
 export interface Lead {
@@ -312,15 +330,21 @@ export interface Opportunity {
   createdAt: string; // ISO 8601
 }
 
-// VERIFIED status values, corrected from the prototype's invented
-// Sent/Viewed/Accepted/Rejected/Expired: the backend confirms quotations
-// start at DRAFT, `revise` sets REVISED, `approve` sets APPROVED, and
-// `convert` creates a SalesOrder (modeled here as CONVERTED, though no
-// quotation is seeded in that state since Sales Orders don't exist in the
-// frontend yet). See docs/backend-ui-contract.md §8.
-export type QuotationStatus = "Draft" | "Revised" | "Approved" | "Converted";
+// VERIFIED: Quotation.status is a plain backend String (@default("DRAFT")),
+// no Prisma enum. create() sets DRAFT, revise() sets REVISED, approve() sets
+// APPROVED — confirmed by reading quotations.service.ts directly. convert()
+// (POST /:id/convert) creates a SalesOrder record but never writes CONVERTED
+// (or any other value) back onto the Quotation itself — that status value is
+// never actually reachable through any real backend code path, even though
+// it's part of the master plan's documented workflow terminology. See
+// docs/backend-ui-contract.md §8, Stage 2C report.
+export type QuotationStatus = "DRAFT" | "REVISED" | "APPROVED" | "CONVERTED";
 
-export const QUOTATION_STATUSES: QuotationStatus[] = ["Draft", "Revised", "Approved", "Converted"];
+export const QUOTATION_STATUSES: QuotationStatus[] = ["DRAFT", "REVISED", "APPROVED", "CONVERTED"];
+
+export function formatQuotationStatus(status: string): string {
+  return titleCaseFromConstant(status);
+}
 
 // MOCK/UI-ONLY: the backend confirms a `revise` operation exists, but no
 // persisted multi-version history is confirmed — this models a V1/V2/V3
@@ -336,20 +360,33 @@ export interface QuotationRevision {
 
 export interface Quotation {
   id: ID;
+  /** quotationCode from the backend, which no verified code path ever sets — falls back to a short id reference (`#XXXXXXXX`), never a fabricated sequential number. */
   quoteNo: string;
   customerId?: ID;
   customerName: string;
   opportunityId?: ID;
   opportunityName: string;
+  /** Canonical headline amount — totalAmount for a real quotation, the user-entered estimate for mock. */
   amount: number;
   status: QuotationStatus;
+  /** MOCK/UI-ONLY — no backend field. Always null for a real quotation. */
   validUntil: string | null; // ISO 8601
   ownerName: string;
   createdAt: string;
-  /** MOCK/UI-ONLY current revision number — see QuotationRevision. */
+  /** MOCK/UI-ONLY current revision number — see QuotationRevision. Always 1 for a real quotation (no persisted version history). */
   version: number;
-  /** MOCK/UI-ONLY revision trail — see QuotationRevision. */
+  /** MOCK/UI-ONLY revision trail — see QuotationRevision. Always empty for a real quotation. */
   revisions: QuotationRevision[];
+  /** VERIFIED real fields below — backend-computed, undefined for mock quotations. See docs/backend-ui-contract.md §8. */
+  quoteDate?: string;
+  quantity?: number;
+  unitPrice?: number;
+  taxableAmount?: number;
+  gstPercent?: number;
+  gstAmount?: number;
+  totalAmount?: number;
+  taxType?: string;
+  placeOfSupply?: string;
 }
 
 export type NotificationIcon =
