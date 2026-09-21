@@ -155,6 +155,9 @@ export default function OpportunityDetailPage() {
               lostKey="Lost"
               lostLabel="Lost"
             />
+            <div style={{ marginTop: 8 }}>
+              <Tag color="n">Not saved to backend</Tag>
+            </div>
             {!isTerminal && (
               <div style={{ display: "flex", gap: 9, marginTop: 16, flexWrap: "wrap" }}>
                 {nextStep && (

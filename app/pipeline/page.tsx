@@ -73,6 +73,11 @@ export default function PipelinePage() {
 
       <div style={{ marginTop: 16 }}>
         <Panel title="Pre-Qualification Board">
+          {!canUpdateStatus && (
+            <p style={{ fontSize: 12.5, color: "var(--muted)", margin: "-4px 0 14px" }}>
+              You don&apos;t have permission to update lead status, so cards on this board can&apos;t be moved.
+            </p>
+          )}
           <KanbanBoard
             columns={BOARD_COLUMNS}
             items={boardLeads}
