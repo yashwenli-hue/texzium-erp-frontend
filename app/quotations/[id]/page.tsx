@@ -34,14 +34,13 @@ export default function QuotationDetailPage() {
   const router = useRouter();
   const toast = useToast();
   const id = params?.id;
-  const { quotation, opportunity, loading, error, refetch, reviseQuotation, approveQuotation, convertQuotation } = useQuotationDetail(id);
+  const { quotation, opportunity, loading, error, refetch, reviseQuotation, approveQuotation } = useQuotationDetail(id);
   const { proformaInvoices, createProformaInvoice, refetch: refetchProformas } = useProformaInvoices();
   const { salesOrders } = useSalesOrders();
   const repo = useRepository();
   const isReal = repo.kind === "real";
   const [showRevise, setShowRevise] = useState(false);
   const [showApprove, setShowApprove] = useState(false);
-  const [showConvert, setShowConvert] = useState(false);
   const [showProformaForm, setShowProformaForm] = useState(false);
 
   if (loading && !quotation) {
@@ -99,10 +98,6 @@ export default function QuotationDetailPage() {
   // app/leads/[id]/page.tsx).
   const canRevise = quotation.status !== "CONVERTED";
   const canApprove = quotation.status === "DRAFT" || quotation.status === "REVISED";
-  // The backend's own convert() has no status precondition at all — this
-  // gate is a UX safeguard matching the documented Revise → Approve →
-  // Convert sequence, not a claimed backend restriction.
-  const canConvert = quotation.status === "APPROVED";
   const revisions = [...quotation.revisions].sort((a, b) => b.version - a.version);
   const relatedProformas = proformaInvoices.filter((p) => p.quotationId === quotation.id);
   const relatedSalesOrders = salesOrders.filter((o) => o.quotationId === quotation.id);
@@ -150,9 +145,6 @@ export default function QuotationDetailPage() {
               </Button>
               <Button variant="primary" icon="check" onClick={() => setShowApprove(true)} disabled={!canApprove}>
                 Approve
-              </Button>
-              <Button variant="ghost" icon="arrow" onClick={() => setShowConvert(true)} disabled={!canConvert}>
-                Convert
               </Button>
             </div>
           </div>
@@ -248,18 +240,21 @@ export default function QuotationDetailPage() {
           <Panel title="Downstream">
             <p style={{ fontSize: 12.5, color: "var(--muted)" }}>
               {quotation.status === "APPROVED"
-                ? "This quotation is approved. Create a Proforma Invoice above, and/or Convert directly to a Sales Order — the backend supports both independently and does not require one before the other. Note: the backend does not change this quotation's own status when converting, so it will keep showing Approved even after conversion."
-                : "Approve this quotation to create a Proforma Invoice or Convert it to a Sales Order."}
+                ? "This quotation is approved. Create a Proforma Invoice above to continue — that's the next step in the standard Quote-to-Cash workflow toward a Sales Order."
+                : "Approve this quotation to create a Proforma Invoice, the next step toward a Sales Order."}
             </p>
           </Panel>
         </div>
       </div>
 
       <DesignNote>
-        <b>Design note.</b> Revise and Approve mirror VERIFIED backend operations. Convert calls the
-        VERIFIED `POST /:id/convert` route, which creates a real Sales Order — its id comes straight from
-        that response, so this page navigates to the new Sales Order&apos;s own detail screen once the
-        backend confirms creation, rather than assuming it succeeded.
+        <b>Design note.</b> Revise and Approve mirror VERIFIED backend operations. The standard Version A
+        workflow continues through Create Proforma Invoice above, then a Sales Order from the Proforma&apos;s
+        own detail page — Proforma is the intended next step after an approved quotation, not a Sales Order
+        directly. The backend also technically exposes a direct `POST /quotations/:id/convert` route that
+        creates a Sales Order straight from a Quotation, bypassing Proforma entirely, but that isn&apos;t the
+        intended commercial workflow, so no action for it is offered here. Any Sales Order already linked to
+        this quotation (e.g. created before this change, or directly against the API) still appears below.
       </DesignNote>
 
       {showRevise && (
@@ -280,19 +275,6 @@ export default function QuotationDetailPage() {
           onConfirm={async () => {
             await approveQuotation();
             toast.show(`${quotation.quoteNo} approved`, "check");
-          }}
-        />
-      )}
-      {showConvert && (
-        <ConfirmDialog
-          title="Convert to Sales Order"
-          body={`Convert ${quotation.quoteNo} to a Sales Order? This creates a new Sales Order record from this quotation's current amount and cannot be undone from this screen.`}
-          confirmLabel="Convert"
-          onClose={() => setShowConvert(false)}
-          onConfirm={async () => {
-            const salesOrderId = await convertQuotation();
-            toast.show(`${quotation.quoteNo} converted — Sales Order created`, "check");
-            if (salesOrderId) router.push(`/sales-orders/${salesOrderId}`);
           }}
         />
       )}
