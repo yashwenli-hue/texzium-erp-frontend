@@ -13,6 +13,8 @@ import {
   ProformaInvoice,
   ProformaInvoiceStatus,
   SalesOrder,
+  SalesInvoice,
+  DispatchOrderOption,
   InventoryItemOption,
   GstRegistrationOption,
   titleCaseFromConstant,
@@ -361,6 +363,96 @@ export function mapSalesOrder(raw: BackendSalesOrder, quotationById: Map<string,
     placeOfSupply: raw.placeOfSupply ?? undefined,
     taxType: raw.taxType ?? undefined,
     inventoryItemId: raw.inventoryItemId ?? undefined,
+    createdAt: raw.createdAt,
+  };
+}
+
+export interface BackendDispatchOrder {
+  id: string;
+  dispatchOrderNo?: string | null;
+  status: string;
+  salesOrderId?: string | null;
+  dispatchDate?: string | null;
+}
+
+export function mapDispatchOrderOption(raw: BackendDispatchOrder): DispatchOrderOption {
+  return {
+    id: raw.id,
+    dispatchOrderNo: raw.dispatchOrderNo || `#${raw.id.slice(0, 8).toUpperCase()}`,
+    status: raw.status,
+    salesOrderId: raw.salesOrderId ?? undefined,
+    dispatchDate: raw.dispatchDate ?? undefined,
+  };
+}
+
+export interface BackendSalesInvoice {
+  id: string;
+  salesOrderId: string;
+  invoiceNumber?: string | null;
+  invoiceDate: string;
+  taxableAmount: number;
+  gstAmount: number;
+  cgstAmount?: number;
+  sgstAmount?: number;
+  igstAmount?: number;
+  totalAmount: number;
+  paymentStatus?: string;
+  status: string;
+  dispatchOrderId?: string | null;
+  customerName?: string | null;
+  remarks?: string | null;
+  createdAt: string;
+  updatedAt?: string;
+  /** GET /sales-invoices nests the raw SalesOrder (never Quotation/Proforma) and the raw DispatchOrder. */
+  salesOrder?: { id: string } | null;
+  dispatchOrder?: BackendDispatchOrder | null;
+}
+
+/**
+ * Cross-references an already-resolved SalesOrder map (the same fully
+ * enriched SalesOrder objects the Sales Orders screen itself uses) to fill
+ * in customerName/opportunityName/quoteNo/proformaNumber/ownerName — those
+ * all flow through the linked Sales Order, exactly like every other
+ * denormalization in this app. The Sales Invoice's own customerName field is
+ * preferred when present (it's captured directly at invoice creation time),
+ * falling back to the linked Sales Order's resolved customerName for older/
+ * incomplete records. dispatchOrderNo/dispatchStatus come straight from the
+ * nested DispatchOrder GET /sales-invoices already includes — no separate
+ * Dispatch Order repository call needed here. See the Stage 2F report.
+ */
+export function mapSalesInvoice(raw: BackendSalesInvoice, salesOrderById: Map<string, SalesOrder>): SalesInvoice {
+  const so = salesOrderById.get(raw.salesOrderId);
+  return {
+    id: raw.id,
+    // No verified code path ever sets invoiceNumber on the live endpoint —
+    // fall back to a short, honestly-labeled id reference rather than
+    // fabricating a sequence number.
+    invoiceNumber: raw.invoiceNumber || `#${raw.id.slice(0, 8).toUpperCase()}`,
+    salesOrderId: raw.salesOrderId,
+    salesOrderCode: so?.salesOrderCode,
+    quotationId: so?.quotationId,
+    quoteNo: so?.quoteNo,
+    proformaInvoiceId: so?.proformaInvoiceId,
+    proformaNumber: so?.proformaNumber,
+    opportunityId: so?.opportunityId,
+    opportunityName: so?.opportunityName,
+    dispatchOrderId: raw.dispatchOrderId ?? undefined,
+    dispatchOrderNo: raw.dispatchOrder
+      ? raw.dispatchOrder.dispatchOrderNo || `#${raw.dispatchOrder.id.slice(0, 8).toUpperCase()}`
+      : undefined,
+    dispatchStatus: raw.dispatchOrder?.status,
+    customerName: raw.customerName || so?.customerName || "—",
+    ownerName: so?.ownerName ?? "Unassigned",
+    invoiceDate: raw.invoiceDate,
+    taxableAmount: raw.taxableAmount,
+    gstAmount: raw.gstAmount,
+    cgstAmount: raw.cgstAmount,
+    sgstAmount: raw.sgstAmount,
+    igstAmount: raw.igstAmount,
+    totalAmount: raw.totalAmount,
+    status: raw.status,
+    paymentStatus: raw.paymentStatus,
+    remarks: raw.remarks ?? undefined,
     createdAt: raw.createdAt,
   };
 }

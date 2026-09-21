@@ -474,6 +474,82 @@ export interface SalesOrder {
   createdAt: string;
 }
 
+// VERIFIED: DispatchOrder is an OperationsOS resource (dispatch-orders
+// module), not RevenueOS — read-only here, the same "least invasive real
+// option" precedent as InventoryItemOption/GstRegistrationOption, because
+// CreateSalesInvoiceDto requires a real dispatchOrderId and there is no
+// Dispatch Order management UI in this app. Only DISPATCHED orders whose own
+// salesOrderId matches the Sales Order being invoiced are ever offered — the
+// backend itself does NOT cross-check that dispatchOrderId and salesOrderId
+// on a Sales Invoice actually belong together (confirmed by reading
+// sales-invoices.service.ts directly), so this is a frontend safeguard on
+// top of real data, not a claimed backend rule. See the Stage 2F report.
+export interface DispatchOrderOption {
+  id: ID;
+  /** dispatchOrderNo from the backend — falls back to a short id reference, same pattern as every other document number here. */
+  dispatchOrderNo: string;
+  status: string;
+  salesOrderId?: ID;
+  dispatchDate?: string | null;
+}
+
+// VERIFIED: SalesInvoice.status is a plain backend String (@default("DRAFT")
+// in the Prisma schema), but the only RevenueOS-scoped write path
+// (sales-invoices.service.ts create()) always sets it to "POSTED" — DRAFT is
+// never written by this controller. A DRAFT-status record was observed in
+// real data with null dispatchOrderId/customerName, which the live DTO's
+// required fields (with a global whitelist/forbidNonWhitelisted
+// ValidationPipe) could not have produced — it predates this endpoint or was
+// seeded directly, not a reachable state through this app. paymentStatus is
+// a separate, real field (PENDING/PAID observed) driven by the
+// AccountsReceivable side effect — shown as read-only information; building
+// payment collection actions is out of Stage 2F's scope. See the Stage 2F report.
+export function formatSalesInvoiceStatus(status: string): string {
+  return titleCaseFromConstant(status);
+}
+
+// Mirrors the VERIFIED CreateSalesInvoiceDto: salesOrderId, dispatchOrderId,
+// invoiceDate, customerName, remarks?. taxableAmount/gstAmount/cgstAmount/
+// sgstAmount/igstAmount/totalAmount are entirely backend-computed (a flat
+// 18% GST assumption applied to the Sales Order's own totalAmount,
+// regardless of the item's real HSN rate — confirmed by reading
+// sales-invoices.service.ts directly) — never sent or estimated by the
+// frontend. invoiceNumber is never set by this controller (unlike a
+// different, unrelated FinanceOS sales-invoices module that generates one
+// via DocumentNumberGeneratorService — that module exists in source but is
+// NOT imported into AppModule, so it is dead code with no live route; the
+// only reachable `POST /sales-invoices` is the RevenueOS one). See the
+// Stage 2F report.
+export interface SalesInvoice {
+  id: ID;
+  /** invoiceNumber from the backend — never set by the live endpoint; falls back to a short id reference, never a fabricated sequence number. */
+  invoiceNumber: string;
+  salesOrderId: ID;
+  salesOrderCode?: string;
+  quotationId?: ID;
+  quoteNo?: string;
+  proformaInvoiceId?: ID;
+  proformaNumber?: string;
+  opportunityId?: ID;
+  opportunityName?: string;
+  dispatchOrderId?: ID;
+  dispatchOrderNo?: string;
+  dispatchStatus?: string;
+  customerName: string;
+  ownerName: string;
+  invoiceDate: string;
+  taxableAmount: number;
+  gstAmount: number;
+  cgstAmount?: number;
+  sgstAmount?: number;
+  igstAmount?: number;
+  totalAmount: number;
+  status: string;
+  paymentStatus?: string;
+  remarks?: string;
+  createdAt: string;
+}
+
 export type NotificationIcon =
   | "funnel"
   | "file"

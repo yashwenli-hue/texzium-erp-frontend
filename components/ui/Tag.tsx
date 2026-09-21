@@ -1,4 +1,4 @@
-import { LeadStatus, formatLeadStatus, formatQuotationStatus, formatProformaInvoiceStatus, formatSalesOrderStatus } from "../../lib/types/domain";
+import { LeadStatus, formatLeadStatus, formatQuotationStatus, formatProformaInvoiceStatus, formatSalesOrderStatus, formatSalesInvoiceStatus } from "../../lib/types/domain";
 
 export type TagColor = "g" | "w" | "b" | "i" | "n";
 
@@ -77,6 +77,32 @@ export const SALES_ORDER_STATUS_STYLE: Record<string, TagColor> = {
 
 export function SalesOrderStatusTag({ status }: { status: string }) {
   return <Tag color={SALES_ORDER_STATUS_STYLE[status] ?? "i"}>{formatSalesOrderStatus(status)}</Tag>;
+}
+
+// Sales Invoice status is an open-ended backend string — the RevenueOS
+// controller's only live creation path always writes POSTED. A DRAFT value
+// was observed in real data but could not have come from this controller
+// (see SalesInvoice in lib/types/domain.ts), so it's styled via the neutral
+// fallback rather than treated as a normal reachable state.
+export const SALES_INVOICE_STATUS_STYLE: Record<string, TagColor> = {
+  POSTED: "g",
+};
+
+export function SalesInvoiceStatusTag({ status }: { status: string }) {
+  return <Tag color={SALES_INVOICE_STATUS_STYLE[status] ?? "n"}>{formatSalesInvoiceStatus(status)}</Tag>;
+}
+
+// Sales Invoice paymentStatus is a distinct, real field (PENDING/PAID
+// observed) driven by the AccountsReceivable side effect the backend
+// creates alongside every invoice — shown as read-only information, since
+// building payment-collection actions is out of scope here.
+export const PAYMENT_STATUS_STYLE: Record<string, TagColor> = {
+  PENDING: "w",
+  PAID: "g",
+};
+
+export function PaymentStatusTag({ status }: { status: string }) {
+  return <Tag color={PAYMENT_STATUS_STYLE[status] ?? "n"}>{formatSalesInvoiceStatus(status)}</Tag>;
 }
 
 // Dedicated lifecycle palette for the verified backend LeadStatus enum

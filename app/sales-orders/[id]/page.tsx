@@ -1,15 +1,21 @@
 "use client";
 
+import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Icon } from "../../../components/ui/Icon";
 import { Panel } from "../../../components/ui/Card";
-import { SalesOrderStatusTag, Tag } from "../../../components/ui/Tag";
+import { SalesOrderStatusTag, SalesInvoiceStatusTag, Tag } from "../../../components/ui/Tag";
 import { Button, EmptyState } from "../../../components/ui/Button";
+import { DataTable, Column } from "../../../components/ui/DataTable";
 import { DesignNote } from "../../../components/ui/PageHeader";
 import { DocumentTrail } from "../../../components/ui/DocumentTrail";
+import { SalesInvoiceForm } from "../../../components/forms/SalesInvoiceForm";
 import { useSalesOrderDetail } from "../../../lib/hooks/useSalesOrders";
+import { useSalesInvoices } from "../../../lib/hooks/useSalesInvoices";
+import { useDispatchOrders } from "../../../lib/hooks/useDispatchOrders";
 import { initials } from "../../../components/ui/Who";
 import { formatInr, formatDate } from "../../../lib/format";
+import { SalesInvoice } from "../../../lib/types/domain";
 
 function goBackOrTo(router: ReturnType<typeof useRouter>, fallback: string) {
   if (typeof window !== "undefined" && window.history.length > 1) {
@@ -24,6 +30,9 @@ export default function SalesOrderDetailPage() {
   const router = useRouter();
   const id = params?.id;
   const { salesOrder, proforma, quotation, opportunity, loading, error, refetch } = useSalesOrderDetail(id);
+  const { salesInvoices, createSalesInvoice, refetch: refetchInvoices } = useSalesInvoices();
+  const { dispatchOrders } = useDispatchOrders();
+  const [showInvoiceForm, setShowInvoiceForm] = useState(false);
 
   if (loading && !salesOrder) {
     return (
@@ -75,6 +84,22 @@ export default function SalesOrderDetailPage() {
   }
 
   const hasGstDetails = salesOrder.sellerGstId || salesOrder.buyerGstId || salesOrder.taxType || salesOrder.placeOfSupply;
+  // READY_FOR_INVOICING is the real status the Dispatch Orders service
+  // writes onto a Sales Order the moment a linked Dispatch Order is marked
+  // DISPATCHED — not a frontend-invented gate. The matching-order lookup is
+  // a frontend safeguard on top of that: the backend itself does not check
+  // that a Sales Invoice's dispatchOrderId actually belongs to its
+  // salesOrderId (confirmed by reading sales-invoices.service.ts directly),
+  // so this only ever offers a Dispatch Order that's both DISPATCHED and
+  // genuinely linked to this Sales Order. See the Stage 2F report.
+  const matchingDispatchedOrders = dispatchOrders.filter((d) => d.salesOrderId === salesOrder.id && d.status === "DISPATCHED");
+  const canCreateInvoice = salesOrder.status === "READY_FOR_INVOICING" && matchingDispatchedOrders.length > 0;
+  const relatedInvoices = salesInvoices.filter((i) => i.salesOrderId === salesOrder.id);
+  const invoiceColumns: Column<SalesInvoice>[] = [
+    { key: "invoiceNumber", header: "Invoice No.", render: (i) => i.invoiceNumber },
+    { key: "totalAmount", header: "Amount", render: (i) => formatInr(i.totalAmount) },
+    { key: "status", header: "Status", render: (i) => <SalesInvoiceStatusTag status={i.status} /> },
+  ];
 
   return (
     <div className="page">
@@ -127,12 +152,40 @@ export default function SalesOrderDetailPage() {
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <Panel
+            title="Related Sales Invoices"
+            flush
+            extraHead={
+              canCreateInvoice ? (
+                <a className="more" href="#" onClick={(e) => { e.preventDefault(); setShowInvoiceForm(true); }}>
+                  <Icon name="plus" size={14} /> Create Sales Invoice
+                </a>
+              ) : undefined
+            }
+          >
+            <DataTable
+              columns={invoiceColumns}
+              rows={relatedInvoices}
+              onRowClick={(i) => router.push(`/sales-invoices/${i.id}`)}
+              emptyTitle="No sales invoices yet"
+              emptyBody={
+                canCreateInvoice
+                  ? "Create one now that a dispatched shipment exists for this order."
+                  : salesOrder.status === "READY_FOR_INVOICING"
+                  ? "This order is ready to invoice, but no matching dispatched order was found for it."
+                  : "This order needs a dispatched shipment before it can be invoiced."
+              }
+            />
+          </Panel>
           <Panel title="Downstream">
             <p style={{ fontSize: 12.5, color: "var(--muted)" }}>
-              There is no verified action to approve, reject, or otherwise move this order past its current
+              There is no verified action to approve, reject, or otherwise move this order through its own
               status from this screen — the RevenueOS Sales Orders API only supports creating and listing
-              orders. Its remaining lifecycle (store approval, advance receipt, accounts approval, dispatch,
-              invoicing) belongs to separate backend modules with no confirmed screen here yet.
+              orders. Its remaining lifecycle (store approval, advance receipt, accounts approval) belongs to
+              separate backend modules with no confirmed screen here yet. Dispatch is the one exception: once
+              a Dispatch Order linked to this order is marked DISPATCHED (an OperationsOS action outside this
+              app), this order&apos;s status becomes &quot;Ready For Invoicing&quot; and Create Sales Invoice
+              above becomes available.
             </p>
           </Panel>
         </div>
@@ -143,10 +196,27 @@ export default function SalesOrderDetailPage() {
         <code>POST /quotations/:id/convert</code>, linked by quotationId, always status <code>OPEN</code>) or
         directly from an approved Proforma Invoice (<code>POST /sales-orders</code>, linked by
         proformaInvoiceId, always status <code>PENDING_STORE_APPROVAL</code>) — never both, and the backend
-        does not connect the two paths. Any other status value seen elsewhere in this app (e.g.
-        &quot;Ready For Invoicing&quot;) is written by unrelated Dispatch/Workflow modules outside RevenueOS,
-        not by anything reachable from this screen.
+        does not connect the two paths. &quot;Ready For Invoicing&quot; is written by the OperationsOS
+        Dispatch Orders service the moment a linked Dispatch Order is marked DISPATCHED — the intended
+        lifecycle is Sales Order → Dispatch Order → Sales Invoice, so Create Sales Invoice above only appears
+        once that real status is reached and a matching dispatched order is found; there is no
+        Quotation/Proforma → Sales Invoice shortcut anywhere in this app.
       </DesignNote>
+
+      {showInvoiceForm && (
+        <SalesInvoiceForm
+          salesOrderId={salesOrder.id}
+          salesOrderCode={salesOrder.salesOrderCode}
+          defaultCustomerName={salesOrder.customerName}
+          dispatchOrders={matchingDispatchedOrders}
+          onClose={() => setShowInvoiceForm(false)}
+          onSubmit={async (input) => {
+            const invoice = await createSalesInvoice(input);
+            refetchInvoices();
+            return invoice;
+          }}
+        />
+      )}
     </div>
   );
 }

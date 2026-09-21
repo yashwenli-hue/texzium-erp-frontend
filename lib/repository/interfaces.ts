@@ -20,6 +20,8 @@ import {
   Quotation,
   ProformaInvoice,
   SalesOrder,
+  SalesInvoice,
+  DispatchOrderOption,
   AppNotification,
 } from "../types/domain";
 
@@ -36,12 +38,13 @@ import {
  */
 
 export type LeadSortField = "customerName" | "lastActivityAt" | "createdAt";
-export type CustomerSortField = "name" | "lifetimeValue" | "customerSince";
+export type CustomerSortField = "customerName" | "customerCode" | "createdAt";
 export type ContactSortField = "name" | "lastContactedAt";
 export type OpportunitySortField = "expectedValue" | "probability" | "expectedCloseDate";
 export type QuotationSortField = "amount" | "validUntil" | "createdAt";
 export type ProformaInvoiceSortField = "totalAmount" | "issueDate" | "createdAt";
 export type SalesOrderSortField = "totalAmount" | "orderDate" | "createdAt";
+export type SalesInvoiceSortField = "totalAmount" | "invoiceDate" | "createdAt";
 export type TaskSortField = "dueAt" | "priority" | "createdAt";
 
 // Mirrors the VERIFIED CreateLeadDto field-for-field. No deal value, owner,
@@ -124,12 +127,14 @@ export interface IUserRepository {
   listAssignable(): Promise<AssignableUser[]>;
 }
 
+// Mirrors the VERIFIED CreateCustomerDto for Customer Master.
 export interface CreateCustomerInput {
-  name: string;
-  industry: string;
-  city: string;
-  ownerName: string;
-  lifetimeValue?: number;
+  customerCode: string;
+  customerName: string;
+  panNumber?: string;
+  email?: string;
+  phone?: string;
+  customerType?: string;
 }
 
 export interface ICustomerRepository {
@@ -313,6 +318,32 @@ export interface ISalesOrderRepository {
   create(input: CreateSalesOrderInput): Promise<SalesOrder>;
 }
 
+// Mirrors the VERIFIED CreateSalesInvoiceDto exactly: salesOrderId,
+// dispatchOrderId, invoiceDate, customerName, remarks?. This is the only
+// live Sales Invoice creation path — it requires the referenced Dispatch
+// Order to already be DISPATCHED (validated server-side in
+// sales-invoices.service.ts). See the Stage 2F report.
+export interface CreateSalesInvoiceInput {
+  salesOrderId: ID;
+  dispatchOrderId: ID;
+  invoiceDate: string; // ISO 8601
+  customerName: string;
+  remarks?: string;
+}
+
+export interface ISalesInvoiceRepository {
+  list(query?: ListQuery<SalesInvoiceSortField>): Promise<Page<SalesInvoice>>;
+  getById(id: ID): Promise<SalesInvoice | null>;
+  create(input: CreateSalesInvoiceInput): Promise<SalesInvoice>;
+}
+
+// Read-only — see DispatchOrderOption. No Dispatch Order management UI
+// exists in this app; this only powers the "which DISPATCHED order should
+// this invoice reference" picker on the Sales Order detail page.
+export interface IDispatchOrderRepository {
+  list(): Promise<DispatchOrderOption[]>;
+}
+
 export interface IInventoryItemRepository {
   list(): Promise<InventoryItemOption[]>;
 }
@@ -363,6 +394,8 @@ export interface RevenueOSRepository {
   quotations: IQuotationRepository;
   proformaInvoices: IProformaInvoiceRepository;
   salesOrders: ISalesOrderRepository;
+  salesInvoices: ISalesInvoiceRepository;
+  dispatchOrders: IDispatchOrderRepository;
   inventoryItems: IInventoryItemRepository;
   sellerGstRegistrations: ISellerGstRepository;
   buyerGstRegistrations: IBuyerGstRepository;

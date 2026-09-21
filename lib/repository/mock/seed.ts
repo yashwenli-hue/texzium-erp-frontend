@@ -11,6 +11,8 @@ import {
   Quotation,
   ProformaInvoice,
   SalesOrder,
+  SalesInvoice,
+  DispatchOrderOption,
   AppNotification,
 } from "../../types/domain";
 
@@ -250,6 +252,85 @@ export const SEED_SALES_ORDERS: SalesOrder[] = [
     customerName: "Havells India",
     ownerName: "Priya N.",
     createdAt: daysAgo(6),
+  },
+  // SO3/SO4 model the READY_FOR_INVOICING status the real Dispatch Orders
+  // service writes once its markDispatched() runs — see SEED_DISPATCH_ORDERS
+  // below. SO3 has no invoice yet (exercises the Create Sales Invoice flow
+  // from a clean state); SO4 already has one (SEED_SALES_INVOICES) to
+  // demonstrate the Related Sales Invoices panel with real-shaped data.
+  {
+    id: "SO3",
+    salesOrderCode: "SO-5299",
+    orderDate: daysAgo(10),
+    totalAmount: 2_850_000,
+    status: "READY_FOR_INVOICING",
+    quotationId: "Q7",
+    quoteNo: "QT-3415",
+    opportunityId: "O7",
+    opportunityName: "Warehouse Automation",
+    customerName: "Tata Projects",
+    ownerName: "Rohit M.",
+    createdAt: daysAgo(10),
+  },
+  {
+    id: "SO4",
+    salesOrderCode: "SO-5240",
+    orderDate: daysAgo(12),
+    totalAmount: 11_000_000,
+    status: "READY_FOR_INVOICING",
+    quotationId: "Q5",
+    quoteNo: "QT-3406",
+    opportunityId: "O5",
+    opportunityName: "Rooftop Solar — Phase 1",
+    customerName: "Adani Green",
+    ownerName: "Vikram J.",
+    createdAt: daysAgo(12),
+  },
+];
+
+// ---------------------------------------------------------------------------
+// DISPATCH ORDERS
+// Read-only lookup data (see DispatchOrderOption) — no mock Dispatch Order
+// management exists, only enough to power the "pick a DISPATCHED order"
+// step of Sales Invoice creation. DO3 models a not-yet-dispatched order so
+// the create action's gating has a real negative case to exercise too.
+// ---------------------------------------------------------------------------
+export const SEED_DISPATCH_ORDERS: DispatchOrderOption[] = [
+  { id: "DO1", dispatchOrderNo: "DO-88031", status: "DISPATCHED", salesOrderId: "SO3", dispatchDate: daysAgo(2) },
+  { id: "DO2", dispatchOrderNo: "DO-88022", status: "DISPATCHED", salesOrderId: "SO4", dispatchDate: daysAgo(5) },
+  { id: "DO3", dispatchOrderNo: "DO-88040", status: "LOGISTICS_PREPARING", salesOrderId: "SO1", dispatchDate: null },
+];
+
+// ---------------------------------------------------------------------------
+// SALES INVOICES
+// Only SO4/DO2 has one seeded — SO3/DO1 are intentionally left uninvoiced so
+// Create Sales Invoice has a real empty case to exercise from Sales Order
+// Detail. Mirrors the real backend's flat 18% GST assumption (taxableAmount
+// is the sales order's own totalAmount, not a real HSN-rate calculation).
+// ---------------------------------------------------------------------------
+export const SEED_SALES_INVOICES: SalesInvoice[] = [
+  {
+    id: "SI1",
+    invoiceNumber: "SI-7701",
+    salesOrderId: "SO4",
+    salesOrderCode: "SO-5240",
+    quotationId: "Q5",
+    quoteNo: "QT-3406",
+    opportunityId: "O5",
+    opportunityName: "Rooftop Solar — Phase 1",
+    dispatchOrderId: "DO2",
+    dispatchOrderNo: "DO-88022",
+    dispatchStatus: "DISPATCHED",
+    customerName: "Adani Green",
+    ownerName: "Vikram J.",
+    invoiceDate: daysAgo(4),
+    taxableAmount: 11_000_000,
+    gstAmount: 1_980_000,
+    totalAmount: 12_980_000,
+    status: "POSTED",
+    paymentStatus: "PENDING",
+    remarks: "Final invoice after dispatch confirmation.",
+    createdAt: daysAgo(4),
   },
 ];
 
