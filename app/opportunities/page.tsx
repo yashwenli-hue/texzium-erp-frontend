@@ -4,12 +4,13 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PageHeader, DesignNote } from "../../components/ui/PageHeader";
 import { StatCard, StatRow, Panel } from "../../components/ui/Card";
-import { Button } from "../../components/ui/Button";
+import { Button, EmptyState } from "../../components/ui/Button";
 import { StatusTag, ChipGroup, Chip } from "../../components/ui/Tag";
 import { DataTable, Column, toggleSortDirection } from "../../components/ui/DataTable";
 import { OpportunityForm } from "../../components/forms/OpportunityForm";
 import { useOpportunities } from "../../lib/hooks/useOpportunities";
 import { useLeads } from "../../lib/hooks/useLeads";
+import { useAuth } from "../../lib/auth/AuthContext";
 import { Opportunity, OPPORTUNITY_STAGES } from "../../lib/types/domain";
 import { formatInr, formatDate } from "../../lib/format";
 import { SortState } from "../../lib/types/common";
@@ -17,8 +18,9 @@ import { OpportunitySortField } from "../../lib/repository/interfaces";
 
 export default function OpportunitiesPage() {
   const router = useRouter();
-  const { opportunities, createOpportunity, sort, setSort } = useOpportunities();
+  const { opportunities, loading, error, createOpportunity, refetch, sort, setSort } = useOpportunities();
   const { leads } = useLeads();
+  const { hasPermission } = useAuth();
   const [showForm, setShowForm] = useState(false);
   const [stageChip, setStageChip] = useState<string>("All");
 
@@ -76,6 +78,41 @@ export default function OpportunitiesPage() {
     { key: "ownerName", header: "Owner", render: (o) => o.ownerName },
   ];
 
+  if (loading && opportunities.length === 0) {
+    return (
+      <div className="page">
+        <div className="skeleton" style={{ height: 220, marginBottom: 16 }} />
+        <div className="skeleton" style={{ height: 300 }} />
+      </div>
+    );
+  }
+
+  // A failed fetch must not read as "zero opportunities" — that's the
+  // DataTable's own empty state below, reserved for a genuine zero-result response.
+  if (error && opportunities.length === 0) {
+    return (
+      <div className="page">
+        <PageHeader
+          eyebrow="RevenueOS · Pipeline · Opportunities"
+          title="Opportunities"
+          subtitle="Qualified, forecastable deals — value, probability and expected close."
+        />
+        <Panel title="Opportunities">
+          <EmptyState
+            icon="alert"
+            title="Couldn't load opportunities"
+            body={error.message || "Something went wrong reaching the RevenueOS backend. Please try again."}
+            action={
+              <Button variant="ghost" onClick={refetch}>
+                Retry
+              </Button>
+            }
+          />
+        </Panel>
+      </div>
+    );
+  }
+
   return (
     <div className="page">
       <PageHeader
@@ -83,7 +120,13 @@ export default function OpportunitiesPage() {
         title="Opportunities"
         subtitle="Qualified, forecastable deals — value, probability and expected close."
         cta={
-          <Button variant="primary" icon="plus" onClick={() => setShowForm(true)}>
+          <Button
+            variant="primary"
+            icon="plus"
+            onClick={() => setShowForm(true)}
+            disabled={!hasPermission("opportunities.create")}
+            title={hasPermission("opportunities.create") ? undefined : "You don't have permission to create opportunities"}
+          >
             New Opportunity
           </Button>
         }

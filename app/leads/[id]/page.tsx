@@ -272,7 +272,13 @@ export default function LeadDetailPage() {
               {!primaryOpportunity && (
                 <div style={{ marginTop: 10 }}>
                   {isQualifiedLeadStatus(lead.status) ? (
-                    <Button variant="primary" icon="brief" onClick={() => setShowConvert(true)}>
+                    <Button
+                      variant="primary"
+                      icon="brief"
+                      onClick={() => setShowConvert(true)}
+                      disabled={!hasPermission("opportunities.create")}
+                      title={hasPermission("opportunities.create") ? undefined : "You don't have permission to create opportunities"}
+                    >
                       Convert to Opportunity
                     </Button>
                   ) : (

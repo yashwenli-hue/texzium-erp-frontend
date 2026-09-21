@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { Icon } from "../../../components/ui/Icon";
 import { Panel } from "../../../components/ui/Card";
 import { StatusTag, Tag } from "../../../components/ui/Tag";
-import { Button } from "../../../components/ui/Button";
+import { Button, EmptyState } from "../../../components/ui/Button";
 import { DesignNote } from "../../../components/ui/PageHeader";
 import { DocumentTrail } from "../../../components/ui/DocumentTrail";
 import { LifecycleStepper } from "../../../components/ui/LifecycleStepper";
@@ -15,6 +15,7 @@ import { ConfirmDialog } from "../../../components/ui/ConfirmDialog";
 import { QuotationForm } from "../../../components/forms/QuotationForm";
 import { useOpportunityDetail } from "../../../lib/hooks/useOpportunities";
 import { useQuotations } from "../../../lib/hooks/useQuotations";
+import { useRepository } from "../../../lib/repository/RepositoryProvider";
 import { useToast } from "../../../components/ui/Toast";
 import { initials } from "../../../components/ui/Who";
 import { formatInr, formatDate } from "../../../lib/format";
@@ -35,8 +36,10 @@ export default function OpportunityDetailPage() {
   const router = useRouter();
   const toast = useToast();
   const id = params?.id;
-  const { opportunity, lead, loading, updateStage, refetch } = useOpportunityDetail(id);
+  const { opportunity, lead, loading, error, updateStage, refetch } = useOpportunityDetail(id);
   const { quotations, createQuotation, refetch: refetchQuotations } = useQuotations();
+  const repo = useRepository();
+  const isReal = repo.kind === "real";
   const [pendingAction, setPendingAction] = useState<StageAction | null>(null);
   const [showQuotationForm, setShowQuotationForm] = useState(false);
 
@@ -45,6 +48,32 @@ export default function OpportunityDetailPage() {
       <div className="page">
         <div className="skeleton" style={{ height: 220, marginBottom: 16 }} />
         <div className="skeleton" style={{ height: 260 }} />
+      </div>
+    );
+  }
+
+  // A fetch failure (403/network/5xx) is not the same as a genuine not-found —
+  // only getById() resolving to null (id absent from the real list, or a
+  // real 404) means the opportunity truly doesn't exist. See the equivalent
+  // Lead Detail handling for the same pattern.
+  if (error) {
+    return (
+      <div className="page">
+        <a className="back-link" onClick={() => goBackOrTo(router, "/opportunities")}>
+          <Icon name="back" size={14} /> Back to Opportunities
+        </a>
+        <Panel title="Couldn't load this opportunity">
+          <EmptyState
+            icon="alert"
+            title="Something went wrong"
+            body={error.message || "Something went wrong reaching the RevenueOS backend. Please try again."}
+            action={
+              <Button variant="ghost" onClick={refetch}>
+                Retry
+              </Button>
+            }
+          />
+        </Panel>
       </div>
     );
   }
@@ -158,17 +187,25 @@ export default function OpportunityDetailPage() {
             title="Related Quotations"
             flush
             extraHead={
-              <a className="more" href="#" onClick={(e) => { e.preventDefault(); setShowQuotationForm(true); }}>
-                <Icon name="plus" size={14} /> Create Quotation
-              </a>
+              isReal ? undefined : (
+                <a className="more" href="#" onClick={(e) => { e.preventDefault(); setShowQuotationForm(true); }}>
+                  <Icon name="plus" size={14} /> Create Quotation
+                </a>
+              )
             }
           >
+            {isReal ? (
+              <p style={{ color: "var(--faint)", fontSize: 11.5, padding: "0 19px 10px" }}>
+                Quotation data isn&apos;t exposed by the connected backend&apos;s Opportunity endpoint yet
+                (docs/backend-ui-contract.md §7) — Quotations integration is a later milestone.
+              </p>
+            ) : null}
             <DataTable
               columns={quoteColumns}
-              rows={relatedQuotes}
+              rows={isReal ? [] : relatedQuotes}
               onRowClick={(q) => router.push(`/quotations/${q.id}`)}
               emptyTitle="No quotations yet"
-              emptyBody="Create one to move this opportunity toward Quote-to-Cash."
+              emptyBody={isReal ? "Quotations aren't part of Stage 2B." : "Create one to move this opportunity toward Quote-to-Cash."}
             />
           </Panel>
         </div>
