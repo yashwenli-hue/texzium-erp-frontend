@@ -88,7 +88,7 @@ function SearchInner() {
                 <div className="result" key={c.id} onClick={() => router.push(`/customers/${c.id}`)} style={{ cursor: "pointer" }}>
                   <div className="ic"><Icon name="building" size={16} /></div>
                   <div className="body">
-                    <b>{highlight(c.name, term)}</b>
+                    <b>{highlight(c.customerName, term)}</b>
                     <small>{c.industry} · {c.city} · {c.status} · LTV {formatInr(c.lifetimeValue)}</small>
                   </div>
                 </div>

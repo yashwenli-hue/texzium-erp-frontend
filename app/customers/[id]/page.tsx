@@ -93,9 +93,9 @@ export default function CustomerDetailPage() {
           <div className="card panel">
             <div className="profile-head">
               <div className="top">
-                <div className="av-lg">{initials(customer.name)}</div>
+                <div className="av-lg">{initials(customer.customerName)}</div>
                 <div>
-                  <h3>{customer.name}</h3>
+                  <h3>{customer.customerName}</h3>
                   <div className="co">{customer.industry} · {customer.city} · Customer since {formatDate(customer.customerSince)}</div>
                 </div>
               </div>

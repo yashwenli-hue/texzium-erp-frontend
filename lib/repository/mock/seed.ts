@@ -90,14 +90,14 @@ export const SEED_LEAD_TIMELINE: LeadTimelineEntry[] = [
 // CUSTOMERS
 // ---------------------------------------------------------------------------
 export const SEED_CUSTOMERS: Customer[] = [
-  { id: "C1", name: "GreenVolt Energy", industry: "Solar EPC", city: "Jaipur", ownerId: "U1", ownerName: "Anita S.", lifetimeValue: 24_000_000, openOrders: 3, status: "Active", customerSince: monthsAgo(28) },
-  { id: "C2", name: "JSW Steel", industry: "Manufacturing", city: "Bellary", ownerId: "U2", ownerName: "Rohit M.", lifetimeValue: 41_000_000, openOrders: 6, status: "Active", customerSince: monthsAgo(42) },
-  { id: "C3", name: "Havells India", industry: "Electricals", city: "Noida", ownerId: "U4", ownerName: "Priya N.", lifetimeValue: 9_600_000, openOrders: 2, status: "Active", customerSince: monthsAgo(14), originLeadId: "L5" },
-  { id: "C4", name: "Sterling Pumps", industry: "Manufacturing", city: "Pune", ownerId: "U2", ownerName: "Rohit M.", lifetimeValue: 12_000_000, openOrders: 4, status: "At Risk", customerSince: monthsAgo(34) },
-  { id: "C5", name: "L&T Infra", industry: "Infrastructure", city: "Chennai", ownerId: "U1", ownerName: "Anita S.", lifetimeValue: 36_000_000, openOrders: 5, status: "Active", customerSince: monthsAgo(45) },
-  { id: "C6", name: "Apex Controls", industry: "Trading", city: "Delhi", ownerId: "U3", ownerName: "Vikram J.", lifetimeValue: 1_800_000, openOrders: 1, status: "New", customerSince: monthsAgo(1) },
-  { id: "C7", name: "Nimbus Cold Chain", industry: "Cold Storage", city: "Surat", ownerId: "U4", ownerName: "Priya N.", lifetimeValue: 0, openOrders: 0, status: "Churned", customerSince: monthsAgo(18) },
-  { id: "C8", name: "Reliance Industries", industry: "Petrochemicals", city: "Mumbai", ownerId: "U1", ownerName: "Anita S.", lifetimeValue: 68_000_000, openOrders: 9, status: "Active", customerSince: monthsAgo(64) },
+  { id: "C1", customerCode: "CUST-1001", customerName: "GreenVolt Energy", industry: "Solar EPC", city: "Jaipur", ownerId: "U1", ownerName: "Anita S.", lifetimeValue: 24_000_000, openOrders: 3, status: "Active", customerSince: monthsAgo(28), createdAt: monthsAgo(28) },
+  { id: "C2", customerCode: "CUST-1002", customerName: "JSW Steel", industry: "Manufacturing", city: "Bellary", ownerId: "U2", ownerName: "Rohit M.", lifetimeValue: 41_000_000, openOrders: 6, status: "Active", customerSince: monthsAgo(42), createdAt: monthsAgo(42) },
+  { id: "C3", customerCode: "CUST-1003", customerName: "Havells India", industry: "Electricals", city: "Noida", ownerId: "U4", ownerName: "Priya N.", lifetimeValue: 9_600_000, openOrders: 2, status: "Active", customerSince: monthsAgo(14), createdAt: monthsAgo(14), originLeadId: "L5" },
+  { id: "C4", customerCode: "CUST-1004", customerName: "Sterling Pumps", industry: "Manufacturing", city: "Pune", ownerId: "U2", ownerName: "Rohit M.", lifetimeValue: 12_000_000, openOrders: 4, status: "At Risk", customerSince: monthsAgo(34), createdAt: monthsAgo(34) },
+  { id: "C5", customerCode: "CUST-1005", customerName: "L&T Infra", industry: "Infrastructure", city: "Chennai", ownerId: "U1", ownerName: "Anita S.", lifetimeValue: 36_000_000, openOrders: 5, status: "Active", customerSince: monthsAgo(45), createdAt: monthsAgo(45) },
+  { id: "C6", customerCode: "CUST-1006", customerName: "Apex Controls", industry: "Trading", city: "Delhi", ownerId: "U3", ownerName: "Vikram J.", lifetimeValue: 1_800_000, openOrders: 1, status: "New", customerSince: monthsAgo(1), createdAt: monthsAgo(1) },
+  { id: "C7", customerCode: "CUST-1007", customerName: "Nimbus Cold Chain", industry: "Cold Storage", city: "Surat", ownerId: "U4", ownerName: "Priya N.", lifetimeValue: 0, openOrders: 0, status: "Churned", customerSince: monthsAgo(18), createdAt: monthsAgo(18) },
+  { id: "C8", customerCode: "CUST-1008", customerName: "Reliance Industries", industry: "Petrochemicals", city: "Mumbai", ownerId: "U1", ownerName: "Anita S.", lifetimeValue: 68_000_000, openOrders: 9, status: "Active", customerSince: monthsAgo(64), createdAt: monthsAgo(64) },
 ];
 
 // ---------------------------------------------------------------------------

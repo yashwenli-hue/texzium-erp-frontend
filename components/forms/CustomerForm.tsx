@@ -7,6 +7,13 @@ import { Button } from "../ui/Button";
 import { useToast } from "../ui/Toast";
 import { CreateCustomerInput } from "../../lib/repository/interfaces";
 
+/**
+ * Field-for-field mirror of the VERIFIED CreateCustomerDto: customerCode,
+ * customerName, panNumber?, email?, phone?, customerType?. Account-profile
+ * fields the prototype used to collect here (industry, city, owner, lifetime
+ * value) aren't part of this DTO — they're defaulted by the repository
+ * instead (see MockCustomerRepository.create()), not collected from the user.
+ */
 export function CustomerForm({
   onClose,
   onSubmit,
@@ -15,19 +22,19 @@ export function CustomerForm({
   onSubmit: (input: CreateCustomerInput) => Promise<unknown>;
 }) {
   const toast = useToast();
-  const [name, setName] = useState("");
-  const [industry, setIndustry] = useState("");
-  const [city, setCity] = useState("");
-  const [ownerName, setOwnerName] = useState("");
-  const [ltv, setLtv] = useState("");
+  const [customerName, setCustomerName] = useState("");
+  const [customerCode, setCustomerCode] = useState("");
+  const [panNumber, setPanNumber] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [customerType, setCustomerType] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
 
   function validate(): boolean {
     const e: Record<string, string> = {};
-    if (!name.trim()) e.name = "Customer name is required";
-    if (!ownerName.trim()) e.ownerName = "Assign an account owner";
-    if (ltv && (isNaN(Number(ltv)) || Number(ltv) < 0)) e.ltv = "Enter a valid amount";
+    if (!customerName.trim()) e.customerName = "Customer name is required";
+    if (!customerCode.trim()) e.customerCode = "Customer code is required";
     setErrors(e);
     return Object.keys(e).length === 0;
   }
@@ -37,13 +44,14 @@ export function CustomerForm({
     setSubmitting(true);
     try {
       await onSubmit({
-        name: name.trim(),
-        industry: industry.trim() || "Not specified",
-        city: city.trim() || "Not specified",
-        ownerName: ownerName.trim(),
-        lifetimeValue: ltv ? Number(ltv) : 0,
+        customerCode: customerCode.trim(),
+        customerName: customerName.trim(),
+        panNumber: panNumber.trim() || undefined,
+        email: email.trim() || undefined,
+        phone: phone.trim() || undefined,
+        customerType: customerType.trim() || undefined,
       });
-      toast.show(`Customer "${name.trim()}" created`, "check");
+      toast.show(`Customer "${customerName.trim()}" created`, "check");
       onClose();
     } catch {
       setErrors({ form: "Something went wrong creating the customer. Please try again." });
@@ -65,14 +73,17 @@ export function CustomerForm({
         </>
       }
     >
-      <TextField label="Customer Name" required value={name} onChange={(e) => setName(e.target.value)} error={errors.name} placeholder="e.g. GreenVolt Energy" />
       <FieldRow>
-        <TextField label="Industry" value={industry} onChange={(e) => setIndustry(e.target.value)} placeholder="e.g. Solar EPC" />
-        <TextField label="City" value={city} onChange={(e) => setCity(e.target.value)} placeholder="e.g. Jaipur" />
+        <TextField label="Customer Name" required value={customerName} onChange={(e) => setCustomerName(e.target.value)} error={errors.customerName} placeholder="e.g. GreenVolt Energy" />
+        <TextField label="Customer Code" required value={customerCode} onChange={(e) => setCustomerCode(e.target.value)} error={errors.customerCode} placeholder="e.g. CUST-1009" />
       </FieldRow>
       <FieldRow>
-        <TextField label="Account Owner" required value={ownerName} onChange={(e) => setOwnerName(e.target.value)} error={errors.ownerName} placeholder="e.g. Anita S." />
-        <TextField label="Lifetime Value (₹)" type="number" min={0} value={ltv} onChange={(e) => setLtv(e.target.value)} error={errors.ltv} placeholder="Optional" />
+        <TextField label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Optional" />
+        <TextField label="Phone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Optional" />
+      </FieldRow>
+      <FieldRow>
+        <TextField label="PAN Number" value={panNumber} onChange={(e) => setPanNumber(e.target.value)} placeholder="Optional" />
+        <TextField label="Customer Type" value={customerType} onChange={(e) => setCustomerType(e.target.value)} placeholder="Optional" />
       </FieldRow>
       {errors.form && <p style={{ color: "var(--bad)", fontSize: 12.5 }}>{errors.form}</p>}
     </Modal>

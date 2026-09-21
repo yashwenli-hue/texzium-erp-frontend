@@ -34,7 +34,7 @@ export default function CustomersPage() {
   const pageRows = paginate(filtered, page, PAGE_SIZE);
 
   const columns: Column<Customer>[] = [
-    { key: "name", header: "Account", render: (c) => <Who name={c.name} sub={`${c.industry} · ${c.city}`} /> },
+    { key: "customerName", header: "Account", render: (c) => <Who name={c.customerName} sub={`${c.industry} · ${c.city}`} /> },
     { key: "ownerName", header: "Owner", render: (c) => c.ownerName },
     { key: "openOrders", header: "Open Orders", render: (c) => String(c.openOrders) },
     { key: "lifetimeValue", header: "Lifetime Value", render: (c) => formatInr(c.lifetimeValue) },

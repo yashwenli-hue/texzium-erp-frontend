@@ -208,7 +208,20 @@ export type CustomerStatus = "Active" | "At Risk" | "New" | "Churned";
 
 export interface Customer {
   id: ID;
-  name: string;
+  // VERIFIED CreateCustomerDto fields — see CreateCustomerInput. Renamed
+  // from the prototype's plain `name` to match the DTO's own field name and
+  // the already-committed CustomerSortField literal.
+  customerName: string;
+  customerCode: string;
+  panNumber?: string;
+  email?: string;
+  phone?: string;
+  customerType?: string;
+  // UI ASSUMPTION fields below — carried over from the prototype, not part
+  // of the verified DTO above. Preserved as-is (the existing Customers list/
+  // detail pages depend on them); the create form simply no longer collects
+  // them, since CreateCustomerInput doesn't accept them, so they're defaulted
+  // in MockCustomerRepository.create() instead of user-supplied.
   industry: string;
   city: string;
   ownerId: ID;
@@ -216,7 +229,13 @@ export interface Customer {
   lifetimeValue: number; // INR
   openOrders: number;
   status: CustomerStatus;
-  customerSince: string; // ISO 8601
+  customerSince: string; // ISO 8601 — the "Customer Since" label the UI already shows
+  // Satisfies the already-committed CustomerSortField's "createdAt" literal
+  // (list()'s ListQuery<CustomerSortField> must stay assignable to
+  // ListQuery<keyof Customer>). Same value as customerSince for every mock
+  // record — both represent account-creation time; kept as a separate field
+  // only to avoid renaming the pre-existing customerSince display field.
+  createdAt: string;
   // @backend-verify: is contactsCount derived server-side or computed
   // client-side from the Contacts collection? Currently computed client-side.
   originLeadId?: ID;

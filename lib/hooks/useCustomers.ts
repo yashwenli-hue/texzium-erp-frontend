@@ -50,18 +50,18 @@ export function useCustomerDetail(id: string | undefined) {
   );
 
   const { data: contacts } = useAsyncList(
-    () => (customer ? repo.contacts.listByCompanyName(customer.name) : Promise.resolve([])),
-    [repo, customer?.name]
+    () => (customer ? repo.contacts.listByCompanyName(customer.customerName) : Promise.resolve([])),
+    [repo, customer?.customerName]
   );
 
   const { data: quotations } = useAsyncList(
     () =>
       customer
         ? repo.quotations
-            .list({ search: customer.name })
-            .then((p) => p.items.filter((q) => q.customerName === customer.name))
+            .list({ search: customer.customerName })
+            .then((p) => p.items.filter((q) => q.customerName === customer.customerName))
         : Promise.resolve([]),
-    [repo, customer?.name]
+    [repo, customer?.customerName]
   );
 
   return {

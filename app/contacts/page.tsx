@@ -34,7 +34,7 @@ export default function ContactsPage() {
   // still tied to a company that's only a Lead (not yet converted) show
   // plain text — no invented companyId relationship, no misleading link to
   // a page that doesn't exist yet.
-  const customerByName = useMemo(() => new Map(customers.map((c) => [c.name, c])), [customers]);
+  const customerByName = useMemo(() => new Map(customers.map((c) => [c.customerName, c])), [customers]);
 
   const typeCounts = useMemo(() => {
     const map: Record<string, number> = {};

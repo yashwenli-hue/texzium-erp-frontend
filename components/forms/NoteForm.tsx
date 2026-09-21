@@ -39,7 +39,7 @@ export function NoteForm({
     () =>
       linkedType === "Lead"
         ? leads.map((l) => ({ id: l.id, name: l.customerName }))
-        : customers.map((c) => ({ id: c.id, name: c.name })),
+        : customers.map((c) => ({ id: c.id, name: c.customerName })),
     [linkedType, leads, customers]
   );
 
