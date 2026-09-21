@@ -206,36 +206,73 @@ export interface LeadTimelineEntry {
 // docs/backend-ui-contract.md §6.
 export type CustomerStatus = "Active" | "At Risk" | "New" | "Churned";
 
+// VERIFIED: CustomerGSTRegistration — GET /customers nests this array as
+// `gstRegistrations`; a flat GET /customer-gst also exists (already
+// consumed read-only as the Buyer GST dropdown lookup — see
+// GstRegistrationOption/IBuyerGstRepository). A customer can have multiple
+// registrations, and the backend does NOT enforce exactly one `isDefault`
+// per customer (confirmed by reading customer-gst.service.ts directly — no
+// other registration is unset when a new default is created), so more than
+// one may legitimately show isDefault: true; never silently correct that.
+// No GSTIN format/checksum validation exists either. POST /customer-gst is
+// currently broken for every payload — see the Stage 2H report.
+export interface CustomerGstRegistration {
+  id: ID;
+  customerId: ID;
+  gstin: string;
+  legalName: string;
+  tradeName?: string;
+  branchName?: string;
+  stateCode: string;
+  stateName: string;
+  addressLine1: string;
+  addressLine2?: string;
+  city: string;
+  pincode: string;
+  isDefault: boolean;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Customer {
   id: ID;
-  // VERIFIED CreateCustomerDto fields — see CreateCustomerInput. Renamed
-  // from the prototype's plain `name` to match the DTO's own field name and
-  // the already-committed CustomerSortField literal.
+  // VERIFIED CreateCustomerDto/Customer model fields — see CreateCustomerInput.
+  // customerName was renamed from the prototype's plain `name` to match the
+  // DTO's own field name and the already-committed CustomerSortField literal.
   customerName: string;
   customerCode: string;
   panNumber?: string;
   email?: string;
   phone?: string;
   customerType?: string;
-  // UI ASSUMPTION fields below — carried over from the prototype, not part
-  // of the verified DTO above. Preserved as-is (the existing Customers list/
-  // detail pages depend on them); the create form simply no longer collects
-  // them, since CreateCustomerInput doesn't accept them, so they're defaulted
-  // in MockCustomerRepository.create() instead of user-supplied.
-  industry: string;
-  city: string;
-  ownerId: ID;
-  ownerName: string;
-  lifetimeValue: number; // INR
-  openOrders: number;
-  status: CustomerStatus;
-  customerSince: string; // ISO 8601 — the "Customer Since" label the UI already shows
-  // Satisfies the already-committed CustomerSortField's "createdAt" literal
-  // (list()'s ListQuery<CustomerSortField> must stay assignable to
-  // ListQuery<keyof Customer>). Same value as customerSince for every mock
-  // record — both represent account-creation time; kept as a separate field
-  // only to avoid renaming the pre-existing customerSince display field.
+  isActive: boolean;
+  // VERIFIED: populated only via the POST /vendors (isCustomer: true)
+  // auto-link path, never via direct customer creation — see the Stage 2H
+  // report. Not a real Prisma relation on either side (linkedVendorId is a
+  // bare string, not a foreign key).
+  isVendor: boolean;
+  linkedVendorId?: ID;
+  gstRegistrations: CustomerGstRegistration[];
   createdAt: string;
+  updatedAt: string;
+  // MOCK/UI-ONLY presentation fields below — carried over from the
+  // prototype, with NO basis in the real Customer model at all (confirmed
+  // by reading the Prisma schema directly — see the Stage 2H report).
+  // Always present for a mock customer; always undefined for a real one —
+  // never synthesized or defaulted for real customers, since a placeholder
+  // value would misrepresent verified backend truth. The create form no
+  // longer collects any of these, since CreateCustomerInput doesn't accept
+  // them; MockCustomerRepository.create() still defaults them for new mock
+  // customers only, to keep the existing mock-mode UI working.
+  industry?: string;
+  city?: string;
+  ownerId?: ID;
+  ownerName?: string;
+  lifetimeValue?: number; // INR
+  openOrders?: number;
+  status?: CustomerStatus;
+  customerSince?: string; // ISO 8601 — the "Customer Since" label mock mode shows
   // @backend-verify: is contactsCount derived server-side or computed
   // client-side from the Contacts collection? Currently computed client-side.
   originLeadId?: ID;

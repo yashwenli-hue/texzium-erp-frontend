@@ -19,6 +19,8 @@ import {
   PaymentCollectionRecord,
   CustomerStatement,
   ReceiptVoucher,
+  Customer,
+  CustomerGstRegistration,
   InventoryItemOption,
   GstRegistrationOption,
   titleCaseFromConstant,
@@ -577,5 +579,88 @@ export function mapReceiptVoucher(raw: BackendReceiptVoucher): ReceiptVoucher {
     referenceNo: raw.referenceNo ?? undefined,
     remarks: raw.remarks ?? undefined,
     createdAt: raw.createdAt,
+  };
+}
+
+export interface BackendCustomerGstRegistration {
+  id: string;
+  customerId: string;
+  gstin: string;
+  legalName: string;
+  tradeName?: string | null;
+  branchName?: string | null;
+  stateCode: string;
+  stateName: string;
+  addressLine1: string;
+  addressLine2?: string | null;
+  city: string;
+  pincode: string;
+  isDefault: boolean;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export function mapCustomerGstRegistration(raw: BackendCustomerGstRegistration): CustomerGstRegistration {
+  return {
+    id: raw.id,
+    customerId: raw.customerId,
+    gstin: raw.gstin,
+    legalName: raw.legalName,
+    tradeName: raw.tradeName ?? undefined,
+    branchName: raw.branchName ?? undefined,
+    stateCode: raw.stateCode,
+    stateName: raw.stateName,
+    addressLine1: raw.addressLine1,
+    addressLine2: raw.addressLine2 ?? undefined,
+    city: raw.city,
+    pincode: raw.pincode,
+    isDefault: raw.isDefault,
+    isActive: raw.isActive,
+    createdAt: raw.createdAt,
+    updatedAt: raw.updatedAt,
+  };
+}
+
+export interface BackendCustomer {
+  id: string;
+  customerCode: string;
+  customerName: string;
+  panNumber?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  customerType?: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  isVendor: boolean;
+  linkedVendorId?: string | null;
+  /** Only present on GET /customers — not returned by POST /customers (which is currently broken anyway; see the Stage 2H report). */
+  gstRegistrations?: BackendCustomerGstRegistration[];
+}
+
+/**
+ * Maps a real Customer record field-for-field against the VERIFIED Prisma
+ * model — deliberately does NOT set any of the legacy mock-only presentation
+ * fields (industry, city, ownerName, lifetimeValue, openOrders, status,
+ * customerSince); those stay undefined for every real customer rather than
+ * being defaulted to a placeholder, since a placeholder would misrepresent
+ * verified backend truth. See Customer in lib/types/domain.ts.
+ */
+export function mapCustomer(raw: BackendCustomer): Customer {
+  return {
+    id: raw.id,
+    customerName: raw.customerName,
+    customerCode: raw.customerCode,
+    panNumber: raw.panNumber ?? undefined,
+    email: raw.email ?? undefined,
+    phone: raw.phone ?? undefined,
+    customerType: raw.customerType ?? undefined,
+    isActive: raw.isActive,
+    isVendor: raw.isVendor,
+    linkedVendorId: raw.linkedVendorId ?? undefined,
+    gstRegistrations: (raw.gstRegistrations ?? []).map(mapCustomerGstRegistration),
+    createdAt: raw.createdAt,
+    updatedAt: raw.updatedAt,
   };
 }

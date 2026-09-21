@@ -17,7 +17,7 @@ import { RealReceiptVoucherRepository } from "./realReceiptVoucherRepository";
 import { RealInventoryItemRepository } from "./realInventoryItemRepository";
 import { RealSellerGstRepository } from "./realSellerGstRepository";
 import { RealBuyerGstRepository } from "./realBuyerGstRepository";
-import { MockCustomerRepository } from "../mock/mockCustomerRepository";
+import { RealCustomerRepository } from "./realCustomerRepository";
 import { MockContactRepository } from "../mock/mockContactRepository";
 import { MockActivityRepository } from "../mock/mockActivityRepository";
 import { MockTaskRepository } from "../mock/mockTaskRepository";
@@ -28,10 +28,11 @@ import { MockSearchRepository } from "../mock/mockSearchRepository";
 /**
  * Stage 2A wired up Leads and Opportunities; Stage 2C adds Quotations
  * (+ their supporting Inventory Item / Seller GST / Buyer GST master-data
- * lookups) against the real backend. Everything else (Customers, Contacts,
- * Activities, Tasks, Notes, Notifications, Search) remains out of scope and
- * stays on the mock implementation — same pattern as createMockRepository(),
- * just per-entity.
+ * lookups); Stage 2H adds Customer Master (GET/create — create is verified
+ * but currently broken backend-side, see RealCustomerRepository) against
+ * the real backend. Everything else (Contacts, Activities, Tasks, Notes,
+ * Notifications, Search) remains out of scope and stays on the mock
+ * implementation — same pattern as createMockRepository(), just per-entity.
  */
 export function createRealRepository(): RevenueOSRepository {
   const users = new RealUserRepository();
@@ -58,7 +59,7 @@ export function createRealRepository(): RevenueOSRepository {
     inventoryItems: new RealInventoryItemRepository(),
     sellerGstRegistrations: new RealSellerGstRepository(),
     buyerGstRegistrations: new RealBuyerGstRepository(),
-    customers: new MockCustomerRepository(),
+    customers: new RealCustomerRepository(),
     contacts: new MockContactRepository(),
     activities: new MockActivityRepository(),
     tasks: new MockTaskRepository(),

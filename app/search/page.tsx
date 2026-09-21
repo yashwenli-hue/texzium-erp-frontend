@@ -89,7 +89,7 @@ function SearchInner() {
                   <div className="ic"><Icon name="building" size={16} /></div>
                   <div className="body">
                     <b>{highlight(c.customerName, term)}</b>
-                    <small>{c.industry} · {c.city} · {c.status} · LTV {formatInr(c.lifetimeValue)}</small>
+                    <small>{c.industry ?? "—"} · {c.city ?? "—"} · {c.status ?? "—"} · LTV {formatInr(c.lifetimeValue ?? 0)}</small>
                   </div>
                 </div>
               ))}

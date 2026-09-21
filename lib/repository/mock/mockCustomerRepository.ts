@@ -26,7 +26,8 @@ export class MockCustomerRepository implements ICustomerRepository {
     // fields the VERIFIED CreateCustomerDto doesn't collect (see Customer in
     // lib/types/domain.ts) — defaulted here rather than user-supplied, same
     // pattern as ownerId/openOrders/status/customerSince already were before
-    // this migration.
+    // this migration. isActive/isVendor/gstRegistrations mirror the real
+    // Customer model's own defaults for a freshly created record.
     const customer: Customer = {
       id: mockId("C"),
       customerName: input.customerName,
@@ -35,6 +36,9 @@ export class MockCustomerRepository implements ICustomerRepository {
       email: input.email,
       phone: input.phone,
       customerType: input.customerType,
+      isActive: true,
+      isVendor: false,
+      gstRegistrations: [],
       industry: "Not specified",
       city: "Not specified",
       ownerId: mockId("U"),
@@ -44,6 +48,7 @@ export class MockCustomerRepository implements ICustomerRepository {
       status: "New",
       customerSince: now,
       createdAt: now,
+      updatedAt: now,
     };
     db.customers.add(customer);
     return delay(customer);

@@ -44,7 +44,7 @@ export function useCustomers() {
 export function useCustomerDetail(id: string | undefined) {
   const repo = useRepository();
 
-  const { data: customer, loading, error } = useAsyncList(
+  const { data: customer, loading, error, refetch } = useAsyncList(
     () => (id ? repo.customers.getById(id) : Promise.resolve(null)),
     [repo, id]
   );
@@ -70,5 +70,6 @@ export function useCustomerDetail(id: string | undefined) {
     quotations: quotations ?? [],
     loading,
     error,
+    refetch,
   };
 }
