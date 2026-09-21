@@ -1,5 +1,5 @@
 import { ID, ListQuery, Page } from "../../types/common";
-import { Quotation } from "../../types/domain";
+import { Quotation, SalesOrder } from "../../types/domain";
 import {
   IQuotationRepository,
   CreateQuotationInput,
@@ -8,6 +8,8 @@ import {
 import { db } from "./db";
 import { delay, applyListQuery } from "./queryUtils";
 import { mockId } from "./entityStore";
+
+let mockOrderCounter = 5090;
 
 const SEARCHABLE: (keyof Quotation)[] = ["quoteNo", "customerName", "opportunityName", "ownerName"];
 
@@ -77,13 +79,33 @@ export class MockQuotationRepository implements IQuotationRepository {
     return delay(updated);
   }
 
-  async convert(id: ID): Promise<Quotation> {
-    // Mock-only: unlike the real backend (which creates a SalesOrder but
-    // leaves Quotation.status untouched), the mock has no Sales Order
-    // concept at all, so it's free to show the master plan's documented
-    // terminal state for demo purposes.
+  async convert(id: ID): Promise<{ quotation: Quotation; salesOrderId: ID }> {
+    const existing = db.quotations.getById(id);
+    if (!existing) throw new Error(`Quotation ${id} not found`);
+    const now = new Date().toISOString();
+    mockOrderCounter += 1;
+    // Mirrors the real quotationsService.convertToSalesOrder(): a Sales
+    // Order linked by quotationId, status OPEN, no proforma involved. Unlike
+    // the real backend (which leaves Quotation.status untouched), the mock
+    // is free to show the master plan's documented terminal state for demo
+    // purposes — that divergence is mock-only, same as before this change.
+    const salesOrder: SalesOrder = {
+      id: mockId("SO"),
+      salesOrderCode: `SO-${mockOrderCounter}`,
+      orderDate: now,
+      totalAmount: existing.amount,
+      status: "OPEN",
+      quotationId: existing.id,
+      quoteNo: existing.quoteNo,
+      opportunityId: existing.opportunityId,
+      opportunityName: existing.opportunityName,
+      customerName: existing.customerName,
+      ownerName: existing.ownerName,
+      createdAt: now,
+    };
+    db.salesOrders.add(salesOrder);
     const updated = db.quotations.update(id, { status: "CONVERTED" });
     if (!updated) throw new Error(`Quotation ${id} not found`);
-    return delay(updated);
+    return delay({ quotation: updated, salesOrderId: salesOrder.id });
   }
 }

@@ -1,4 +1,4 @@
-import { LeadStatus, formatLeadStatus, formatQuotationStatus, formatProformaInvoiceStatus } from "../../lib/types/domain";
+import { LeadStatus, formatLeadStatus, formatQuotationStatus, formatProformaInvoiceStatus, formatSalesOrderStatus } from "../../lib/types/domain";
 
 export type TagColor = "g" | "w" | "b" | "i" | "n";
 
@@ -61,6 +61,22 @@ export const PROFORMA_INVOICE_STATUS_STYLE: Record<string, TagColor> = {
 
 export function ProformaInvoiceStatusTag({ status }: { status: string }) {
   return <Tag color={PROFORMA_INVOICE_STATUS_STYLE[status] ?? "n"}>{formatProformaInvoiceStatus(status)}</Tag>;
+}
+
+// Sales Order status is an open-ended backend string, not a closed enum —
+// RevenueOS's own Sales Orders controller only ever writes OPEN (Quotation
+// conversion) or PENDING_STORE_APPROVAL (direct create from an approved
+// Proforma). Other values exist in real data (e.g. READY_FOR_INVOICING) but
+// are written exclusively by unrelated OperationsOS/AdminOS modules outside
+// this stage's scope — shown honestly via the neutral fallback tint rather
+// than styled as if this screen recognizes them.
+export const SALES_ORDER_STATUS_STYLE: Record<string, TagColor> = {
+  OPEN: "n",
+  PENDING_STORE_APPROVAL: "w",
+};
+
+export function SalesOrderStatusTag({ status }: { status: string }) {
+  return <Tag color={SALES_ORDER_STATUS_STYLE[status] ?? "i"}>{formatSalesOrderStatus(status)}</Tag>;
 }
 
 // Dedicated lifecycle palette for the verified backend LeadStatus enum

@@ -10,6 +10,7 @@ import {
   Opportunity,
   Quotation,
   ProformaInvoice,
+  SalesOrder,
   AppNotification,
 } from "../../types/domain";
 
@@ -206,6 +207,50 @@ export const SEED_QUOTATIONS: Quotation[] = [
 export const SEED_PROFORMA_INVOICES: ProformaInvoice[] = [
   { id: "PF1", proformaNumber: "PI-1042", quotationId: "Q3", quoteNo: "QT-3390", customerName: "JSW Steel", opportunityId: "O3", opportunityName: "Factory Automation Retrofit", issueDate: daysAgo(4), totalAmount: 8_500_000, status: "APPROVED", validityDate: daysFromNow(10), remarks: "Final commercial confirmation before Sales Order.", ownerName: "Rohit M.", createdAt: daysAgo(4) },
   { id: "PF2", proformaNumber: "PI-1058", quotationId: "Q7", quoteNo: "QT-3415", customerName: "Tata Projects", opportunityId: "O7", opportunityName: "Warehouse Automation", issueDate: daysAgo(1), totalAmount: 2_850_000, status: "PENDING", validityDate: daysFromNow(20), ownerName: "Rohit M.", createdAt: daysAgo(1) },
+];
+
+// ---------------------------------------------------------------------------
+// SALES ORDERS
+// Demonstrates both verified, independent real creation paths: SO1 comes
+// from the already-APPROVED PF1 (the direct POST /sales-orders path, tied
+// to a Proforma Invoice), SO2 comes directly from the already-APPROVED Q8
+// (the POST /quotations/:id/convert path, tied to a Quotation, with no
+// Proforma involved at all) — Q8 intentionally has no Proforma Invoice of
+// its own (see SEED_PROFORMA_INVOICES above), so this is its only downstream
+// document. Mirrors the two status values the RevenueOS Sales Orders
+// controller actually writes: PENDING_STORE_APPROVAL and OPEN.
+// ---------------------------------------------------------------------------
+export const SEED_SALES_ORDERS: SalesOrder[] = [
+  {
+    id: "SO1",
+    salesOrderCode: "SO-5201",
+    orderDate: daysAgo(3),
+    totalAmount: 8_500_000,
+    status: "PENDING_STORE_APPROVAL",
+    proformaInvoiceId: "PF1",
+    proformaNumber: "PI-1042",
+    quotationId: "Q3",
+    quoteNo: "QT-3390",
+    opportunityId: "O3",
+    opportunityName: "Factory Automation Retrofit",
+    customerName: "JSW Steel",
+    ownerName: "Rohit M.",
+    createdAt: daysAgo(3),
+  },
+  {
+    id: "SO2",
+    salesOrderCode: "SO-5187",
+    orderDate: daysAgo(6),
+    totalAmount: 5_200_000,
+    status: "OPEN",
+    quotationId: "Q8",
+    quoteNo: "QT-3385",
+    opportunityId: "O8",
+    opportunityName: "Switchgear Replacement Order",
+    customerName: "Havells India",
+    ownerName: "Priya N.",
+    createdAt: daysAgo(6),
+  },
 ];
 
 // ---------------------------------------------------------------------------

@@ -11,6 +11,7 @@ import { MockNoteRepository } from "./mockNoteRepository";
 import { MockOpportunityRepository } from "./mockOpportunityRepository";
 import { MockQuotationRepository } from "./mockQuotationRepository";
 import { MockProformaInvoiceRepository } from "./mockProformaInvoiceRepository";
+import { MockSalesOrderRepository } from "./mockSalesOrderRepository";
 import { MockInventoryItemRepository } from "./mockInventoryItemRepository";
 import { MockSellerGstRepository } from "./mockSellerGstRepository";
 import { MockBuyerGstRepository } from "./mockBuyerGstRepository";
@@ -39,6 +40,7 @@ export function createMockRepository(): RevenueOSRepository {
     opportunities: new MockOpportunityRepository(),
     quotations: new MockQuotationRepository(),
     proformaInvoices: new MockProformaInvoiceRepository(),
+    salesOrders: new MockSalesOrderRepository(),
     inventoryItems: new MockInventoryItemRepository(),
     sellerGstRegistrations: new MockSellerGstRepository(),
     buyerGstRegistrations: new MockBuyerGstRepository(),

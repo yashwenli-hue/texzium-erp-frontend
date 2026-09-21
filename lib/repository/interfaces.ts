@@ -19,6 +19,7 @@ import {
   OpportunityStage,
   Quotation,
   ProformaInvoice,
+  SalesOrder,
   AppNotification,
 } from "../types/domain";
 
@@ -40,6 +41,7 @@ export type ContactSortField = "name" | "lastContactedAt";
 export type OpportunitySortField = "expectedValue" | "probability" | "expectedCloseDate";
 export type QuotationSortField = "amount" | "validUntil" | "createdAt";
 export type ProformaInvoiceSortField = "totalAmount" | "issueDate" | "createdAt";
+export type SalesOrderSortField = "totalAmount" | "orderDate" | "createdAt";
 export type TaskSortField = "dueAt" | "priority" | "createdAt";
 
 // Mirrors the VERIFIED CreateLeadDto field-for-field. No deal value, owner,
@@ -256,11 +258,14 @@ export interface IQuotationRepository {
    * VERIFIED: `POST /:id/convert` — creates a real SalesOrder linked to this
    * quotation, but does NOT write CONVERTED (or any status) back onto the
    * Quotation itself; confirmed by reading quotations.service.ts directly.
-   * Returns the quotation as re-fetched after conversion — its status will
-   * still reflect whatever it was before (e.g. APPROVED), which is the
-   * honest backend behavior, not a bug in this mapping.
+   * Returns the quotation as re-fetched after conversion (its status will
+   * still reflect whatever it was before, e.g. APPROVED — the honest
+   * backend behavior, not a bug in this mapping) plus the id of the Sales
+   * Order the backend just created, straight from its response body, so the
+   * caller can navigate to it once Sales Order screens exist without
+   * guessing or re-deriving the id client-side.
    */
-  convert(id: ID): Promise<Quotation>;
+  convert(id: ID): Promise<{ quotation: Quotation; salesOrderId: ID }>;
 }
 
 // Mirrors the VERIFIED CreateProformaInvoiceDto exactly: quotationId,
@@ -281,6 +286,31 @@ export interface IProformaInvoiceRepository {
   create(input: CreateProformaInvoiceInput): Promise<ProformaInvoice>;
   /** VERIFIED: `PATCH /:id/approve`, no body — sets customerStatus to APPROVED. No other transition exists. */
   approve(id: ID): Promise<ProformaInvoice>;
+}
+
+// Mirrors the VERIFIED CreateSalesOrderDto exactly: proformaInvoiceId,
+// orderDate, totalAmount, inventoryItemId, orderQty, sellerGstId,
+// buyerGstId. This is the direct POST /sales-orders creation path, which
+// hard-requires an APPROVED Proforma Invoice (validated server-side in
+// sales-orders.service.ts, along with the inventory item and both GST
+// registrations). It is independent of IQuotationRepository.convert() —
+// the backend does not connect the two, so a Sales Order created this way
+// is never a duplicate of one created via Quotation conversion. See the
+// Stage 2E report.
+export interface CreateSalesOrderInput {
+  proformaInvoiceId: ID;
+  orderDate: string; // ISO 8601
+  totalAmount: number;
+  inventoryItemId: ID;
+  orderQty: number;
+  sellerGstId: ID;
+  buyerGstId: ID;
+}
+
+export interface ISalesOrderRepository {
+  list(query?: ListQuery<SalesOrderSortField>): Promise<Page<SalesOrder>>;
+  getById(id: ID): Promise<SalesOrder | null>;
+  create(input: CreateSalesOrderInput): Promise<SalesOrder>;
 }
 
 export interface IInventoryItemRepository {
@@ -332,6 +362,7 @@ export interface RevenueOSRepository {
   opportunities: IOpportunityRepository;
   quotations: IQuotationRepository;
   proformaInvoices: IProformaInvoiceRepository;
+  salesOrders: ISalesOrderRepository;
   inventoryItems: IInventoryItemRepository;
   sellerGstRegistrations: ISellerGstRepository;
   buyerGstRegistrations: IBuyerGstRepository;

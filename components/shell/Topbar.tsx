@@ -13,6 +13,7 @@ function crumbFor(pathname: string): string {
   if (seg[0] === "opportunities" && seg[1]) return "Opportunity Details";
   if (seg[0] === "quotations" && seg[1]) return "Quotation Details";
   if (seg[0] === "proforma-invoices" && seg[1]) return "Proforma Invoice Details";
+  if (seg[0] === "sales-orders" && seg[1]) return "Sales Order Details";
   if (seg[0] === "customers" && seg[1]) return "Customer Details";
   return PAGE_META[seg[0]]?.title ?? "Dashboard";
 }

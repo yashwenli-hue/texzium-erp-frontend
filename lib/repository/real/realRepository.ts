@@ -6,6 +6,7 @@ import { RealLeadFollowupRepository } from "./realLeadFollowupRepository";
 import { RealUserRepository } from "./realUserRepository";
 import { RealQuotationRepository } from "./realQuotationRepository";
 import { RealProformaInvoiceRepository } from "./realProformaInvoiceRepository";
+import { RealSalesOrderRepository } from "./realSalesOrderRepository";
 import { RealInventoryItemRepository } from "./realInventoryItemRepository";
 import { RealSellerGstRepository } from "./realSellerGstRepository";
 import { RealBuyerGstRepository } from "./realBuyerGstRepository";
@@ -38,6 +39,7 @@ export function createRealRepository(): RevenueOSRepository {
     opportunities,
     quotations,
     proformaInvoices: new RealProformaInvoiceRepository(quotations),
+    salesOrders: new RealSalesOrderRepository(quotations),
     inventoryItems: new RealInventoryItemRepository(),
     sellerGstRegistrations: new RealSellerGstRepository(),
     buyerGstRegistrations: new RealBuyerGstRepository(),

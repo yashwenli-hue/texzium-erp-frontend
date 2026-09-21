@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Icon } from "../../../components/ui/Icon";
 import { Panel } from "../../../components/ui/Card";
-import { QuotationStatusTag, ProformaInvoiceStatusTag, Tag } from "../../../components/ui/Tag";
+import { QuotationStatusTag, ProformaInvoiceStatusTag, SalesOrderStatusTag, Tag } from "../../../components/ui/Tag";
 import { Button, EmptyState } from "../../../components/ui/Button";
 import { DataTable, Column } from "../../../components/ui/DataTable";
 import { DesignNote } from "../../../components/ui/PageHeader";
@@ -14,11 +14,12 @@ import { QuotationReviseDialog } from "../../../components/forms/QuotationRevise
 import { ProformaInvoiceForm } from "../../../components/forms/ProformaInvoiceForm";
 import { useQuotationDetail } from "../../../lib/hooks/useQuotations";
 import { useProformaInvoices } from "../../../lib/hooks/useProformaInvoices";
+import { useSalesOrders } from "../../../lib/hooks/useSalesOrders";
 import { useRepository } from "../../../lib/repository/RepositoryProvider";
 import { useToast } from "../../../components/ui/Toast";
 import { initials } from "../../../components/ui/Who";
 import { formatInr, formatDate, formatDateTime } from "../../../lib/format";
-import { ProformaInvoice } from "../../../lib/types/domain";
+import { ProformaInvoice, SalesOrder } from "../../../lib/types/domain";
 
 function goBackOrTo(router: ReturnType<typeof useRouter>, fallback: string) {
   if (typeof window !== "undefined" && window.history.length > 1) {
@@ -35,6 +36,7 @@ export default function QuotationDetailPage() {
   const id = params?.id;
   const { quotation, opportunity, loading, error, refetch, reviseQuotation, approveQuotation, convertQuotation } = useQuotationDetail(id);
   const { proformaInvoices, createProformaInvoice, refetch: refetchProformas } = useProformaInvoices();
+  const { salesOrders } = useSalesOrders();
   const repo = useRepository();
   const isReal = repo.kind === "real";
   const [showRevise, setShowRevise] = useState(false);
@@ -103,6 +105,7 @@ export default function QuotationDetailPage() {
   const canConvert = quotation.status === "APPROVED";
   const revisions = [...quotation.revisions].sort((a, b) => b.version - a.version);
   const relatedProformas = proformaInvoices.filter((p) => p.quotationId === quotation.id);
+  const relatedSalesOrders = salesOrders.filter((o) => o.quotationId === quotation.id);
   // No backend precondition exists on proforma creation (it doesn't even
   // check the quotation's status) — this mirrors the same documented
   // Quote-to-Cash sequence assumption as Convert's own gate, not a claimed
@@ -113,6 +116,12 @@ export default function QuotationDetailPage() {
     { key: "proformaNumber", header: "No.", render: (p) => p.proformaNumber },
     { key: "totalAmount", header: "Amount", render: (p) => formatInr(p.totalAmount) },
     { key: "status", header: "Status", render: (p) => <ProformaInvoiceStatusTag status={p.status} /> },
+  ];
+
+  const salesOrderColumns: Column<SalesOrder>[] = [
+    { key: "salesOrderCode", header: "Order No.", render: (o) => o.salesOrderCode },
+    { key: "totalAmount", header: "Amount", render: (o) => formatInr(o.totalAmount) },
+    { key: "status", header: "Status", render: (o) => <SalesOrderStatusTag status={o.status} /> },
   ];
 
   return (
@@ -225,6 +234,17 @@ export default function QuotationDetailPage() {
               emptyBody={canCreateProforma ? "Create one to move toward a Sales Order." : "Approve this quotation first."}
             />
           </Panel>
+          {relatedSalesOrders.length > 0 && (
+            <Panel title="Related Sales Orders" flush>
+              <DataTable
+                columns={salesOrderColumns}
+                rows={relatedSalesOrders}
+                onRowClick={(o) => router.push(`/sales-orders/${o.id}`)}
+                emptyTitle="No sales orders yet"
+                emptyBody=""
+              />
+            </Panel>
+          )}
           <Panel title="Downstream">
             <p style={{ fontSize: 12.5, color: "var(--muted)" }}>
               {quotation.status === "APPROVED"
@@ -237,8 +257,9 @@ export default function QuotationDetailPage() {
 
       <DesignNote>
         <b>Design note.</b> Revise and Approve mirror VERIFIED backend operations. Convert calls the
-        VERIFIED `POST /:id/convert` route, which creates a real Sales Order — Sales Order screens
-        themselves are a later Quote-to-Cash stage, so this page only confirms the conversion happened.
+        VERIFIED `POST /:id/convert` route, which creates a real Sales Order — its id comes straight from
+        that response, so this page navigates to the new Sales Order&apos;s own detail screen once the
+        backend confirms creation, rather than assuming it succeeded.
       </DesignNote>
 
       {showRevise && (
@@ -269,8 +290,9 @@ export default function QuotationDetailPage() {
           confirmLabel="Convert"
           onClose={() => setShowConvert(false)}
           onConfirm={async () => {
-            await convertQuotation();
+            const salesOrderId = await convertQuotation();
             toast.show(`${quotation.quoteNo} converted — Sales Order created`, "check");
+            if (salesOrderId) router.push(`/sales-orders/${salesOrderId}`);
           }}
         />
       )}

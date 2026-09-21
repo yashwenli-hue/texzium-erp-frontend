@@ -60,9 +60,10 @@ export function useQuotationDetail(id: string | undefined) {
   }, [id, repo, refetch]);
 
   const convertQuotation = useCallback(async () => {
-    if (!id) return;
-    await repo.quotations.convert(id);
+    if (!id) return undefined;
+    const { salesOrderId } = await repo.quotations.convert(id);
     refetch();
+    return salesOrderId;
   }, [id, repo, refetch]);
 
   return { quotation, opportunity, loading, error, reviseQuotation, approveQuotation, convertQuotation, refetch };

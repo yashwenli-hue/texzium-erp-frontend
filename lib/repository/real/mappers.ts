@@ -12,6 +12,7 @@ import {
   QuotationStatus,
   ProformaInvoice,
   ProformaInvoiceStatus,
+  SalesOrder,
   InventoryItemOption,
   GstRegistrationOption,
   titleCaseFromConstant,
@@ -300,6 +301,66 @@ export function mapProformaInvoice(raw: BackendProformaInvoice, quotationById: M
     validityDate: raw.validityDate ?? null,
     remarks: raw.remarks ?? undefined,
     ownerName: q?.ownerName ?? "Unassigned",
+    createdAt: raw.createdAt,
+  };
+}
+
+export interface BackendSalesOrder {
+  id: string;
+  salesOrderCode?: string | null;
+  orderDate: string;
+  totalAmount: number;
+  status: string;
+  sellerGstId?: string | null;
+  buyerGstId?: string | null;
+  placeOfSupply?: string | null;
+  taxType?: string | null;
+  inventoryItemId?: string | null;
+  proformaInvoiceId?: string | null;
+  quotationId?: string | null;
+  createdAt: string;
+  updatedAt?: string;
+  /** GET /sales-orders nests the raw ProformaInvoice only — never the Quotation, even for orders created via Quotation conversion. */
+  proformaInvoice?: BackendProformaInvoice | null;
+}
+
+/**
+ * Cross-references an already-resolved Quotation map (the same fully
+ * enriched Quotation objects the Quotations screen itself uses) to fill in
+ * customerName/opportunityName/ownerName. A Sales Order links to a
+ * Quotation either directly (raw.quotationId, set by the
+ * POST /quotations/:id/convert path) or indirectly through its nested
+ * Proforma Invoice's own quotationId (set by the direct POST /sales-orders
+ * path) — both are resolved the same way here. See the Stage 2E report.
+ */
+export function mapSalesOrder(raw: BackendSalesOrder, quotationById: Map<string, Quotation>): SalesOrder {
+  const linkedQuotationId = raw.quotationId ?? raw.proformaInvoice?.quotationId ?? undefined;
+  const q = linkedQuotationId ? quotationById.get(linkedQuotationId) : undefined;
+  return {
+    id: raw.id,
+    // No verified code path ever sets salesOrderCode (the one observed
+    // real value comes from the unrelated AdminOS Workflow Executor, not
+    // this controller) — fall back to a short, honestly-labeled id
+    // reference rather than fabricating a sequence number.
+    salesOrderCode: raw.salesOrderCode || `#${raw.id.slice(0, 8).toUpperCase()}`,
+    orderDate: raw.orderDate,
+    totalAmount: raw.totalAmount,
+    status: raw.status,
+    quotationId: raw.quotationId ?? undefined,
+    quoteNo: q?.quoteNo,
+    proformaInvoiceId: raw.proformaInvoiceId ?? undefined,
+    proformaNumber: raw.proformaInvoice
+      ? raw.proformaInvoice.proformaNumber || `#${raw.proformaInvoice.id.slice(0, 8).toUpperCase()}`
+      : undefined,
+    opportunityId: q?.opportunityId,
+    opportunityName: q?.opportunityName ?? "—",
+    customerName: q?.customerName ?? "—",
+    ownerName: q?.ownerName ?? "Unassigned",
+    sellerGstId: raw.sellerGstId ?? undefined,
+    buyerGstId: raw.buyerGstId ?? undefined,
+    placeOfSupply: raw.placeOfSupply ?? undefined,
+    taxType: raw.taxType ?? undefined,
+    inventoryItemId: raw.inventoryItemId ?? undefined,
     createdAt: raw.createdAt,
   };
 }

@@ -4,15 +4,19 @@ import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Icon } from "../../../components/ui/Icon";
 import { Panel } from "../../../components/ui/Card";
-import { ProformaInvoiceStatusTag, Tag } from "../../../components/ui/Tag";
+import { ProformaInvoiceStatusTag, SalesOrderStatusTag, Tag } from "../../../components/ui/Tag";
 import { Button, EmptyState } from "../../../components/ui/Button";
+import { DataTable, Column } from "../../../components/ui/DataTable";
 import { DesignNote } from "../../../components/ui/PageHeader";
 import { DocumentTrail } from "../../../components/ui/DocumentTrail";
 import { ConfirmDialog } from "../../../components/ui/ConfirmDialog";
+import { SalesOrderForm } from "../../../components/forms/SalesOrderForm";
 import { useProformaInvoiceDetail } from "../../../lib/hooks/useProformaInvoices";
+import { useSalesOrders } from "../../../lib/hooks/useSalesOrders";
 import { useToast } from "../../../components/ui/Toast";
 import { initials } from "../../../components/ui/Who";
 import { formatInr, formatDate } from "../../../lib/format";
+import { SalesOrder } from "../../../lib/types/domain";
 
 function goBackOrTo(router: ReturnType<typeof useRouter>, fallback: string) {
   if (typeof window !== "undefined" && window.history.length > 1) {
@@ -28,7 +32,9 @@ export default function ProformaInvoiceDetailPage() {
   const toast = useToast();
   const id = params?.id;
   const { proforma, quotation, opportunity, loading, error, refetch, approveProformaInvoice } = useProformaInvoiceDetail(id);
+  const { salesOrders, createSalesOrder, refetch: refetchSalesOrders } = useSalesOrders();
   const [showApprove, setShowApprove] = useState(false);
+  const [showSalesOrderForm, setShowSalesOrderForm] = useState(false);
 
   if (loading && !proforma) {
     return (
@@ -80,6 +86,17 @@ export default function ProformaInvoiceDetailPage() {
   }
 
   const canApprove = proforma.status === "PENDING";
+  // The backend's POST /sales-orders hard-requires an APPROVED proforma
+  // (validated server-side in sales-orders.service.ts) — this is a real
+  // backend precondition, not just a UX safeguard, unlike the equivalent
+  // gates on the Quotation detail page.
+  const canCreateSalesOrder = proforma.status === "APPROVED";
+  const relatedSalesOrders = salesOrders.filter((o) => o.proformaInvoiceId === proforma.id);
+  const salesOrderColumns: Column<SalesOrder>[] = [
+    { key: "salesOrderCode", header: "Order No.", render: (o) => o.salesOrderCode },
+    { key: "totalAmount", header: "Amount", render: (o) => formatInr(o.totalAmount) },
+    { key: "status", header: "Status", render: (o) => <SalesOrderStatusTag status={o.status} /> },
+  ];
 
   return (
     <div className="page">
@@ -135,11 +152,30 @@ export default function ProformaInvoiceDetailPage() {
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <Panel
+            title="Related Sales Orders"
+            flush
+            extraHead={
+              canCreateSalesOrder ? (
+                <a className="more" href="#" onClick={(e) => { e.preventDefault(); setShowSalesOrderForm(true); }}>
+                  <Icon name="plus" size={14} /> Create Sales Order
+                </a>
+              ) : undefined
+            }
+          >
+            <DataTable
+              columns={salesOrderColumns}
+              rows={relatedSalesOrders}
+              onRowClick={(o) => router.push(`/sales-orders/${o.id}`)}
+              emptyTitle="No sales orders yet"
+              emptyBody={canCreateSalesOrder ? "Create one to move into Quote-to-Cash." : "Approve this proforma invoice first."}
+            />
+          </Panel>
           <Panel title="Downstream">
             <p style={{ fontSize: 12.5, color: "var(--muted)" }}>
               {proforma.status === "APPROVED"
-                ? "This proforma invoice is approved. Sales Order creation from an approved proforma is a later Quote-to-Cash stage — that screen hasn't been built yet."
-                : "Approve this proforma invoice to move it toward the next Quote-to-Cash stage."}
+                ? "This proforma invoice is approved. Create a Sales Order above — the backend allows creating more than one from the same proforma (no duplicate check exists server-side), so check the list above before creating another."
+                : "Approve this proforma invoice to create a Sales Order from it."}
             </p>
           </Panel>
         </div>
@@ -147,8 +183,11 @@ export default function ProformaInvoiceDetailPage() {
 
       <DesignNote>
         <b>Design note.</b> Approve mirrors the VERIFIED `PATCH /:id/approve` operation, which sets
-        customerStatus to Approved — no other status exists. There is no verified Sales Order creation
-        tied to this action, so none is offered here.
+        customerStatus to Approved — no other status exists. Create Sales Order calls the VERIFIED
+        `POST /sales-orders` route, which requires this exact proforma to already be Approved and also
+        validates the chosen inventory item and seller/buyer GST registrations server-side. This is a
+        separate, independent creation path from converting the source Quotation directly — the backend
+        never links the two, so using both is not a duplicate.
       </DesignNote>
 
       {showApprove && (
@@ -160,6 +199,19 @@ export default function ProformaInvoiceDetailPage() {
           onConfirm={async () => {
             await approveProformaInvoice();
             toast.show(`${proforma.proformaNumber} approved`, "check");
+          }}
+        />
+      )}
+      {showSalesOrderForm && (
+        <SalesOrderForm
+          proformaInvoiceId={proforma.id}
+          proformaNumber={proforma.proformaNumber}
+          defaultTotalAmount={proforma.totalAmount}
+          onClose={() => setShowSalesOrderForm(false)}
+          onSubmit={async (input) => {
+            const o = await createSalesOrder(input);
+            refetchSalesOrders();
+            return o;
           }}
         />
       )}

@@ -12,6 +12,7 @@ import {
   Opportunity,
   Quotation,
   ProformaInvoice,
+  SalesOrder,
   AppNotification,
 } from "../../types/domain";
 import {
@@ -26,6 +27,7 @@ import {
   SEED_OPPORTUNITIES,
   SEED_QUOTATIONS,
   SEED_PROFORMA_INVOICES,
+  SEED_SALES_ORDERS,
   SEED_NOTIFICATIONS,
 } from "./seed";
 
@@ -57,5 +59,6 @@ export const db = {
   opportunities: new EntityStore<Opportunity>(SEED_OPPORTUNITIES, "revenueos.mock.opportunities"),
   quotations: new EntityStore<Quotation>(SEED_QUOTATIONS),
   proformaInvoices: new EntityStore<ProformaInvoice>(SEED_PROFORMA_INVOICES),
+  salesOrders: new EntityStore<SalesOrder>(SEED_SALES_ORDERS),
   notifications: new EntityStore<AppNotification>(SEED_NOTIFICATIONS),
 };

@@ -84,14 +84,17 @@ export class RealQuotationRepository implements IQuotationRepository {
     return updated;
   }
 
-  async convert(id: ID): Promise<Quotation> {
+  async convert(id: ID): Promise<{ quotation: Quotation; salesOrderId: ID }> {
     // VERIFIED: creates a real SalesOrder linked to this quotation, but never
     // writes a status back onto the Quotation itself (confirmed by reading
     // quotations.service.ts) — re-fetching honestly reflects that the
     // quotation's own status is unchanged, rather than fabricating CONVERTED.
-    await apiFetch<unknown>(`/quotations/${id}/convert`, { method: "POST" });
+    // The endpoint's response body is the created SalesOrder record itself
+    // (quotationsService.convertToSalesOrder returns prisma.salesOrder.create()
+    // directly) — its id is read straight from that response, never re-derived.
+    const salesOrder = await apiFetch<{ id: string }>(`/quotations/${id}/convert`, { method: "POST" });
     const updated = await this.getById(id);
     if (!updated) throw new Error(`Quotation ${id} not found`);
-    return updated;
+    return { quotation: updated, salesOrderId: salesOrder.id };
   }
 }

@@ -424,6 +424,56 @@ export interface ProformaInvoice {
   createdAt: string;
 }
 
+// VERIFIED: SalesOrder.status is a plain backend String (@default("OPEN")),
+// no Prisma enum — same pattern as Quotation/ProformaInvoice. The RevenueOS
+// Sales Orders controller (sales-orders.controller.ts) only ever writes two
+// values: "OPEN" (via quotations.service.ts convertToSalesOrder(), and the
+// AdminOS Workflow Executor's unrelated QUOTATION_APPROVED trigger) and
+// "PENDING_STORE_APPROVAL" (via sales-orders.service.ts create(), the direct
+// POST /sales-orders path from an approved Proforma Invoice). Other values
+// observed in real data (e.g. "READY_FOR_INVOICING") are written exclusively
+// by unrelated OperationsOS (Dispatch Orders) and AdminOS (Workflow
+// Executor) modules — there is no RevenueOS-scoped endpoint that transitions
+// a Sales Order's status, so this stays a plain string rather than a closed
+// union, and no frontend action is offered for those other values. See the
+// Stage 2E report.
+export function formatSalesOrderStatus(status: string): string {
+  return titleCaseFromConstant(status);
+}
+
+// VERIFIED CreateSalesOrderDto: proformaInvoiceId, orderDate, totalAmount,
+// inventoryItemId, orderQty, sellerGstId, buyerGstId — see
+// CreateSalesOrderInput. A Sales Order can also be created without any of
+// those fields via POST /quotations/:id/convert (quotationId only) — the
+// two backend creation paths are independent and never cross-reference each
+// other, so a given Sales Order carries either quotationId or
+// proformaInvoiceId (rarely both meaningfully linked at once). customerName/
+// opportunityName/ownerName/quoteNo/proformaNumber are always denormalized
+// from whichever linked Quotation/Proforma Invoice is resolvable. See the
+// Stage 2E report.
+export interface SalesOrder {
+  id: ID;
+  /** salesOrderCode from the backend — null for both verified RevenueOS creation paths; falls back to a short id reference, never a fabricated sequence number. */
+  salesOrderCode: string;
+  orderDate: string;
+  totalAmount: number;
+  status: string;
+  quotationId?: ID;
+  quoteNo?: string;
+  proformaInvoiceId?: ID;
+  proformaNumber?: string;
+  opportunityId?: ID;
+  opportunityName?: string;
+  customerName: string;
+  ownerName: string;
+  sellerGstId?: ID;
+  buyerGstId?: ID;
+  placeOfSupply?: string;
+  taxType?: string;
+  inventoryItemId?: ID;
+  createdAt: string;
+}
+
 export type NotificationIcon =
   | "funnel"
   | "file"
