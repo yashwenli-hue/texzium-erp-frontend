@@ -17,12 +17,12 @@ interface MenuPos {
  * UserMenu's exact popover pattern/CSS classes (.user-menu/.user-menu-item,
  * position:fixed rect-based placement) rather than introducing a new one.
  *
- * Only options for themes that actually exist are offered — Variant 2 is
- * added to OPTIONS once its own commit lands, not before.
+ * Only options for themes that actually exist are offered.
  */
 const OPTIONS: { value: ThemeName; label: string; icon: string }[] = [
   { value: "light", label: "Light", icon: "sun" },
   { value: "dark-v1", label: "Dark — Variant 1 (Navy Purple)", icon: "moon" },
+  { value: "dark-v2", label: "Dark — Variant 2 (Navy + Semantic)", icon: "moon" },
 ];
 
 export function ThemeToggle() {

@@ -46,8 +46,20 @@
    three elements exactly as they already look today, in every theme.
    --mark-bg/--mark-fg (the Search page's <mark> highlight) stay a fixed
    pale-yellow/dark-text pair for the same reason search-match highlighting
-   conventionally doesn't invert with app theme in most editors/apps. */
-:root[data-theme="dark-v1"]{
+   conventionally doesn't invert with app theme in most editors/apps.
+
+   IMPORTANT: [data-theme="dark-v1"] and [data-theme="dark-v2"] are
+   mutually exclusive attribute selectors — an element can only match one
+   attribute value at a time, so a v2-only rule does NOT inherit v1's
+   values through the cascade; without this shared foundation block,
+   Variant 2 would fall back to the plain :root (light) values for
+   everything it doesn't redefine. The two selectors are combined below to
+   give both variants the same navy/purple foundation, and the separate
+   [data-theme="dark-v2"] rule further down (later in source order, so it
+   wins on equal specificity) overrides only the four semantic tokens that
+   differ. */
+:root[data-theme="dark-v1"],
+:root[data-theme="dark-v2"]{
   --ink:#F5F6FA; --canvas:#0B0E17; --surface:#141A2C;
   --line:#262E47; --line-2:#1B2136; --text:#E4E6F0; --muted:#8B90A8; --faint:#6B7293;
   --good:#34D399; --good-bg:rgba(52,211,153,.16); --good-strong:#0FAE7D;
@@ -61,6 +73,22 @@
   --shadow:0 1px 1px rgba(0,0,0,.3), 0 10px 30px -14px rgba(0,0,0,.65);
   --scrim:rgba(3,5,14,.72);
   color-scheme:dark;
+}
+
+/* Variant 2 override, applied on top of the shared dark foundation above.
+   The difference is purely the four core semantic tokens: more saturated
+   good/warn/bad, and --info shifted from blue to cyan specifically (per
+   the brief's "cyan/blue = informational" and the NAQIX reference), plus
+   slightly stronger tint backgrounds so KPI/status accents read a touch
+   punchier. --stage-teal/--stage-indigo/--source-orange (Lead Status/
+   Source's extra hues) stay identical to Variant 1 — the brief's
+   "more expressive" direction is specifically about the four semantic
+   families, not every hue in the app. */
+:root[data-theme="dark-v2"]{
+  --good:#22C55E; --good-bg:rgba(34,197,94,.20); --good-strong:#16A34A;
+  --warn:#F59E0B; --warn-bg:rgba(245,158,11,.20);
+  --bad:#EF4444; --bad-bg:rgba(239,68,68,.20);
+  --info:#22D3EE; --info-bg:rgba(34,211,238,.20);
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth}
