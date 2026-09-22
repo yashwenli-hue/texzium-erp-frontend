@@ -17,7 +17,10 @@ import { BackendNotification, mapNotification } from "./mappers";
  * notification in the system rather than filtering by the caller's
  * identity — this repository filters client-side to the current user's id
  * (decoded from the same JWT apiFetch() already sends) so connected mode
- * shows "your" notifications, not everyone's.
+ * shows "your" notifications, not everyone's. Fails CLOSED: if the token
+ * can't be decoded for any reason, this returns no notifications rather
+ * than falling back to the full unfiltered list — showing nothing is the
+ * safe failure mode for a privacy-adjacent list, not showing everyone's.
  *
  * There is no bulk mark-all-read route and no dedicated unread-count route:
  * markAllRead() issues one PATCH per unread notification, and
@@ -28,7 +31,7 @@ export class RealNotificationRepository implements INotificationRepository {
   private async fetchAll(): Promise<AppNotification[]> {
     const rows = await apiFetch<BackendNotification[]>("/notifications");
     const uid = getCurrentUserId();
-    const scoped = uid ? rows.filter((r) => r.userId === uid) : rows;
+    const scoped = uid ? rows.filter((r) => r.userId === uid) : [];
     return scoped.map(mapNotification).sort((a, b) => (a.occurredAt < b.occurredAt ? 1 : -1));
   }
 

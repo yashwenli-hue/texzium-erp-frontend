@@ -13,6 +13,7 @@ import { ContactForm } from "../../components/forms/ContactForm";
 import { ContactRowActions } from "../../components/ui/ContactRowActions";
 import { useContacts } from "../../lib/hooks/useContacts";
 import { useCustomers } from "../../lib/hooks/useCustomers";
+import { useRepository } from "../../lib/repository/RepositoryProvider";
 import { Contact, ContactType } from "../../lib/types/domain";
 import { formatDate } from "../../lib/format";
 
@@ -21,6 +22,7 @@ const TYPES: ContactType[] = ["Decision Maker", "Champion", "Influencer"];
 
 export default function ContactsPage() {
   const router = useRouter();
+  const repo = useRepository();
   const { contacts: allContacts, createContact } = useContacts();
   const { customers } = useCustomers();
   const [showForm, setShowForm] = useState(false);
@@ -87,6 +89,14 @@ export default function ContactsPage() {
           </Button>
         }
       />
+
+      {repo.kind === "real" && (
+        <p style={{ fontSize: 12.5, color: "var(--muted)", margin: "-8px 0 14px" }}>
+          Contacts has no backend module of its own yet — this section runs entirely on local,
+          in-browser demo data, even though the rest of RevenueOS is connected to the real backend.
+          Nothing created or edited here is saved anywhere permanent.
+        </p>
+      )}
 
       <ChipGroup>
         <Chip label={`All ${allContacts.length}`} active={typeChip === "All"} onClick={() => { setTypeChip("All"); setPage(1); }} />

@@ -7,6 +7,7 @@ import { StatusTag } from "../../components/ui/Tag";
 import { Icon } from "../../components/ui/Icon";
 import { TaskForm } from "../../components/forms/TaskForm";
 import { useTasks } from "../../lib/hooks/useTasks";
+import { useRepository } from "../../lib/repository/RepositoryProvider";
 import { Task } from "../../lib/types/domain";
 import { formatDateTime, isOverdue } from "../../lib/format";
 
@@ -23,6 +24,7 @@ function groupOf(task: Task): "Overdue" | "Today" | "Upcoming" | "Done" {
 }
 
 export default function TasksPage() {
+  const repo = useRepository();
   const { tasks, createTask, toggleDone } = useTasks();
   const [showForm, setShowForm] = useState(false);
 
@@ -46,6 +48,14 @@ export default function TasksPage() {
           </Button>
         }
       />
+
+      {repo.kind === "real" && (
+        <p style={{ fontSize: 12.5, color: "var(--muted)", margin: "-8px 0 14px" }}>
+          Follow-ups/Tasks has no backend module of its own yet — this section runs entirely on
+          local, in-browser demo data, even though the rest of RevenueOS is connected to the real
+          backend. Nothing created or checked off here is saved anywhere permanent.
+        </p>
+      )}
 
       {(["Overdue", "Today", "Upcoming"] as const).map((label) => (
         <div className="task-group" key={label}>

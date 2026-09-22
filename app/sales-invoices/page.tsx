@@ -1,15 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PageHeader, DesignNote } from "../../components/ui/PageHeader";
 import { StatCard, StatRow, Panel } from "../../components/ui/Card";
 import { Button, EmptyState } from "../../components/ui/Button";
 import { Pagination, paginate } from "../../components/ui/Button";
-import { SalesInvoiceStatusTag } from "../../components/ui/Tag";
+import { SalesInvoiceStatusTag, ChipGroup, Chip } from "../../components/ui/Tag";
 import { DataTable, Column } from "../../components/ui/DataTable";
 import { useSalesInvoices } from "../../lib/hooks/useSalesInvoices";
-import { SalesInvoice } from "../../lib/types/domain";
+import { SalesInvoice, formatSalesInvoiceStatus } from "../../lib/types/domain";
 import { formatInr, formatDate } from "../../lib/format";
 
 const PAGE_SIZE = 8;
@@ -17,11 +17,26 @@ const PAGE_SIZE = 8;
 export default function SalesInvoicesPage() {
   const router = useRouter();
   const { salesInvoices, loading, error, refetch } = useSalesInvoices();
+  const [statusChip, setStatusChip] = useState<string>("All");
   const [page, setPage] = useState(1);
 
   const totalValue = salesInvoices.reduce((s, i) => s + i.totalAmount, 0);
   const postedCount = salesInvoices.filter((i) => i.status === "POSTED").length;
-  const rows = paginate(salesInvoices, page, PAGE_SIZE);
+
+  // SalesInvoice.status is a plain open-ended backend string, not a closed
+  // enum — the live RevenueOS controller always writes POSTED, but other
+  // values (e.g. DRAFT) have been observed in real data from records this
+  // controller couldn't have produced (see formatSalesInvoiceStatus in
+  // lib/types/domain.ts) — same reasoning as the Sales Orders status chips.
+  const statusCounts = useMemo(() => {
+    const map: Record<string, number> = {};
+    salesInvoices.forEach((i) => (map[i.status] = (map[i.status] ?? 0) + 1));
+    return map;
+  }, [salesInvoices]);
+  const statusOptions = useMemo(() => Object.keys(statusCounts).sort(), [statusCounts]);
+
+  const filtered = statusChip === "All" ? salesInvoices : salesInvoices.filter((i) => i.status === statusChip);
+  const rows = paginate(filtered, page, PAGE_SIZE);
 
   const columns: Column<SalesInvoice>[] = [
     { key: "invoiceNumber", header: "Invoice No.", render: (i) => i.invoiceNumber },
@@ -81,16 +96,23 @@ export default function SalesInvoicesPage() {
         <StatCard label="Posted" value={String(postedCount)} note="accounting effects applied by the backend" />
       </StatRow>
 
+      <ChipGroup>
+        <Chip label={`All ${salesInvoices.length}`} active={statusChip === "All"} onClick={() => { setStatusChip("All"); setPage(1); }} />
+        {statusOptions.map((s) => (
+          <Chip key={s} label={`${formatSalesInvoiceStatus(s)} ${statusCounts[s]}`} active={statusChip === s} onClick={() => { setStatusChip(s); setPage(1); }} />
+        ))}
+      </ChipGroup>
+
       <div style={{ marginTop: 14 }}>
         <Panel title="All Sales Invoices" flush>
           <DataTable
             columns={columns}
             rows={rows}
             onRowClick={(i) => router.push(`/sales-invoices/${i.id}`)}
-            emptyTitle="No sales invoices yet"
+            emptyTitle="No sales invoices match this filter"
             emptyBody="Create one from a Sales Order that's ready to invoice, on its detail page."
           />
-          <Pagination page={page} pageSize={PAGE_SIZE} total={salesInvoices.length} onPageChange={setPage} />
+          <Pagination page={page} pageSize={PAGE_SIZE} total={filtered.length} onPageChange={setPage} />
         </Panel>
       </div>
 

@@ -8,10 +8,12 @@ import { Icon } from "../../components/ui/Icon";
 import { NoteForm } from "../../components/forms/NoteForm";
 import { NoteDetailModal } from "../../components/forms/NoteDetailModal";
 import { useNotes } from "../../lib/hooks/useNotes";
+import { useRepository } from "../../lib/repository/RepositoryProvider";
 import { formatDateTime } from "../../lib/format";
 import { Note } from "../../lib/types/domain";
 
 export default function NotesPage() {
+  const repo = useRepository();
   const { notes, createNote, updateNote } = useNotes();
   const [filter, setFilter] = useState<"All" | "Pinned" | "Lead" | "Customer">("All");
   const [showForm, setShowForm] = useState(false);
@@ -35,6 +37,14 @@ export default function NotesPage() {
           </Button>
         }
       />
+
+      {repo.kind === "real" && (
+        <p style={{ fontSize: 12.5, color: "var(--muted)", margin: "-8px 0 14px" }}>
+          Notes has no backend module of its own yet — this section runs entirely on local,
+          in-browser demo data, even though the rest of RevenueOS is connected to the real backend.
+          Nothing created or edited here is saved anywhere permanent.
+        </p>
+      )}
 
       <ChipGroup>
         <Chip label="All" active={filter === "All"} onClick={() => setFilter("All")} />

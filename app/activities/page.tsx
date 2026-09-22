@@ -8,6 +8,7 @@ import { ChipGroup, Chip } from "../../components/ui/Tag";
 import { Icon } from "../../components/ui/Icon";
 import { ActivityForm } from "../../components/forms/ActivityForm";
 import { useActivities } from "../../lib/hooks/useActivities";
+import { useRepository } from "../../lib/repository/RepositoryProvider";
 import { ActivityType } from "../../lib/types/domain";
 import { formatDateTime } from "../../lib/format";
 
@@ -32,6 +33,7 @@ function groupLabel(iso: string): string {
 }
 
 export default function ActivitiesPage() {
+  const repo = useRepository();
   const { activities, logActivity } = useActivities();
   const [typeChip, setTypeChip] = useState("All");
   const [showForm, setShowForm] = useState(false);
@@ -61,6 +63,14 @@ export default function ActivitiesPage() {
           </Button>
         }
       />
+
+      {repo.kind === "real" && (
+        <p style={{ fontSize: 12.5, color: "var(--muted)", margin: "-8px 0 14px" }}>
+          Activities has no backend module of its own yet — this section runs entirely on local,
+          in-browser demo data, even though the rest of RevenueOS is connected to the real backend.
+          Nothing logged here is saved anywhere permanent.
+        </p>
+      )}
 
       <ChipGroup>
         <Chip label="All" active={typeChip === "All"} onClick={() => setTypeChip("All")} />
