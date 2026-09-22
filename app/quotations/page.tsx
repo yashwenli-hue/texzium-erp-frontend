@@ -7,16 +7,20 @@ import { StatCard, StatRow, Panel } from "../../components/ui/Card";
 import { Button, EmptyState } from "../../components/ui/Button";
 import { QuotationStatusTag, ChipGroup, Chip } from "../../components/ui/Tag";
 import { DataTable, Column } from "../../components/ui/DataTable";
+import { Pagination, paginate } from "../../components/ui/Button";
 import { QuotationForm } from "../../components/forms/QuotationForm";
 import { useQuotations } from "../../lib/hooks/useQuotations";
 import { Quotation, QUOTATION_STATUSES, formatQuotationStatus } from "../../lib/types/domain";
 import { formatInr, formatDate } from "../../lib/format";
+
+const PAGE_SIZE = 8;
 
 export default function QuotationsPage() {
   const router = useRouter();
   const { quotations, loading, error, createQuotation, refetch } = useQuotations();
   const [showForm, setShowForm] = useState(false);
   const [statusChip, setStatusChip] = useState<string>("All");
+  const [page, setPage] = useState(1);
 
   const totalValue = quotations.reduce((s, q) => s + q.amount, 0);
   const approved = quotations.filter((q) => q.status === "APPROVED" || q.status === "CONVERTED").length;
@@ -33,7 +37,8 @@ export default function QuotationsPage() {
     return map;
   }, [quotations]);
 
-  const rows = statusChip === "All" ? quotations : quotations.filter((q) => q.status === statusChip);
+  const filtered = statusChip === "All" ? quotations : quotations.filter((q) => q.status === statusChip);
+  const rows = paginate(filtered, page, PAGE_SIZE);
 
   const columns: Column<Quotation>[] = [
     { key: "quoteNo", header: "Quote No.", render: (q) => (
@@ -106,9 +111,9 @@ export default function QuotationsPage() {
       </StatRow>
 
       <ChipGroup>
-        <Chip label={`All ${quotations.length}`} active={statusChip === "All"} onClick={() => setStatusChip("All")} />
+        <Chip label={`All ${quotations.length}`} active={statusChip === "All"} onClick={() => { setStatusChip("All"); setPage(1); }} />
         {QUOTATION_STATUSES.filter((s) => statusCounts[s]).map((s) => (
-          <Chip key={s} label={`${formatQuotationStatus(s)} ${statusCounts[s]}`} active={statusChip === s} onClick={() => setStatusChip(s)} />
+          <Chip key={s} label={`${formatQuotationStatus(s)} ${statusCounts[s]}`} active={statusChip === s} onClick={() => { setStatusChip(s); setPage(1); }} />
         ))}
       </ChipGroup>
 
@@ -120,6 +125,7 @@ export default function QuotationsPage() {
             onRowClick={(q) => router.push(`/quotations/${q.id}`)}
             emptyTitle="No quotations match this filter"
           />
+          <Pagination page={page} pageSize={PAGE_SIZE} total={filtered.length} onPageChange={setPage} />
         </Panel>
       </div>
 

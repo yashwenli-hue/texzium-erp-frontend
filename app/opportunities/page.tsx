@@ -7,6 +7,7 @@ import { StatCard, StatRow, Panel } from "../../components/ui/Card";
 import { Button, EmptyState } from "../../components/ui/Button";
 import { StatusTag, ChipGroup, Chip } from "../../components/ui/Tag";
 import { DataTable, Column, toggleSortDirection } from "../../components/ui/DataTable";
+import { Pagination, paginate } from "../../components/ui/Button";
 import { OpportunityForm } from "../../components/forms/OpportunityForm";
 import { useOpportunities } from "../../lib/hooks/useOpportunities";
 import { useLeads } from "../../lib/hooks/useLeads";
@@ -16,6 +17,8 @@ import { formatInr, formatDate } from "../../lib/format";
 import { SortState } from "../../lib/types/common";
 import { OpportunitySortField } from "../../lib/repository/interfaces";
 
+const PAGE_SIZE = 8;
+
 export default function OpportunitiesPage() {
   const router = useRouter();
   const { opportunities, loading, error, createOpportunity, refetch, sort, setSort } = useOpportunities();
@@ -23,6 +26,7 @@ export default function OpportunitiesPage() {
   const { hasPermission } = useAuth();
   const [showForm, setShowForm] = useState(false);
   const [stageChip, setStageChip] = useState<string>("All");
+  const [page, setPage] = useState(1);
 
   // Product isn't an Opportunity field — it's surfaced from the linked
   // Lead's existing uiContext.productInterest (mock/UI-only, see
@@ -41,7 +45,8 @@ export default function OpportunitiesPage() {
     return map;
   }, [opportunities]);
 
-  const rows = stageChip === "All" ? opportunities : opportunities.filter((o) => o.stage === stageChip);
+  const filtered = stageChip === "All" ? opportunities : opportunities.filter((o) => o.stage === stageChip);
+  const rows = paginate(filtered, page, PAGE_SIZE);
 
   const columns: Column<Opportunity>[] = [
     {
@@ -140,9 +145,9 @@ export default function OpportunitiesPage() {
       </StatRow>
 
       <ChipGroup>
-        <Chip label={`All ${opportunities.length}`} active={stageChip === "All"} onClick={() => setStageChip("All")} />
+        <Chip label={`All ${opportunities.length}`} active={stageChip === "All"} onClick={() => { setStageChip("All"); setPage(1); }} />
         {OPPORTUNITY_STAGES.filter((s) => stageCounts[s]).map((s) => (
-          <Chip key={s} label={`${s} ${stageCounts[s]}`} active={stageChip === s} onClick={() => setStageChip(s)} />
+          <Chip key={s} label={`${s} ${stageCounts[s]}`} active={stageChip === s} onClick={() => { setStageChip(s); setPage(1); }} />
         ))}
       </ChipGroup>
 
@@ -159,6 +164,7 @@ export default function OpportunitiesPage() {
             emptyTitle="No opportunities yet"
             emptyBody="Opportunities appear here once a lead is qualified and converted."
           />
+          <Pagination page={page} pageSize={PAGE_SIZE} total={filtered.length} onPageChange={setPage} />
         </Panel>
       </div>
 

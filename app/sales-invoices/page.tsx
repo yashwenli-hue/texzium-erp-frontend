@@ -1,21 +1,27 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { PageHeader, DesignNote } from "../../components/ui/PageHeader";
 import { StatCard, StatRow, Panel } from "../../components/ui/Card";
 import { Button, EmptyState } from "../../components/ui/Button";
+import { Pagination, paginate } from "../../components/ui/Button";
 import { SalesInvoiceStatusTag } from "../../components/ui/Tag";
 import { DataTable, Column } from "../../components/ui/DataTable";
 import { useSalesInvoices } from "../../lib/hooks/useSalesInvoices";
 import { SalesInvoice } from "../../lib/types/domain";
 import { formatInr, formatDate } from "../../lib/format";
 
+const PAGE_SIZE = 8;
+
 export default function SalesInvoicesPage() {
   const router = useRouter();
   const { salesInvoices, loading, error, refetch } = useSalesInvoices();
+  const [page, setPage] = useState(1);
 
   const totalValue = salesInvoices.reduce((s, i) => s + i.totalAmount, 0);
   const postedCount = salesInvoices.filter((i) => i.status === "POSTED").length;
+  const rows = paginate(salesInvoices, page, PAGE_SIZE);
 
   const columns: Column<SalesInvoice>[] = [
     { key: "invoiceNumber", header: "Invoice No.", render: (i) => i.invoiceNumber },
@@ -79,11 +85,12 @@ export default function SalesInvoicesPage() {
         <Panel title="All Sales Invoices" flush>
           <DataTable
             columns={columns}
-            rows={salesInvoices}
+            rows={rows}
             onRowClick={(i) => router.push(`/sales-invoices/${i.id}`)}
             emptyTitle="No sales invoices yet"
             emptyBody="Create one from a Sales Order that's ready to invoice, on its detail page."
           />
+          <Pagination page={page} pageSize={PAGE_SIZE} total={salesInvoices.length} onPageChange={setPage} />
         </Panel>
       </div>
 

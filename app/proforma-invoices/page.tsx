@@ -1,22 +1,37 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PageHeader, DesignNote } from "../../components/ui/PageHeader";
 import { StatCard, StatRow, Panel } from "../../components/ui/Card";
 import { Button, EmptyState } from "../../components/ui/Button";
-import { ProformaInvoiceStatusTag } from "../../components/ui/Tag";
+import { Pagination, paginate } from "../../components/ui/Button";
+import { ProformaInvoiceStatusTag, ChipGroup, Chip } from "../../components/ui/Tag";
 import { DataTable, Column } from "../../components/ui/DataTable";
 import { useProformaInvoices } from "../../lib/hooks/useProformaInvoices";
-import { ProformaInvoice } from "../../lib/types/domain";
+import { ProformaInvoice, PROFORMA_INVOICE_STATUSES, formatProformaInvoiceStatus } from "../../lib/types/domain";
 import { formatInr, formatDate } from "../../lib/format";
+
+const PAGE_SIZE = 8;
 
 export default function ProformaInvoicesPage() {
   const router = useRouter();
   const { proformaInvoices, loading, error, refetch } = useProformaInvoices();
+  const [statusChip, setStatusChip] = useState<string>("All");
+  const [page, setPage] = useState(1);
 
   const totalValue = proformaInvoices.reduce((s, p) => s + p.totalAmount, 0);
   const approvedCount = proformaInvoices.filter((p) => p.status === "APPROVED").length;
   const pendingCount = proformaInvoices.filter((p) => p.status === "PENDING").length;
+
+  const statusCounts = useMemo(() => {
+    const map: Record<string, number> = {};
+    proformaInvoices.forEach((p) => (map[p.status] = (map[p.status] ?? 0) + 1));
+    return map;
+  }, [proformaInvoices]);
+
+  const filtered = statusChip === "All" ? proformaInvoices : proformaInvoices.filter((p) => p.status === statusChip);
+  const rows = paginate(filtered, page, PAGE_SIZE);
 
   const columns: Column<ProformaInvoice>[] = [
     { key: "proformaNumber", header: "Proforma No.", render: (p) => p.proformaNumber },
@@ -77,15 +92,23 @@ export default function ProformaInvoicesPage() {
         <StatCard label="Pending" value={String(pendingCount)} note="awaiting approval" />
       </StatRow>
 
+      <ChipGroup>
+        <Chip label={`All ${proformaInvoices.length}`} active={statusChip === "All"} onClick={() => { setStatusChip("All"); setPage(1); }} />
+        {PROFORMA_INVOICE_STATUSES.filter((s) => statusCounts[s]).map((s) => (
+          <Chip key={s} label={`${formatProformaInvoiceStatus(s)} ${statusCounts[s]}`} active={statusChip === s} onClick={() => { setStatusChip(s); setPage(1); }} />
+        ))}
+      </ChipGroup>
+
       <div style={{ marginTop: 14 }}>
         <Panel title="All Proforma Invoices" flush>
           <DataTable
             columns={columns}
-            rows={proformaInvoices}
+            rows={rows}
             onRowClick={(p) => router.push(`/proforma-invoices/${p.id}`)}
-            emptyTitle="No proforma invoices yet"
+            emptyTitle="No proforma invoices match this filter"
             emptyBody="Create one from an approved Quotation's detail page."
           />
+          <Pagination page={page} pageSize={PAGE_SIZE} total={filtered.length} onPageChange={setPage} />
         </Panel>
       </div>
 

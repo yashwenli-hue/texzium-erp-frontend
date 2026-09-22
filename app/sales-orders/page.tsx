@@ -1,22 +1,43 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PageHeader, DesignNote } from "../../components/ui/PageHeader";
 import { StatCard, StatRow, Panel } from "../../components/ui/Card";
 import { Button, EmptyState } from "../../components/ui/Button";
-import { SalesOrderStatusTag } from "../../components/ui/Tag";
+import { Pagination, paginate } from "../../components/ui/Button";
+import { SalesOrderStatusTag, ChipGroup, Chip } from "../../components/ui/Tag";
 import { DataTable, Column } from "../../components/ui/DataTable";
 import { useSalesOrders } from "../../lib/hooks/useSalesOrders";
-import { SalesOrder } from "../../lib/types/domain";
+import { SalesOrder, formatSalesOrderStatus } from "../../lib/types/domain";
 import { formatInr, formatDate } from "../../lib/format";
+
+const PAGE_SIZE = 8;
 
 export default function SalesOrdersPage() {
   const router = useRouter();
   const { salesOrders, loading, error, refetch } = useSalesOrders();
+  const [statusChip, setStatusChip] = useState<string>("All");
+  const [page, setPage] = useState(1);
 
   const totalValue = salesOrders.reduce((s, o) => s + o.totalAmount, 0);
   const openCount = salesOrders.filter((o) => o.status === "OPEN").length;
   const pendingStoreCount = salesOrders.filter((o) => o.status === "PENDING_STORE_APPROVAL").length;
+
+  // SalesOrder.status is a plain open-ended backend string, not a closed
+  // enum (see formatSalesOrderStatus in lib/types/domain.ts) — other values
+  // besides OPEN/PENDING_STORE_APPROVAL are written by unrelated
+  // OperationsOS/AdminOS modules, so chip options are derived from whatever
+  // statuses are actually present rather than a fixed, possibly-incomplete list.
+  const statusCounts = useMemo(() => {
+    const map: Record<string, number> = {};
+    salesOrders.forEach((o) => (map[o.status] = (map[o.status] ?? 0) + 1));
+    return map;
+  }, [salesOrders]);
+  const statusOptions = useMemo(() => Object.keys(statusCounts).sort(), [statusCounts]);
+
+  const filtered = statusChip === "All" ? salesOrders : salesOrders.filter((o) => o.status === statusChip);
+  const rows = paginate(filtered, page, PAGE_SIZE);
 
   const columns: Column<SalesOrder>[] = [
     { key: "salesOrderCode", header: "Order No.", render: (o) => o.salesOrderCode },
@@ -77,15 +98,23 @@ export default function SalesOrdersPage() {
         <StatCard label="Pending Store Approval" value={String(pendingStoreCount)} note="from a Proforma Invoice" />
       </StatRow>
 
+      <ChipGroup>
+        <Chip label={`All ${salesOrders.length}`} active={statusChip === "All"} onClick={() => { setStatusChip("All"); setPage(1); }} />
+        {statusOptions.map((s) => (
+          <Chip key={s} label={`${formatSalesOrderStatus(s)} ${statusCounts[s]}`} active={statusChip === s} onClick={() => { setStatusChip(s); setPage(1); }} />
+        ))}
+      </ChipGroup>
+
       <div style={{ marginTop: 14 }}>
         <Panel title="All Sales Orders" flush>
           <DataTable
             columns={columns}
-            rows={salesOrders}
+            rows={rows}
             onRowClick={(o) => router.push(`/sales-orders/${o.id}`)}
-            emptyTitle="No sales orders yet"
+            emptyTitle="No sales orders match this filter"
             emptyBody="Convert an approved Quotation, or create one from an approved Proforma Invoice."
           />
+          <Pagination page={page} pageSize={PAGE_SIZE} total={filtered.length} onPageChange={setPage} />
         </Panel>
       </div>
 
