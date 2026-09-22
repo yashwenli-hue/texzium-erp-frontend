@@ -12,7 +12,16 @@ export class MockSearchRepository implements ISearchRepository {
   async search(term: string): Promise<SearchResults> {
     const q = term.trim().toLowerCase();
     if (!q) {
-      return delay({ leads: [], customers: [], contacts: [], quotations: [], notes: [] });
+      return delay({
+        leads: [],
+        customers: [],
+        contacts: [],
+        quotations: [],
+        notes: [],
+        opportunities: [],
+        salesOrders: [],
+        salesInvoices: [],
+      });
     }
     const leads = db.leads.getAll().filter((l) =>
       [l.customerName, l.companyName ?? "", l.sourceName].some((f) => f.toLowerCase().includes(q))
@@ -31,6 +40,19 @@ export class MockSearchRepository implements ISearchRepository {
     const notes = db.notes.getAll().filter((n) =>
       [n.text, n.linkedName].some((f) => f.toLowerCase().includes(q))
     );
-    return delay({ leads, customers, contacts, quotations, notes });
+    const opportunities = db.opportunities.getAll().filter((o) =>
+      [o.title, o.customerName].some((f) => f.toLowerCase().includes(q))
+    );
+    const salesOrders = db.salesOrders.getAll().filter((so) =>
+      [so.salesOrderCode, so.customerName, so.quoteNo ?? "", so.proformaNumber ?? ""].some((f) =>
+        f.toLowerCase().includes(q)
+      )
+    );
+    const salesInvoices = db.salesInvoices.getAll().filter((si) =>
+      [si.invoiceNumber, si.customerName, si.salesOrderCode ?? ""].some((f) =>
+        f.toLowerCase().includes(q)
+      )
+    );
+    return delay({ leads, customers, contacts, quotations, notes, opportunities, salesOrders, salesInvoices });
   }
 }

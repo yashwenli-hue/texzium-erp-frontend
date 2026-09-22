@@ -20,30 +20,35 @@ import { RealInventoryItemRepository } from "./realInventoryItemRepository";
 import { RealSellerGstRepository } from "./realSellerGstRepository";
 import { RealBuyerGstRepository } from "./realBuyerGstRepository";
 import { RealCustomerRepository } from "./realCustomerRepository";
+import { RealSearchRepository } from "./realSearchRepository";
 import { MockContactRepository } from "../mock/mockContactRepository";
 import { MockActivityRepository } from "../mock/mockActivityRepository";
 import { MockTaskRepository } from "../mock/mockTaskRepository";
 import { MockNoteRepository } from "../mock/mockNoteRepository";
 import { MockNotificationRepository } from "../mock/mockNotificationRepository";
-import { MockSearchRepository } from "../mock/mockSearchRepository";
 
 /**
  * Stage 2A wired up Leads and Opportunities; Stage 2C adds Quotations
  * (+ their supporting Inventory Item / Seller GST / Buyer GST master-data
  * lookups); Stage 2H adds Customer Master (GET/create — create is verified
  * but currently broken backend-side, see RealCustomerRepository) against
- * the real backend. Everything else (Contacts, Activities, Tasks, Notes,
- * Notifications, Search) remains out of scope and stays on the mock
- * implementation — same pattern as createMockRepository(), just per-entity.
+ * the real backend. Search aggregates the same already-real list() calls
+ * (no dedicated backend search endpoint exists — see RealSearchRepository).
+ * Everything else (Contacts, Activities, Tasks, Notes, Notifications)
+ * remains out of scope and stays on the mock implementation — same pattern
+ * as createMockRepository(), just per-entity.
  */
 export function createRealRepository(): RevenueOSRepository {
   const users = new RealUserRepository();
+  const leads = new RealLeadRepository();
+  const customers = new RealCustomerRepository();
   const opportunities = new RealOpportunityRepository(users);
   const quotations = new RealQuotationRepository(opportunities);
   const salesOrders = new RealSalesOrderRepository(quotations);
+  const salesInvoices = new RealSalesInvoiceRepository(salesOrders);
   return {
     kind: "real",
-    leads: new RealLeadRepository(),
+    leads,
     leadSources: new RealLeadSourceRepository(),
     leadFollowups: new RealLeadFollowupRepository(),
     users,
@@ -51,7 +56,7 @@ export function createRealRepository(): RevenueOSRepository {
     quotations,
     proformaInvoices: new RealProformaInvoiceRepository(quotations),
     salesOrders,
-    salesInvoices: new RealSalesInvoiceRepository(salesOrders),
+    salesInvoices,
     dispatchOrders: new RealDispatchOrderRepository(),
     accountsReceivable: new RealAccountsReceivableRepository(),
     paymentCollections: new RealPaymentCollectionRepository(),
@@ -63,12 +68,12 @@ export function createRealRepository(): RevenueOSRepository {
     inventoryItems: new RealInventoryItemRepository(),
     sellerGstRegistrations: new RealSellerGstRepository(),
     buyerGstRegistrations: new RealBuyerGstRepository(),
-    customers: new RealCustomerRepository(),
+    customers,
     contacts: new MockContactRepository(),
     activities: new MockActivityRepository(),
     tasks: new MockTaskRepository(),
     notes: new MockNoteRepository(),
     notifications: new MockNotificationRepository(),
-    search: new MockSearchRepository(),
+    search: new RealSearchRepository(leads, customers, quotations, opportunities, salesOrders, salesInvoices),
   };
 }
