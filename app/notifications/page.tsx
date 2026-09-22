@@ -6,6 +6,7 @@ import { Panel } from "../../components/ui/Card";
 import { Button } from "../../components/ui/Button";
 import { Icon } from "../../components/ui/Icon";
 import { useNotifications } from "../../lib/hooks/useNotifications";
+import { useRepository } from "../../lib/repository/RepositoryProvider";
 import { formatDateTime } from "../../lib/format";
 
 function groupLabel(iso: string): string {
@@ -17,6 +18,7 @@ function groupLabel(iso: string): string {
 }
 
 export default function NotificationsPage() {
+  const repo = useRepository();
   const { notifications, markRead, markAllRead } = useNotifications();
 
   const groups = useMemo(() => {
@@ -76,7 +78,10 @@ export default function NotificationsPage() {
 
       <DesignNote>
         <b>Design note.</b> Unread notifications get a tinted background and a dot, not a loud badge
-        color. Click any unread item to mark it read — the sidebar badge count updates immediately.
+        color. Click any unread item to mark it read.{" "}
+        {repo.kind === "real"
+          ? "This calls the real RevenueOS notification endpoint (GET/PATCH /notifications) — the sidebar badge reflects it on your next navigation, since there's no live push mechanism against a plain REST backend. “Mark all as read” issues one request per unread notification, as there's no bulk endpoint."
+          : "The sidebar badge count updates immediately, since this is a live subscription against the mock store."}
       </DesignNote>
     </div>
   );

@@ -13,16 +13,21 @@ import { useRepository } from "../repository/RepositoryProvider";
  * subscription to reflect mutations made on whatever page is currently
  * active without a manual refetch trigger.
  *
- * Leads, Opportunities, Quotations, and (since Stage 2H) Customers all go
- * through the repository instead of the mock `db` directly, so each
- * reflects real backend counts in connected mode — refetched on every route
- * change (there's no live push/subscription mechanism against a plain REST
- * backend, so this is "accurate as of your last navigation", not
- * millisecond-live). Stage 2I fixed a real bug here: quotationsCount and
- * customersCount used to read the mock singleton store unconditionally,
- * even in connected mode, left over from when those entities were still
- * mock-only. Contacts/Tasks/Notifications/Notes have no real repository at
- * all yet and correctly keep reading the mock store's live subscription.
+ * Leads, Opportunities, Quotations, Customers, and (since Milestone 1B)
+ * Notifications all go through the repository instead of the mock `db`
+ * directly, so each reflects real backend counts in connected mode —
+ * refetched on every route change (there's no live push/subscription
+ * mechanism against a plain REST backend, so this is "accurate as of your
+ * last navigation", not millisecond-live). In mock mode Notifications keeps
+ * its live subscription instead, since the mock UX (instant badge update on
+ * marking something read, no navigation needed) is worth preserving and
+ * MockNotificationRepository's own store already supports it.
+ *
+ * Contacts, Tasks and Notes genuinely have NO backend counterpart at all
+ * (confirmed — no matching module exists anywhere in the backend) and stay
+ * on the mock store's live subscription in both modes; `kind` is returned so
+ * consumers (the Sidebar) can mark those three as demo data specifically
+ * when running in connected mode, rather than presenting them as live counts.
  */
 export function useLiveCounts() {
   const repo = useRepository();
@@ -31,6 +36,7 @@ export function useLiveCounts() {
   const [opportunitiesCount, setOpportunitiesCount] = useState(0);
   const [quotationsCount, setQuotationsCount] = useState(0);
   const [customersCount, setCustomersCount] = useState(0);
+  const [realUnreadNotificationsCount, setRealUnreadNotificationsCount] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -46,13 +52,18 @@ export function useLiveCounts() {
     repo.customers.list().then((page) => {
       if (!cancelled) setCustomersCount(page.total);
     });
+    if (repo.kind === "real") {
+      repo.notifications.unreadCount().then((n) => {
+        if (!cancelled) setRealUnreadNotificationsCount(n);
+      });
+    }
     return () => {
       cancelled = true;
     };
   }, [repo, pathname]);
 
   const tasks = useSyncExternalStore(db.tasks.subscribe, db.tasks.getSnapshot, db.tasks.getSnapshot);
-  const notifications = useSyncExternalStore(
+  const mockNotifications = useSyncExternalStore(
     db.notifications.subscribe,
     db.notifications.getSnapshot,
     db.notifications.getSnapshot
@@ -65,9 +76,11 @@ export function useLiveCounts() {
   const notes = useSyncExternalStore(db.notes.subscribe, db.notes.getSnapshot, db.notes.getSnapshot);
 
   return {
+    kind: repo.kind,
     leadsCount,
     openTasksCount: tasks.filter((t) => !t.done).length,
-    unreadNotificationsCount: notifications.filter((n) => n.unread).length,
+    unreadNotificationsCount:
+      repo.kind === "real" ? realUnreadNotificationsCount : mockNotifications.filter((n) => n.unread).length,
     opportunitiesCount,
     quotationsCount,
     customersCount,

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { usePathname } from "next/navigation";
 import { Icon } from "../ui/Icon";
-import { NAV_SECTIONS } from "../../lib/pageMeta";
+import { NAV_SECTIONS, NavItem } from "../../lib/pageMeta";
 import { useLiveCounts } from "../../lib/hooks/useLiveCounts";
 
 interface TooltipState {
@@ -12,6 +12,14 @@ interface TooltipState {
   top: number;
   left: number;
 }
+
+// Contacts, Tasks and Notes have no backend counterpart at all (confirmed —
+// no matching module exists anywhere in the backend), so their counts stay
+// mock-sourced even in connected mode. Showing a numeric badge there would
+// look identical to Leads/Opportunities/Quotations/Customers/Notifications'
+// genuinely live counts, so in connected mode these three read "Demo"
+// instead of a number rather than silently passing off fixture data as real.
+const DEMO_ONLY_COUNT_KEYS: NavItem["countKey"][] = ["contactsCount", "openTasksCount", "notesCount"];
 
 export function Sidebar({
   mobileOpen,
@@ -72,6 +80,7 @@ export function Sidebar({
             {section.items.map((item) => {
               const active = pathname === item.href || pathname?.startsWith(item.href + "/");
               const count = item.countKey ? counts[item.countKey] : undefined;
+              const isDemoOnly = counts.kind === "real" && !!item.countKey && DEMO_ONLY_COUNT_KEYS.includes(item.countKey);
               return (
                 <Link
                   key={item.href}
@@ -85,8 +94,15 @@ export function Sidebar({
                     <Icon name={item.icon} size={14} />
                   </span>
                   <span className="mod-label">{item.label}</span>
-                  {count !== undefined && <span className="badge-count">{count}</span>}
-                  {count !== undefined && count > 0 && <span className="rail-dot" />}
+                  {count !== undefined && (
+                    <span
+                      className="badge-count"
+                      title={isDemoOnly ? "Demo data — no backend module exists for this yet" : undefined}
+                    >
+                      {isDemoOnly ? "Demo" : count}
+                    </span>
+                  )}
+                  {count !== undefined && count > 0 && !isDemoOnly && <span className="rail-dot" />}
                 </Link>
               );
             })}

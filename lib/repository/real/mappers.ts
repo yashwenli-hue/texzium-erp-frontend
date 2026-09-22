@@ -28,6 +28,7 @@ import {
   CollectionsRecoveryRate,
   InventoryItemOption,
   GstRegistrationOption,
+  AppNotification,
   titleCaseFromConstant,
 } from "../../types/domain";
 
@@ -755,4 +756,31 @@ export interface BackendCollectionsRecoveryRate {
 
 export function mapCollectionsRecoveryRate(raw: BackendCollectionsRecoveryRate): CollectionsRecoveryRate {
   return { totalInvoiceValue: raw.totalInvoiceValue, totalCollected: raw.totalCollected, recoveryRate: raw.recoveryRate };
+}
+
+export interface BackendNotification {
+  id: string;
+  title?: string | null;
+  message?: string | null;
+  isRead: boolean;
+  createdAt: string;
+  userId?: string | null;
+}
+
+/**
+ * VERIFIED: GET /notifications (core/notifications module). No per-category
+ * icon concept exists backend-side — every real notification maps to the
+ * generic "bell" icon (see NotificationIcon) rather than guessing a specific
+ * one from category/priority/referenceType. `text` prefers the longer
+ * `message` field over the shorter `title`, matching how mock notifications'
+ * own `text` field reads (a full sentence, not a headline).
+ */
+export function mapNotification(raw: BackendNotification): AppNotification {
+  return {
+    id: raw.id,
+    icon: "bell",
+    text: raw.message || raw.title || "Notification",
+    occurredAt: raw.createdAt,
+    unread: !raw.isRead,
+  };
 }

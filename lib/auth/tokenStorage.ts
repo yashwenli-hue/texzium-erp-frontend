@@ -30,3 +30,24 @@ export function clearStoredToken(): void {
     // ignore
   }
 }
+
+/**
+ * Decodes just the JWT's `sub` claim from the stored token, for the rare
+ * non-React call site (a repository, not a component) that needs to scope a
+ * request to the current user without importing AuthContext. Mirrors
+ * AuthContext's own decode logic but stays deliberately minimal — no expiry
+ * check, no full AuthUser shape; apiFetch()'s existing 401 handling is what
+ * actually enforces session validity.
+ */
+export function getCurrentUserId(): string | null {
+  const token = getStoredToken();
+  if (!token) return null;
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) return null;
+    const payload = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
+    return typeof payload.sub === "string" ? payload.sub : null;
+  } catch {
+    return null;
+  }
+}

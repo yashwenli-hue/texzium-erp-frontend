@@ -765,7 +765,13 @@ export type NotificationIcon =
   | "cash"
   | "alert"
   | "check"
-  | "cal";
+  | "cal"
+  // Generic fallback for real backend-sourced notifications — the live
+  // core/notifications module has no per-category icon concept, only a
+  // category/priority/referenceType string trio that doesn't map cleanly
+  // onto the specific icons above without guessing at meaning the backend
+  // doesn't actually convey.
+  | "bell";
 
 export interface AppNotification {
   id: ID;
