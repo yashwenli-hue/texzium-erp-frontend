@@ -149,6 +149,86 @@
   --funnel-1-bg:rgba(34,197,94,.20); --funnel-1-fg:#22C55E;
   --funnel-2-bg:#22C55E;
 }
+
+/* ============================================================
+   DARK MODE — Version A, Variant 3 ("dark-v3"). Approved design
+   candidate; see docs/revenueos-version-a-dark-mode-v3-proposed.md.
+
+   Built as a wholly separate block (not joined to dark-v1/dark-v2's
+   combined selector list) so V1 and V2 stay byte-for-byte untouched —
+   this is a THIRD selectable theme, not a replacement or an edit to
+   either existing variant. Every token below that also exists in
+   dark-v1/dark-v2 is set to the identical value those blocks already
+   use (V3 retains V1's navy/purple foundation, per the approved
+   proposal); only the tokens listed under "V3-specific" differ.
+
+   V3-specific tokens are consumed by shared rules ONLY via a
+   `var(--token, <fallback>)` pattern, where the fallback reproduces
+   that rule's exact pre-existing light/V1/V2 output — so this block
+   never requires touching the base :root or the dark-v1/dark-v2 block
+   to stay safe. See the affected rules further down (search
+   "V3 elevation" / "V3:") for each fallback. */
+:root[data-theme="dark-v3"]{
+  --ink:#F5F6FA; --canvas:#0B0E17; --surface:#141A2C;
+  --line:#262E47; --line-2:#1B2136; --text:#E4E6F0; --muted:#8B90A8; --faint:#6B7293;
+  --good:#34D399; --good-bg:rgba(52,211,153,.16); --good-strong:#0FAE7D;
+  --warn:#FBBF24; --warn-bg:rgba(251,191,36,.16);
+  --bad:#F87171; --bad-bg:rgba(248,113,113,.16);
+  --info:#60A5FA; --info-bg:rgba(96,165,250,.16);
+  --m:#7C3AED; --m-soft:rgba(124,58,237,.18); --m-2:#A78BFA; --m-rgb:124,58,237;
+  --stage-teal:#2DD4BF; --stage-teal-bg:rgba(45,212,191,.16);
+  --stage-indigo:#A5B4FC; --stage-indigo-bg:rgba(165,180,252,.16);
+  --source-orange:#FB923C; --source-orange-bg:rgba(251,146,60,.16);
+  --shadow:0 1px 1px rgba(0,0,0,.3), 0 10px 30px -14px rgba(0,0,0,.65);
+  --scrim:rgba(3,5,14,.72);
+  color-scheme:dark;
+
+  /* Same as dark-v1/dark-v2 — V3 isn't changing any of this except
+     Negotiation, below. */
+  --mark-fg:#3D3418;
+  --lead-new-bg:rgba(96,165,250,.16); --lead-new-fg:#60A5FA;
+  --lead-good-bg:rgba(52,211,153,.16); --lead-good-fg:#34D399;
+  --lead-proposal-bg:rgba(251,191,36,.16); --lead-proposal-fg:#FBBF24;
+  --lead-lost-bg:rgba(248,113,113,.16); --lead-lost-fg:#F87171;
+  --src-website-bg:#1B2136; --src-website-fg:#8B90A8;
+  --src-meta-bg:rgba(96,165,250,.16); --src-meta-fg:#60A5FA;
+  --src-google-bg:rgba(251,191,36,.16); --src-google-fg:#FBBF24;
+  --src-whatsapp-bg:rgba(52,211,153,.16); --src-whatsapp-fg:#34D399;
+  --src-indiamart-bg:rgba(248,113,113,.16); --src-indiamart-fg:#F87171;
+  --funnel-1-bg:rgba(52,211,153,.16); --funnel-1-fg:#34D399;
+  --funnel-2-bg:#34D399;
+  --mod-dot-bg:rgba(124,58,237,.18);
+  --scrim-rail:rgba(3,5,14,.72);
+  --control-accent:#7C3AED;
+
+  /* V3-specific: --row-hover/--lead-row-hover get their own value (kept
+     as two separate tokens per the approved decision, not merged), a
+     touch lighter/warmer than dark-v1/v2's flat --line-2 copy, since V3
+     has real elevation tiers to play off. */
+  --row-hover:#1E2740; --lead-row-hover:#1E2740;
+
+  /* V3-specific: dedicated Negotiation hue, distinct from the brand
+     accent (--m) — dark-v1/dark-v2 render Negotiation as literally the
+     same color as --m/--m-soft (the exact collision the dark-mode audit
+     flagged); light mode already has its own distinct violet since the
+     restore-Version-A-light-theme milestone. --stage-violet gives dark
+     mode the same distinctiveness, parallel to --stage-teal/--stage-indigo. */
+  --stage-violet:#E879F9; --stage-violet-bg:rgba(232,121,249,.16);
+  --lead-negotiation-bg:var(--stage-violet-bg); --lead-negotiation-fg:var(--stage-violet);
+
+  /* V3-specific: elevation system — a second surface tier for raised
+     elements (modals/dropdowns/popovers/toasts), a third for sunken
+     elements (form inputs), a second shadow tier tuned to actually read
+     against a near-black canvas (dark-v1/v2's shadows are still the
+     light-tuned near-invisible literals on most floating surfaces — see
+     the audit), and an alpha-based hairline for separating a raised
+     surface's edge from whatever's behind it. */
+  --surface-2:#1C2438;
+  --surface-inset:#10141F;
+  --border-soft:rgba(255,255,255,.08);
+  --shadow-1:0 1px 1px rgba(0,0,0,.3), 0 10px 30px -14px rgba(0,0,0,.65);
+  --shadow-2:0 4px 12px rgba(0,0,0,.4), 0 24px 60px -16px rgba(0,0,0,.75);
+}
 *{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth}
 body{font-family:var(--sans);background:var(--canvas);color:var(--text);font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased}
@@ -210,13 +290,13 @@ svg.i18{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.6;st
 .rail-tooltip{
   position:fixed;transform:translateY(-50%);
   background:var(--chip-ink);color:#fff;padding:6px 10px;border-radius:8px;font-size:12px;font-weight:600;white-space:nowrap;
-  pointer-events:none;z-index:200;box-shadow:0 8px 20px -8px rgba(0,0,0,.5);
+  pointer-events:none;z-index:200;box-shadow:var(--shadow-2, 0 8px 20px -8px rgba(0,0,0,.5));
 }
 
 /* Topbar account/profile menu (popover anchored to the topbar avatar) */
 .user-menu{
-  position:fixed;width:216px;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-sm);
-  box-shadow:0 20px 48px -16px rgba(10,10,12,.28);z-index:210;padding:6px;
+  position:fixed;width:216px;background:var(--surface-2, var(--surface));border:1px solid var(--border-soft, var(--line));border-radius:var(--radius-sm);
+  box-shadow:var(--shadow-2, 0 20px 48px -16px rgba(10,10,12,.28));z-index:210;padding:6px;
 }
 .user-menu-item{display:flex;align-items:center;gap:10px;width:100%;padding:9px 10px;border-radius:8px;font-size:13px;font-weight:600;color:var(--text)}
 .user-menu-item:hover{background:var(--canvas)}
@@ -353,7 +433,7 @@ tbody tr.clickable:hover{background:var(--row-hover)}
 .kcol{background:var(--canvas);border-radius:13px;padding:11px;border:1px solid var(--line);min-width:190px}
 .kcol h4{font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);font-weight:700;margin-bottom:10px;display:flex;justify-content:space-between}
 .kcol h4 span{color:var(--faint)}
-.kcard{background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:11px;margin-bottom:9px;box-shadow:0 1px 2px rgba(16,24,40,.03);cursor:pointer;transition:border-color .1s}
+.kcard{background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:11px;margin-bottom:9px;box-shadow:var(--shadow-1, 0 1px 2px rgba(16,24,40,.03));cursor:pointer;transition:border-color .1s}
 .kcard:hover{border-color:var(--m)}
 .kcard .co{font-weight:700;font-size:12.5px}
 .kcard .amt{font-family:var(--display);font-weight:700;font-size:13px;margin-top:6px;color:var(--ink)}
@@ -521,7 +601,7 @@ tbody tr.clickable:hover{background:var(--row-hover)}
 
 /* Modal */
 .modal-overlay{position:fixed;inset:0;background:var(--scrim);display:flex;align-items:flex-start;justify-content:center;padding:5vh 16px;z-index:100;overflow-y:auto}
-.modal{background:var(--surface);border-radius:var(--radius);box-shadow:0 24px 60px -20px rgba(10,10,12,.35);width:100%;max-width:560px;max-height:90vh;display:flex;flex-direction:column;animation:modalIn .16s ease-out}
+.modal{background:var(--surface-2, var(--surface));border-radius:var(--radius);box-shadow:var(--shadow-2, 0 24px 60px -20px rgba(10,10,12,.35));width:100%;max-width:560px;max-height:90vh;display:flex;flex-direction:column;animation:modalIn .16s ease-out}
 @keyframes modalIn{from{opacity:0;transform:translateY(8px) scale(.98)}to{opacity:1;transform:none}}
 .modal-head{display:flex;align-items:center;gap:12px;padding:20px 22px;border-bottom:1px solid var(--line)}
 .modal-head h2{font-family:var(--display);font-size:17px;font-weight:700;color:var(--ink)}
@@ -535,7 +615,7 @@ tbody tr.clickable:hover{background:var(--row-hover)}
 .field label{font-size:12.5px;font-weight:600;color:var(--text)}
 .field label .req{color:var(--bad);margin-left:2px}
 .field input,.field select,.field textarea{
-  font-family:inherit;font-size:13.5px;color:var(--text);background:var(--surface);
+  font-family:inherit;font-size:13.5px;color:var(--text);background:var(--surface-inset, var(--surface));
   border:1px solid var(--line);border-radius:10px;padding:10px 12px;outline:none;
   transition:border-color .12s,box-shadow .12s;width:100%;accent-color:var(--control-accent);
 }
@@ -557,8 +637,8 @@ tbody tr.clickable:hover{background:var(--row-hover)}
 .fd-trigger:hover{border-color:var(--faint);color:var(--text)}
 .fd-trigger.active{border-color:var(--m);color:var(--m);background:var(--m-soft)}
 .fd-count{display:inline-flex;align-items:center;justify-content:center;min-width:17px;height:17px;padding:0 4px;border-radius:20px;background:var(--m);color:#fff;font-size:10.5px;font-weight:700}
-.fd-panel{position:absolute;top:calc(100% + 6px);left:0;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-sm);box-shadow:0 20px 48px -16px rgba(10,10,12,.28);width:220px;z-index:50;padding:8px}
-.fd-search{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:12.5px;font-family:inherit;outline:none;margin-bottom:6px;background:var(--surface);color:var(--text)}
+.fd-panel{position:absolute;top:calc(100% + 6px);left:0;background:var(--surface-2, var(--surface));border:1px solid var(--border-soft, var(--line));border-radius:var(--radius-sm);box-shadow:var(--shadow-2, 0 20px 48px -16px rgba(10,10,12,.28));width:220px;z-index:50;padding:8px}
+.fd-search{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:12.5px;font-family:inherit;outline:none;margin-bottom:6px;background:var(--surface-inset, var(--surface));color:var(--text)}
 .fd-search:focus{border-color:var(--m)}
 .fd-options{max-height:220px;overflow-y:auto;display:flex;flex-direction:column}
 .fd-opt{display:flex;align-items:center;gap:9px;padding:7px 8px;border-radius:7px;font-size:13px;color:var(--text);cursor:pointer}
@@ -580,7 +660,7 @@ tbody tr.clickable:hover{background:var(--row-hover)}
 .fd-presets button:hover{border-color:var(--m);color:var(--m)}
 .fd-date-row{display:flex;gap:8px;margin-bottom:4px}
 .fd-date-row label{flex:1;display:flex;flex-direction:column;gap:4px;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.3px}
-.fd-date-row input{font-family:inherit;font-size:12.5px;color:var(--text);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:7px 8px;outline:none;width:100%;color-scheme:inherit}
+.fd-date-row input{font-family:inherit;font-size:12.5px;color:var(--text);background:var(--surface-inset, var(--surface));border:1px solid var(--line);border-radius:8px;padding:7px 8px;outline:none;width:100%;color-scheme:inherit}
 .fd-date-row input:focus{border-color:var(--m)}
 
 /* Active filter chips (below the header, mirrors the filter popover state) */
@@ -588,7 +668,7 @@ tbody tr.clickable:hover{background:var(--row-hover)}
 .af-chip{display:inline-flex;align-items:center;gap:6px;padding:5px 6px 5px 11px;border-radius:20px;font-size:12px;font-weight:600;background:var(--m-soft);color:var(--m)}
 .af-chip-label{opacity:.75;font-weight:600}
 .af-chip button{display:grid;place-items:center;width:18px;height:18px;border-radius:50%;color:var(--m)}
-.af-chip button:hover{background:rgba(5,150,105,.18)}
+.af-chip button:hover{background:rgba(var(--m-rgb),.18)}
 .af-clear{font-size:12px;font-weight:600;color:var(--muted);padding:5px 4px}
 .af-clear:hover{color:var(--text)}
 
@@ -616,7 +696,7 @@ tbody tr.clickable:hover{background:var(--row-hover)}
 
 /* Toast / inline feedback */
 .toast-stack{position:fixed;bottom:20px;right:20px;z-index:200;display:flex;flex-direction:column;gap:8px;max-width:340px}
-.toast{background:var(--chip-ink);color:#fff;padding:12px 16px;border-radius:12px;font-size:13px;display:flex;align-items:center;gap:10px;box-shadow:0 12px 30px -10px rgba(10,10,12,.4);animation:toastIn .15s ease-out}
+.toast{background:var(--chip-ink);color:#fff;padding:12px 16px;border-radius:12px;font-size:13px;display:flex;align-items:center;gap:10px;box-shadow:var(--shadow-2, 0 12px 30px -10px rgba(10,10,12,.4));animation:toastIn .15s ease-out}
 @keyframes toastIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 .toast .ic{color:var(--m);flex:none}
 @media(max-width:640px){.toast-stack{left:16px;right:16px;bottom:16px;max-width:none}}

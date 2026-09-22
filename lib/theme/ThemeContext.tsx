@@ -3,17 +3,19 @@
 import { createContext, useCallback, useContext, useEffect, useState, ReactNode } from "react";
 
 /**
- * Version A Dark Mode A/B experiment (docs/revenueos-version-a-dark-mode-ab-brief.md).
- * "light" is the untouched existing theme and stays the default — this
- * experiment must not change what a user with no stored preference sees.
- * "dark-v1" is added by this commit; "dark-v2" is added by the following
- * commit once Variant 2 exists, with no changes needed here beyond the
- * union type and the selector UI's option list.
+ * Version A Dark Mode experiments (docs/revenueos-version-a-dark-mode-ab-brief.md
+ * for V1/V2's original A/B process; docs/revenueos-version-a-dark-mode-v3-proposed.md
+ * for V3). "light" is the untouched existing theme and stays the default —
+ * these experiments must not change what a user with no stored preference
+ * sees. "dark-v1"/"dark-v2" are the original A/B variants; "dark-v3" is a
+ * further, independently-built candidate (see app/globals.css's
+ * `:root[data-theme="dark-v3"]` block) — adding it required no change here
+ * beyond the union type, THEMES list, and init-script check below.
  */
-export type ThemeName = "light" | "dark-v1" | "dark-v2";
+export type ThemeName = "light" | "dark-v1" | "dark-v2" | "dark-v3";
 
 const STORAGE_KEY = "revenueos.theme";
-const THEMES: ThemeName[] = ["light", "dark-v1", "dark-v2"];
+const THEMES: ThemeName[] = ["light", "dark-v1", "dark-v2", "dark-v3"];
 
 interface ThemeContextValue {
   theme: ThemeName;
@@ -78,4 +80,4 @@ export function useTheme(): ThemeContextValue {
  */
 export const THEME_INIT_SCRIPT = `(function(){try{var t=localStorage.getItem(${JSON.stringify(
   STORAGE_KEY
-)});if(t&&t!=="light"&&(t==="dark-v1"||t==="dark-v2")){document.documentElement.setAttribute("data-theme",t);}}catch(e){}})();`;
+)});if(t&&t!=="light"&&(t==="dark-v1"||t==="dark-v2"||t==="dark-v3")){document.documentElement.setAttribute("data-theme",t);}}catch(e){}})();`;

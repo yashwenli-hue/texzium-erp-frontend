@@ -10,12 +10,13 @@ interface MenuPos {
 }
 
 /**
- * Theme selector for the Version A Dark Mode A/B experiment
- * (docs/revenueos-version-a-dark-mode-ab-brief.md) — lets the same running
- * app compare Light against each dark variant, per the brief's suggested
- * "simple theme/variant selector... suitable for comparison" (§5). Reuses
- * UserMenu's exact popover pattern/CSS classes (.user-menu/.user-menu-item,
- * position:fixed rect-based placement) rather than introducing a new one.
+ * Theme selector for the Version A Dark Mode experiments
+ * (docs/revenueos-version-a-dark-mode-ab-brief.md for V1/V2's original A/B
+ * process; docs/revenueos-version-a-dark-mode-v3-proposed.md for V3) —
+ * lets the same running app compare Light against each dark candidate.
+ * Reuses UserMenu's exact popover pattern/CSS classes (.user-menu/
+ * .user-menu-item, position:fixed rect-based placement) rather than
+ * introducing a new one.
  *
  * Only options for themes that actually exist are offered.
  */
@@ -23,6 +24,7 @@ const OPTIONS: { value: ThemeName; label: string; icon: string }[] = [
   { value: "light", label: "Light", icon: "sun" },
   { value: "dark-v1", label: "Dark — Variant 1 (Navy Purple)", icon: "moon" },
   { value: "dark-v2", label: "Dark — Variant 2 (Navy + Semantic)", icon: "moon" },
+  { value: "dark-v3", label: "Dark — Variant 3 (Elevated)", icon: "moon" },
 ];
 
 export function ThemeToggle() {
@@ -76,7 +78,7 @@ export function ThemeToggle() {
       {open && pos && (
         <div className="user-menu" ref={menuRef} role="menu" style={{ right: pos.right, top: pos.top }}>
           <div style={{ padding: "8px 14px 6px", fontSize: 11, fontWeight: 700, color: "var(--faint)", textTransform: "uppercase", letterSpacing: ".4px" }}>
-            Theme (A/B experiment)
+            Theme (experimental)
           </div>
           {OPTIONS.map((o) => (
             <button
