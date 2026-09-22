@@ -229,6 +229,98 @@
   --shadow-1:0 1px 1px rgba(0,0,0,.3), 0 10px 30px -14px rgba(0,0,0,.65);
   --shadow-2:0 4px 12px rgba(0,0,0,.4), 0 24px 60px -16px rgba(0,0,0,.75);
 }
+
+/* ============================================================
+   DARK MODE — Version A, Variant 4, "Graphite & Emerald"
+   (independently designed; see
+   docs/revenueos-version-a-dark-mode-v4.md). A fourth, fully
+   self-contained selectable theme — NOT a refinement of dark-v1/v2/v3,
+   which stay exactly as shipped. Every token below is V4's own value;
+   none are copied from any other dark variant, and this block never
+   touches the base :root (light) or any other :root[data-theme="…"]
+   block.
+
+   Color philosophy: neutral graphite (no navy/blue cast), a single
+   emerald brand accent matching the LIGHT theme's actual brand hue
+   (--m:#059669 there) instead of the purple every other dark variant
+   introduced, alpha-white borders/hovers instead of flat per-tier hex,
+   and an inset top-highlight on raised surfaces for real elevation.
+   See the proposal doc for full rationale.
+
+   Every token name here already exists in the architecture (defined by
+   light :root, by the light-theme-restoration set, or by V3's
+   surface-2/surface-inset/border-soft/shadow-1/shadow-2/focus-ring) —
+   V4 supplies only new VALUES, so none of the shared rules that
+   already reference these tokens via `var(--token, <fallback>)` need
+   any further editing. The one new token name is --surface-rail (see
+   .rail's rule further down), needed because .rail otherwise shares
+   --surface with cards/tables. */
+:root[data-theme="dark-v4"]{
+  --ink:#F5F5F7; --canvas:#0A0A0C; --surface:#141416;
+  --line:rgba(255,255,255,.08); --line-2:rgba(255,255,255,.05);
+  --text:#E4E4E7; --muted:#9A9AA2; --faint:#6E6E76;
+  --good:#4ADE80; --good-bg:rgba(74,222,128,.14); --good-strong:#22C55E;
+  --warn:#F5A524; --warn-bg:rgba(245,165,36,.14);
+  --bad:#F0524F; --bad-bg:rgba(240,82,79,.14);
+  --info:#4F9CF9; --info-bg:rgba(79,156,249,.14);
+  --m:#10B981; --m-soft:rgba(16,185,129,.15); --m-2:#34D399; --m-rgb:16,185,129;
+  --stage-teal:#2BC8B4; --stage-teal-bg:rgba(43,200,180,.14);
+  --stage-indigo:#7C8CF8; --stage-indigo-bg:rgba(124,140,248,.14);
+  --source-orange:#F2994A; --source-orange-bg:rgba(242,153,74,.14);
+  --shadow:0 1px 2px rgba(0,0,0,.4);
+  --scrim:rgba(0,0,0,.6);
+  color-scheme:dark;
+
+  /* Light-theme-restoration-era tokens — same mapping as every other
+     dark variant (NEW→info, QUALIFIED/SALES_ASSIGNED/WON→good,
+     PROPOSAL_SENT→warn, LOST→bad, Website→neutral, Meta→info,
+     Google→warn, WhatsApp→good, IndiaMART→bad, Funnel→good family),
+     just resolved through V4's own palette above. */
+  --mark-fg:#362B10;
+  --lead-new-bg:rgba(79,156,249,.14); --lead-new-fg:#4F9CF9;
+  --lead-good-bg:rgba(74,222,128,.14); --lead-good-fg:#4ADE80;
+  --lead-proposal-bg:rgba(245,165,36,.14); --lead-proposal-fg:#F5A524;
+  --lead-lost-bg:rgba(240,82,79,.14); --lead-lost-fg:#F0524F;
+  --src-website-bg:rgba(255,255,255,.05); --src-website-fg:#9A9AA2;
+  --src-meta-bg:rgba(79,156,249,.14); --src-meta-fg:#4F9CF9;
+  --src-google-bg:rgba(245,165,36,.14); --src-google-fg:#F5A524;
+  --src-whatsapp-bg:rgba(74,222,128,.14); --src-whatsapp-fg:#4ADE80;
+  --src-indiamart-bg:rgba(240,82,79,.14); --src-indiamart-fg:#F0524F;
+  --funnel-1-bg:rgba(74,222,128,.14); --funnel-1-fg:#4ADE80;
+  --funnel-2-bg:#4ADE80;
+  --mod-dot-bg:rgba(16,185,129,.15);
+  --row-hover:rgba(255,255,255,.04); --lead-row-hover:rgba(255,255,255,.04);
+  --scrim-rail:rgba(0,0,0,.6);
+  --control-accent:#10B981;
+
+  /* Negotiation: a genuinely free, uncontested violet — V4 never spent
+     purple on the brand accent (that's emerald here), so unlike
+     dark-v1/v2/v3 this isn't an escape hatch, it's just "the violet." */
+  --stage-violet:#9F7AEA; --stage-violet-bg:rgba(159,122,234,.14);
+  --lead-negotiation-bg:var(--stage-violet-bg); --lead-negotiation-fg:var(--stage-violet);
+
+  /* Elevation: same four-tier architecture V3 introduced (surface-2/
+     surface-inset/border-soft/shadow-1/shadow-2), V4's own values.
+     shadow-2's inset layer is the "catching light" top highlight —
+     see the proposal doc §4. */
+  --surface-2:#1B1B1F;
+  --surface-inset:#101012;
+  --border-soft:rgba(255,255,255,.10);
+  --shadow-1:0 1px 2px rgba(0,0,0,.4);
+  --shadow-2:0 2px 4px rgba(0,0,0,.3), 0 16px 40px -12px rgba(0,0,0,.7), inset 0 1px 0 rgba(255,255,255,.06);
+
+  /* V4-specific: the nav rail recedes to canvas level instead of
+     sharing --surface with cards (every other theme, light included,
+     intentionally keeps rail == card surface) — see .rail's rule and
+     the proposal doc §5. */
+  --surface-rail:#0A0A0C;
+
+  /* V4-specific: a crisp 1px accent border layered under the soft glow,
+     instead of the single soft ring every other theme uses — scoped to
+     V4 only via .field's focus rule fallback (see below) so light and
+     dark-v1/v2/v3's focus ring are completely unaffected. */
+  --focus-ring:0 0 0 1px var(--m), 0 0 0 4px rgba(var(--m-rgb),.18);
+}
 *{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth}
 body{font-family:var(--sans);background:var(--canvas);color:var(--text);font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased}
@@ -246,7 +338,7 @@ svg.i18{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.6;st
    state is carried by the soft-green tint + left accent bar + bold ink
    text (no reliance on a dark backdrop for contrast). */
 .app{display:flex;min-height:100vh}
-.rail{width:240px;flex:none;background:var(--surface);color:var(--muted);border-right:1px solid var(--line);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow:hidden;transition:width .18s ease}
+.rail{width:240px;flex:none;background:var(--surface-rail, var(--surface));color:var(--muted);border-right:1px solid var(--line);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow:hidden;transition:width .18s ease}
 .rail.collapsed{width:68px}
 .brand{display:flex;align-items:center;gap:10px;padding:19px 18px 15px;border-bottom:1px solid var(--line)}
 .rail.collapsed .brand{justify-content:center;padding:19px 0 15px}
@@ -619,7 +711,7 @@ tbody tr.clickable:hover{background:var(--row-hover)}
   border:1px solid var(--line);border-radius:10px;padding:10px 12px;outline:none;
   transition:border-color .12s,box-shadow .12s;width:100%;accent-color:var(--control-accent);
 }
-.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--m);box-shadow:0 0 0 3px var(--m-soft)}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--m);box-shadow:var(--focus-ring, 0 0 0 3px var(--m-soft))}
 .field textarea{resize:vertical;min-height:80px;font-family:inherit}
 .field .err{color:var(--bad);font-size:11.5px;font-weight:500}
 .field.has-err input,.field.has-err select,.field.has-err textarea{border-color:var(--bad)}
