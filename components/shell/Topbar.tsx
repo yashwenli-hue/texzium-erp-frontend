@@ -6,6 +6,7 @@ import { Icon } from "../ui/Icon";
 import { PAGE_META } from "../../lib/pageMeta";
 import { useLiveCounts } from "../../lib/hooks/useLiveCounts";
 import { UserMenu } from "./UserMenu";
+import { ThemeToggle } from "./ThemeToggle";
 
 const DETAIL_LABELS: Record<string, string> = {
   leads: "Lead Details",
@@ -93,6 +94,7 @@ export function Topbar({ onMenuClick }: { onMenuClick: () => void }) {
             <Icon name="bell" size={18} />
           </button>
         </div>
+        <ThemeToggle />
         <UserMenu />
       </div>
     </header>

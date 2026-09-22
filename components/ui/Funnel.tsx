@@ -2,10 +2,13 @@ import { Lead, isQualifiedLeadStatus } from "../../lib/types/domain";
 import { Icon } from "./Icon";
 
 const FUNNEL_LABELS = ["New", "Contacted", "Qualified"];
+// Theme-aware token references — a light→deep progression through the same
+// green/"good" family used for success elsewhere (not the brand purple;
+// this ramp represents lead progression, not a highlighted/active state).
 const RAMP: { shade: string; txt: string }[] = [
-  { shade: "#A7F3D0", txt: "#065F46" },
-  { shade: "#34D399", txt: "#fff" },
-  { shade: "#059669", txt: "#fff" },
+  { shade: "var(--good-bg)", txt: "var(--good)" },
+  { shade: "var(--good)", txt: "#fff" },
+  { shade: "var(--good-strong)", txt: "#fff" },
 ];
 
 /**

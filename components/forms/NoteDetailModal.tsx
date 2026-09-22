@@ -95,7 +95,7 @@ export function NoteDetailModal({
         <>
           <TextAreaField label="Note" rows={6} value={text} onChange={(e) => setText(e.target.value)} />
           <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, marginTop: 4 }}>
-            <input type="checkbox" checked={pinned} onChange={(e) => setPinned(e.target.checked)} style={{ width: "auto" }} />
+            <input type="checkbox" checked={pinned} onChange={(e) => setPinned(e.target.checked)} style={{ width: "auto", accentColor: "var(--m)" }} />
             Pin this note
           </label>
         </>

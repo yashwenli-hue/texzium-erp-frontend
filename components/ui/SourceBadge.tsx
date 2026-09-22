@@ -17,14 +17,24 @@
 // Colors per design review Stage 1.3 §1 (Website=grey, WhatsApp=WhatsApp
 // green, IndiaMART=red, TradeIndia=orange, Google=yellow). Meta Ads and
 // ExporterIndia weren't specified, so they keep their existing colors.
+//
+// Theme-aware token references, not literal hex (these are presentation
+// tints, not literal third-party brand colors — the genuine brand hex for
+// Google/Meta live only in their SVG glyphs below, left untouched).
+// Website reuses the shared neutral fallback tokens; the rest map onto the
+// nearest semantic family (WhatsApp=good/green, IndiaMART=bad/red,
+// Google=warn/amber) or the two extra hue tokens also used by
+// LEAD_STATUS_STYLE (--source-orange for TradeIndia, --stage-indigo for
+// ExporterIndia's violet) rather than the brand accent (--m), so a lead
+// source badge is never mistaken for a highlighted/active state.
 const SOURCE_STYLES: Record<string, { bg: string; fg: string; mark: string }> = {
-  Website: { bg: "#F1F2F4", fg: "#6B7280", mark: "W" },
-  "Meta Ads": { bg: "#E7EEFE", fg: "#3457D5", mark: "M" },
-  "Google Ads": { bg: "#FDF6DC", fg: "#B8860B", mark: "G" },
-  WhatsApp: { bg: "#E7F8ED", fg: "#1F9D55", mark: "wa" },
-  IndiaMART: { bg: "#FCE9E9", fg: "#C4272E", mark: "iM" },
-  TradeIndia: { bg: "#FFF1E0", fg: "#D2660A", mark: "T" },
-  ExporterIndia: { bg: "#EFEAFE", fg: "#5B3FD1", mark: "E" },
+  Website: { bg: "var(--line-2)", fg: "var(--muted)", mark: "W" },
+  "Meta Ads": { bg: "var(--info-bg)", fg: "var(--info)", mark: "M" },
+  "Google Ads": { bg: "var(--warn-bg)", fg: "var(--warn)", mark: "G" },
+  WhatsApp: { bg: "var(--good-bg)", fg: "var(--good)", mark: "wa" },
+  IndiaMART: { bg: "var(--bad-bg)", fg: "var(--bad)", mark: "iM" },
+  TradeIndia: { bg: "var(--source-orange-bg)", fg: "var(--source-orange)", mark: "T" },
+  ExporterIndia: { bg: "var(--stage-indigo-bg)", fg: "var(--stage-indigo)", mark: "E" },
 };
 
 const FALLBACK = { bg: "var(--line-2)", fg: "var(--muted)", mark: "•" };

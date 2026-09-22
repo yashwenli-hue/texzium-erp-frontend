@@ -216,7 +216,7 @@ export default function LeadsPage() {
 
       <div style={{ marginBottom: 6 }}>
         <input
-          style={{ maxWidth: 320, width: "100%", padding: "9px 13px", borderRadius: 10, border: "1px solid var(--line)", fontSize: 13.5, fontFamily: "inherit", outline: "none" }}
+          style={{ maxWidth: 320, width: "100%", padding: "9px 13px", borderRadius: 10, border: "1px solid var(--line)", background: "var(--surface)", color: "var(--text)", fontSize: 13.5, fontFamily: "inherit", outline: "none" }}
           placeholder="Search leads by name, company, product, owner…"
           value={search}
           onChange={(e) => { setSearch(e.target.value); setPage(1); }}

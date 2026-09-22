@@ -145,18 +145,30 @@ export function AccountsReceivableStatusTag({ status }: { status: string }) {
 // large solid saturated fill, even for a terminal state). No new status
 // values are introduced, only presentation color — text always renders
 // alongside it so nothing depends on color alone.
+// Theme-aware token references, not literal hex — this map is also passed
+// as KanbanBoard's colorMap for the Lead Pipeline board (app/pipeline/page.tsx),
+// so it paints full column backgrounds, not just this badge. Each stage
+// reuses the existing semantic token family it's genuinely closest to in
+// meaning (new/informational=info, qualified/won=good, proposal=warn,
+// lost=bad) plus two dedicated extra hue tokens (--stage-teal, --stage-indigo)
+// for the two stages that don't map onto an existing semantic meaning, and
+// the brand accent (--m) for Negotiation specifically — a single,
+// deliberate, restrained use of purple among many statuses, not a
+// blanket "every badge is purple" treatment. Light-mode token values are
+// set to match this map's previous literal hex exactly (see globals.css),
+// so light mode is visually unchanged.
 export const LEAD_STATUS_STYLE: Record<LeadStatus, { bg: string; fg: string }> = {
-  NEW: { bg: "#DBEAFE", fg: "#1E3A8A" },
-  ASSIGNED: { bg: "#CCFBF1", fg: "#0F766E" },
-  CONTACTED: { bg: "#CCFBF1", fg: "#0F766E" },
-  PRE_SALES_ASSIGNED: { bg: "#CCFBF1", fg: "#0F766E" },
-  QUALIFIED: { bg: "#D1FAE5", fg: "#065F46" },
-  SALES_ASSIGNED: { bg: "#D1FAE5", fg: "#065F46" },
-  PROPOSAL_SENT: { bg: "#FEF3C7", fg: "#92400E" },
-  NEGOTIATION: { bg: "#EDE9FE", fg: "#5B21B6" },
-  WON: { bg: "#D1FAE5", fg: "#065F46" },
-  LOST: { bg: "#FEE2E2", fg: "#991B1B" },
-  REJECTED: { bg: "#E0E7FF", fg: "#3730A3" },
+  NEW: { bg: "var(--info-bg)", fg: "var(--info)" },
+  ASSIGNED: { bg: "var(--stage-teal-bg)", fg: "var(--stage-teal)" },
+  CONTACTED: { bg: "var(--stage-teal-bg)", fg: "var(--stage-teal)" },
+  PRE_SALES_ASSIGNED: { bg: "var(--stage-teal-bg)", fg: "var(--stage-teal)" },
+  QUALIFIED: { bg: "var(--good-bg)", fg: "var(--good)" },
+  SALES_ASSIGNED: { bg: "var(--good-bg)", fg: "var(--good)" },
+  PROPOSAL_SENT: { bg: "var(--warn-bg)", fg: "var(--warn)" },
+  NEGOTIATION: { bg: "var(--m-soft)", fg: "var(--m)" },
+  WON: { bg: "var(--good-bg)", fg: "var(--good)" },
+  LOST: { bg: "var(--bad-bg)", fg: "var(--bad)" },
+  REJECTED: { bg: "var(--stage-indigo-bg)", fg: "var(--stage-indigo)" },
 };
 
 export function LeadStatusTag({ status }: { status: string }) {

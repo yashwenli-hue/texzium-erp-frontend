@@ -1,11 +1,66 @@
 :root{
   --ink:#14171D; --canvas:#FAFAFA; --surface:#FFFFFF;
   --line:#EEEFF1; --line-2:#F5F5F6; --text:#1A1C20; --muted:#767A80; --faint:#B0B4BA;
-  --good:#12805C; --good-bg:#E9F7F1; --warn:#9A5B00; --warn-bg:#FDF3E2; --bad:#B0223D; --bad-bg:#FBE9ED; --info:#1D4ED8; --info-bg:#EAF1FE;
-  --m:#059669; --m-soft:#E7F6EF;
+  --good:#12805C; --good-bg:#E9F7F1; --good-strong:#059669; --warn:#9A5B00; --warn-bg:#FDF3E2; --bad:#B0223D; --bad-bg:#FBE9ED; --info:#1D4ED8; --info-bg:#EAF1FE;
+  --m:#059669; --m-soft:#E7F6EF; --m-2:#10B981; --m-rgb:5,150,105;
   --radius:18px; --radius-sm:11px;
   --shadow:0 1px 1px rgba(10,10,12,.02), 0 8px 28px -14px rgba(10,10,12,.10);
+  --scrim:rgba(10,10,12,.42);
   --display:var(--font-jakarta),"Plus Jakarta Sans",system-ui,sans-serif; --sans:var(--font-inter),"Inter",system-ui,sans-serif;
+
+  /* Fixed across every theme, light or dark — see the dark-mode token
+     architecture note below the theme blocks for why these three don't
+     flip with the rest of the palette. */
+  --chip-ink:#14171D;
+  --mark-bg:#FDF3C4; --mark-fg:#3D3418;
+
+  /* Extra hue families beyond the four semantic tokens (good/warn/bad/info)
+     — used by Lead Status (Tag.tsx) and Lead Source (SourceBadge.tsx) where
+     collapsing 7 distinct hues down to 4 would lose real visual
+     distinctiveness on the Lead Pipeline Kanban board and the source donut
+     chart. Light-mode values match the hex these replace exactly — zero
+     visual change to the existing light theme. */
+  --stage-teal:#0F766E; --stage-teal-bg:#CCFBF1;
+  --stage-indigo:#3730A3; --stage-indigo-bg:#E0E7FF;
+  --source-orange:#D2660A; --source-orange-bg:#FFF1E0;
+
+  color-scheme:light;
+}
+
+/* ============================================================
+   DARK MODE — Version A A/B experiment (see
+   docs/revenueos-version-a-dark-mode-ab-brief.md). Two variants, selected
+   via a `data-theme` attribute on <html> (see lib/theme/ThemeContext.tsx);
+   absence of the attribute (or `data-theme="light"`) is the untouched
+   light theme above. Only CSS custom-property VALUES differ between
+   variants — every selector in this file still resolves through the same
+   ~25 tokens, so no component or class rule needed to change for either
+   variant to exist.
+
+   --chip-ink / --mark-bg / --mark-fg are deliberately NOT redefined by
+   either dark variant below: --chip-ink backs a small set of "always-dark"
+   solid chips (topbar avatar, collapsed-sidebar tooltip, toast) that carry
+   fixed white text — letting them track --ink (which flips to a bright
+   color in dark mode) would put white text on a near-white fill. Keeping
+   --chip-ink pinned to the same near-black in every theme keeps those
+   three elements exactly as they already look today, in every theme.
+   --mark-bg/--mark-fg (the Search page's <mark> highlight) stay a fixed
+   pale-yellow/dark-text pair for the same reason search-match highlighting
+   conventionally doesn't invert with app theme in most editors/apps. */
+:root[data-theme="dark-v1"]{
+  --ink:#F5F6FA; --canvas:#0B0E17; --surface:#141A2C;
+  --line:#262E47; --line-2:#1B2136; --text:#E4E6F0; --muted:#8B90A8; --faint:#6B7293;
+  --good:#34D399; --good-bg:rgba(52,211,153,.16); --good-strong:#0FAE7D;
+  --warn:#FBBF24; --warn-bg:rgba(251,191,36,.16);
+  --bad:#F87171; --bad-bg:rgba(248,113,113,.16);
+  --info:#60A5FA; --info-bg:rgba(96,165,250,.16);
+  --m:#7C3AED; --m-soft:rgba(124,58,237,.18); --m-2:#A78BFA; --m-rgb:124,58,237;
+  --stage-teal:#2DD4BF; --stage-teal-bg:rgba(45,212,191,.16);
+  --stage-indigo:#A5B4FC; --stage-indigo-bg:rgba(165,180,252,.16);
+  --source-orange:#FB923C; --source-orange-bg:rgba(251,146,60,.16);
+  --shadow:0 1px 1px rgba(0,0,0,.3), 0 10px 30px -14px rgba(0,0,0,.65);
+  --scrim:rgba(3,5,14,.72);
+  color-scheme:dark;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth}
@@ -28,7 +83,7 @@ svg.i18{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.6;st
 .rail.collapsed{width:68px}
 .brand{display:flex;align-items:center;gap:10px;padding:19px 18px 15px;border-bottom:1px solid var(--line)}
 .rail.collapsed .brand{justify-content:center;padding:19px 0 15px}
-.brand .logo{width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,var(--m),#10B981);display:grid;place-items:center;color:#fff;font-family:var(--display);font-weight:700;font-size:14px;flex:none}
+.brand .logo{width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,var(--m),var(--m-2));display:grid;place-items:center;color:#fff;font-family:var(--display);font-weight:700;font-size:14px;flex:none}
 .brand b{font-family:var(--display);font-weight:700;font-size:15px;color:var(--ink);letter-spacing:-.2px}
 .brand small{display:block;color:var(--muted);font-size:11px;font-weight:400}
 .rail-scroll{overflow-y:auto;flex:1;padding:10px 10px 24px}
@@ -37,7 +92,7 @@ svg.i18{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.6;st
 .nav-label:first-child{padding-top:4px}
 .mod{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:10px;font-size:13.5px;font-weight:600;color:var(--muted);transition:background .12s,color .12s;position:relative}
 .mod:hover{background:var(--canvas);color:var(--text)}
-.mod .dot{width:24px;height:24px;border-radius:7px;display:grid;place-items:center;flex:none;font-size:13px;color:var(--m);background:rgba(5,150,105,.14)}
+.mod .dot{width:24px;height:24px;border-radius:7px;display:grid;place-items:center;flex:none;font-size:13px;color:var(--m);background:var(--m-soft)}
 .mod.active{background:var(--m-soft);color:var(--ink)}
 .mod.active::before{content:"";position:absolute;left:-10px;top:8px;bottom:8px;width:3px;border-radius:0 3px 3px 0;background:var(--m)}
 .mod .badge-count{margin-left:auto;font-size:10.5px;color:var(--muted);font-weight:700;background:var(--line-2);padding:1px 7px;border-radius:20px}
@@ -67,7 +122,7 @@ svg.i18{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.6;st
 .rail.collapsed .rail-dot{display:block}
 .rail-tooltip{
   position:fixed;transform:translateY(-50%);
-  background:var(--ink);color:#fff;padding:6px 10px;border-radius:8px;font-size:12px;font-weight:600;white-space:nowrap;
+  background:var(--chip-ink);color:#fff;padding:6px 10px;border-radius:8px;font-size:12px;font-weight:600;white-space:nowrap;
   pointer-events:none;z-index:200;box-shadow:0 8px 20px -8px rgba(0,0,0,.5);
 }
 
@@ -97,7 +152,7 @@ svg.i18{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.6;st
 .icon-btn .badge{position:absolute;top:7px;right:8px;width:6px;height:6px;border-radius:50%;background:var(--bad);border:2px solid var(--surface)}
 .icon-btn.sm{width:28px;height:28px;border-radius:8px;border:1px solid var(--line);background:var(--surface)}
 .contact-row-actions{display:flex;align-items:center;gap:6px}
-.avatar{width:34px;height:34px;border-radius:10px;background:var(--ink);color:#fff;display:grid;place-items:center;font-family:var(--display);font-weight:700;font-size:12px;margin-left:4px}
+.avatar{width:34px;height:34px;border-radius:10px;background:var(--chip-ink);color:#fff;display:grid;place-items:center;font-family:var(--display);font-weight:700;font-size:12px;margin-left:4px}
 .mobile-toggle{display:none}
 
 /* ---------- Page ---------- */
@@ -151,7 +206,7 @@ td{padding:13px 21px;border-bottom:1px solid var(--line-2);color:var(--text)}
 tr:last-child td{border-bottom:none}
 tbody tr{cursor:default}
 tbody tr.clickable{cursor:pointer}
-tbody tr.clickable:hover{background:#FBFBFC}
+tbody tr.clickable:hover{background:var(--line-2)}
 .who{display:flex;align-items:center;gap:10px}
 .who .av{width:31px;height:31px;border-radius:9px;background:var(--m-soft);color:var(--m);display:grid;place-items:center;font-weight:700;font-size:12px;font-family:var(--display);flex:none}
 .who small{display:block;color:var(--muted);font-size:11.5px;margin-top:1px}
@@ -265,7 +320,7 @@ tbody tr.clickable:hover{background:#FBFBFC}
 .crm-grid{display:grid;grid-template-columns:1.5fr 1fr;gap:16px;align-items:start}
 .lead-row{display:flex;align-items:center;gap:12px;padding:13px 16px;border-bottom:1px solid var(--line-2);cursor:pointer;transition:background .1s}
 .lead-row:last-child{border-bottom:none}
-.lead-row:hover{background:#FBFBFD}
+.lead-row:hover{background:var(--line-2)}
 .lead-row.sel{background:var(--m-soft)}
 .lead-row .av{width:36px;height:36px;border-radius:10px;background:var(--m-soft);color:var(--m);display:grid;place-items:center;font-family:var(--display);font-weight:700;font-size:13px;flex:none}
 .lead-row .main{flex:1;min-width:0}
@@ -324,7 +379,7 @@ tbody tr.clickable:hover{background:#FBFBFC}
 .notes-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
 .note{border:1px solid var(--line);border-radius:15px;padding:16px;background:var(--surface);display:flex;flex-direction:column;gap:10px}
 .note.clickable{cursor:pointer;transition:border-color .12s,box-shadow .12s}
-.note.clickable:hover{border-color:var(--m);box-shadow:0 6px 16px -10px rgba(5,150,105,.35)}
+.note.clickable:hover{border-color:var(--m);box-shadow:0 6px 16px -10px rgba(var(--m-rgb),.35)}
 .note .txt{font-size:13px;color:var(--text);line-height:1.55;flex:1}
 .note .foot{display:flex;align-items:center;gap:9px;padding-top:10px;border-top:1px solid var(--line-2)}
 .note .foot small{color:var(--muted);font-size:11.5px}
@@ -347,7 +402,7 @@ tbody tr.clickable:hover{background:#FBFBFC}
 .search-group h4{font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px;display:flex;align-items:center;gap:8px}
 .search-group h4 .cnt{color:var(--faint);font-weight:600;text-transform:none;letter-spacing:0}
 .result{display:flex;align-items:center;gap:13px;padding:12px 16px;border:1px solid var(--line);border-radius:13px;margin-bottom:8px;background:var(--surface)}
-.result mark{background:#FDF3C4;color:inherit;border-radius:3px;padding:0 1px}
+.result mark{background:var(--mark-bg);color:var(--mark-fg);border-radius:3px;padding:0 1px}
 .result .ic{width:34px;height:34px;border-radius:10px;background:var(--m-soft);color:var(--m);display:grid;place-items:center;flex:none}
 .result .body{flex:1;min-width:0}
 .result .body b{font-size:13px}
@@ -356,7 +411,7 @@ tbody tr.clickable:hover{background:#FBFBFC}
 @media(max-width:1080px){.cols{grid-template-columns:1fr}.crm-grid{grid-template-columns:1fr}.stat-row{grid-template-columns:repeat(2,1fr)}.tiles{grid-template-columns:1fr 1fr}.notes-grid{grid-template-columns:1fr 1fr}.kanban{grid-template-columns:repeat(3,1fr)}}
 @media(max-width:720px){
   .rail{position:fixed;left:0;top:0;z-index:60;width:250px;transform:translateX(-100%);transition:transform .22s}
-  .rail.show{transform:none;box-shadow:0 0 0 100vmax rgba(0,0,0,.4)}
+  .rail.show{transform:none;box-shadow:0 0 0 100vmax var(--scrim)}
   /* Mobile always shows the full drawer regardless of the desktop collapse preference. */
   .rail.collapsed{width:250px}
   .rail.collapsed .brand{justify-content:flex-start;padding:19px 18px 15px}
@@ -378,7 +433,7 @@ tbody tr.clickable:hover{background:#FBFBFC}
    ============================================================ */
 
 /* Modal */
-.modal-overlay{position:fixed;inset:0;background:rgba(10,10,12,.42);display:flex;align-items:flex-start;justify-content:center;padding:5vh 16px;z-index:100;overflow-y:auto}
+.modal-overlay{position:fixed;inset:0;background:var(--scrim);display:flex;align-items:flex-start;justify-content:center;padding:5vh 16px;z-index:100;overflow-y:auto}
 .modal{background:var(--surface);border-radius:var(--radius);box-shadow:0 24px 60px -20px rgba(10,10,12,.35);width:100%;max-width:560px;max-height:90vh;display:flex;flex-direction:column;animation:modalIn .16s ease-out}
 @keyframes modalIn{from{opacity:0;transform:translateY(8px) scale(.98)}to{opacity:1;transform:none}}
 .modal-head{display:flex;align-items:center;gap:12px;padding:20px 22px;border-bottom:1px solid var(--line)}
@@ -395,7 +450,7 @@ tbody tr.clickable:hover{background:#FBFBFC}
 .field input,.field select,.field textarea{
   font-family:inherit;font-size:13.5px;color:var(--text);background:var(--surface);
   border:1px solid var(--line);border-radius:10px;padding:10px 12px;outline:none;
-  transition:border-color .12s,box-shadow .12s;width:100%;
+  transition:border-color .12s,box-shadow .12s;width:100%;accent-color:var(--m);
 }
 .field input:focus,.field select:focus,.field textarea:focus{border-color:var(--m);box-shadow:0 0 0 3px var(--m-soft)}
 .field textarea{resize:vertical;min-height:80px;font-family:inherit}
@@ -416,12 +471,12 @@ tbody tr.clickable:hover{background:#FBFBFC}
 .fd-trigger.active{border-color:var(--m);color:var(--m);background:var(--m-soft)}
 .fd-count{display:inline-flex;align-items:center;justify-content:center;min-width:17px;height:17px;padding:0 4px;border-radius:20px;background:var(--m);color:#fff;font-size:10.5px;font-weight:700}
 .fd-panel{position:absolute;top:calc(100% + 6px);left:0;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-sm);box-shadow:0 20px 48px -16px rgba(10,10,12,.28);width:220px;z-index:50;padding:8px}
-.fd-search{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:12.5px;font-family:inherit;outline:none;margin-bottom:6px}
+.fd-search{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:12.5px;font-family:inherit;outline:none;margin-bottom:6px;background:var(--surface);color:var(--text)}
 .fd-search:focus{border-color:var(--m)}
 .fd-options{max-height:220px;overflow-y:auto;display:flex;flex-direction:column}
 .fd-opt{display:flex;align-items:center;gap:9px;padding:7px 8px;border-radius:7px;font-size:13px;color:var(--text);cursor:pointer}
 .fd-opt:hover{background:var(--canvas)}
-.fd-opt input{width:auto;margin:0}
+.fd-opt input{width:auto;margin:0;accent-color:var(--m)}
 .fd-empty{padding:10px 8px;font-size:12.5px;color:var(--faint)}
 .fd-clear{width:100%;text-align:left;margin-top:4px;padding:7px 8px;border-top:1px solid var(--line-2);font-size:12px;font-weight:600;color:var(--muted)}
 .fd-clear:hover{color:var(--bad)}
@@ -438,7 +493,7 @@ tbody tr.clickable:hover{background:#FBFBFC}
 .fd-presets button:hover{border-color:var(--m);color:var(--m)}
 .fd-date-row{display:flex;gap:8px;margin-bottom:4px}
 .fd-date-row label{flex:1;display:flex;flex-direction:column;gap:4px;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.3px}
-.fd-date-row input{font-family:inherit;font-size:12.5px;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:7px 8px;outline:none;width:100%}
+.fd-date-row input{font-family:inherit;font-size:12.5px;color:var(--text);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:7px 8px;outline:none;width:100%;color-scheme:inherit}
 .fd-date-row input:focus{border-color:var(--m)}
 
 /* Active filter chips (below the header, mirrors the filter popover state) */
@@ -474,7 +529,7 @@ tbody tr.clickable:hover{background:#FBFBFC}
 
 /* Toast / inline feedback */
 .toast-stack{position:fixed;bottom:20px;right:20px;z-index:200;display:flex;flex-direction:column;gap:8px;max-width:340px}
-.toast{background:var(--ink);color:#fff;padding:12px 16px;border-radius:12px;font-size:13px;display:flex;align-items:center;gap:10px;box-shadow:0 12px 30px -10px rgba(10,10,12,.4);animation:toastIn .15s ease-out}
+.toast{background:var(--chip-ink);color:#fff;padding:12px 16px;border-radius:12px;font-size:13px;display:flex;align-items:center;gap:10px;box-shadow:0 12px 30px -10px rgba(10,10,12,.4);animation:toastIn .15s ease-out}
 @keyframes toastIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 .toast .ic{color:var(--m);flex:none}
 @media(max-width:640px){.toast-stack{left:16px;right:16px;bottom:16px;max-width:none}}
