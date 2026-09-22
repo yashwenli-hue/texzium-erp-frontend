@@ -7,16 +7,35 @@ import { PAGE_META } from "../../lib/pageMeta";
 import { useLiveCounts } from "../../lib/hooks/useLiveCounts";
 import { UserMenu } from "./UserMenu";
 
-function crumbFor(pathname: string): string {
+const DETAIL_LABELS: Record<string, string> = {
+  leads: "Lead Details",
+  opportunities: "Opportunity Details",
+  quotations: "Quotation Details",
+  "proforma-invoices": "Proforma Invoice Details",
+  "sales-orders": "Sales Order Details",
+  "sales-invoices": "Sales Invoice Details",
+  customers: "Customer Details",
+};
+
+interface Crumb {
+  label: string;
+  href?: string;
+}
+
+// A detail route (e.g. /leads/abc123) now shows its parent list page as a
+// clickable middle segment — "RevenueOS / Leads / Lead Details" — instead
+// of jumping straight from "RevenueOS" to "Lead Details" with no trail back
+// to the list. Top-level routes are unchanged (two segments, as before).
+function crumbTrail(pathname: string): Crumb[] {
   const seg = pathname.split("/").filter(Boolean);
-  if (seg[0] === "leads" && seg[1]) return "Lead Details";
-  if (seg[0] === "opportunities" && seg[1]) return "Opportunity Details";
-  if (seg[0] === "quotations" && seg[1]) return "Quotation Details";
-  if (seg[0] === "proforma-invoices" && seg[1]) return "Proforma Invoice Details";
-  if (seg[0] === "sales-orders" && seg[1]) return "Sales Order Details";
-  if (seg[0] === "sales-invoices" && seg[1]) return "Sales Invoice Details";
-  if (seg[0] === "customers" && seg[1]) return "Customer Details";
-  return PAGE_META[seg[0]]?.title ?? "Dashboard";
+  const detailLabel = seg[0] && seg[1] ? DETAIL_LABELS[seg[0]] : undefined;
+  if (detailLabel) {
+    return [
+      { label: PAGE_META[seg[0]]?.title ?? seg[0], href: `/${seg[0]}` },
+      { label: detailLabel },
+    ];
+  }
+  return [{ label: PAGE_META[seg[0]]?.title ?? "Dashboard" }];
 }
 
 export function Topbar({ onMenuClick }: { onMenuClick: () => void }) {
@@ -24,6 +43,7 @@ export function Topbar({ onMenuClick }: { onMenuClick: () => void }) {
   const pathname = usePathname() ?? "/dashboard";
   const counts = useLiveCounts();
   const [term, setTerm] = useState("");
+  const trail = crumbTrail(pathname);
 
   function submitSearch(e: KeyboardEvent<HTMLInputElement>) {
     if (e.key === "Enter" && term.trim()) {
@@ -38,8 +58,23 @@ export function Topbar({ onMenuClick }: { onMenuClick: () => void }) {
       </button>
       <div className="crumb">
         <span>RevenueOS</span>
-        <span className="sep">/</span>
-        <b>{crumbFor(pathname)}</b>
+        {trail.map((c, i) => (
+          <span key={i} style={{ display: "contents" }}>
+            <span className="sep">/</span>
+            {c.href ? (
+              <span
+                onClick={() => router.push(c.href!)}
+                style={{ cursor: "pointer" }}
+                onMouseEnter={(e) => (e.currentTarget.style.color = "var(--text)")}
+                onMouseLeave={(e) => (e.currentTarget.style.color = "")}
+              >
+                {c.label}
+              </span>
+            ) : (
+              <b>{c.label}</b>
+            )}
+          </span>
+        ))}
       </div>
       <div className="search">
         <Icon name="search" size={16} />

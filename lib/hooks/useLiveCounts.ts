@@ -13,9 +13,10 @@ import { useRepository } from "../repository/RepositoryProvider";
  * subscription to reflect mutations made on whatever page is currently
  * active without a manual refetch trigger.
  *
- * Leads, Opportunities, Quotations, Customers, and (since Milestone 1B)
- * Notifications all go through the repository instead of the mock `db`
- * directly, so each reflects real backend counts in connected mode —
+ * Leads, Opportunities, Quotations, Proforma Invoices, Sales Orders, Sales
+ * Invoices, Customers, and (since Milestone 1B) Notifications all go through
+ * the repository instead of the mock `db` directly, so each reflects real
+ * backend counts in connected mode —
  * refetched on every route change (there's no live push/subscription
  * mechanism against a plain REST backend, so this is "accurate as of your
  * last navigation", not millisecond-live). In mock mode Notifications keeps
@@ -35,6 +36,9 @@ export function useLiveCounts() {
   const [leadsCount, setLeadsCount] = useState(0);
   const [opportunitiesCount, setOpportunitiesCount] = useState(0);
   const [quotationsCount, setQuotationsCount] = useState(0);
+  const [proformaInvoicesCount, setProformaInvoicesCount] = useState(0);
+  const [salesOrdersCount, setSalesOrdersCount] = useState(0);
+  const [salesInvoicesCount, setSalesInvoicesCount] = useState(0);
   const [customersCount, setCustomersCount] = useState(0);
   const [realUnreadNotificationsCount, setRealUnreadNotificationsCount] = useState(0);
 
@@ -48,6 +52,15 @@ export function useLiveCounts() {
     });
     repo.quotations.list().then((page) => {
       if (!cancelled) setQuotationsCount(page.total);
+    });
+    repo.proformaInvoices.list().then((page) => {
+      if (!cancelled) setProformaInvoicesCount(page.total);
+    });
+    repo.salesOrders.list().then((page) => {
+      if (!cancelled) setSalesOrdersCount(page.total);
+    });
+    repo.salesInvoices.list().then((page) => {
+      if (!cancelled) setSalesInvoicesCount(page.total);
     });
     repo.customers.list().then((page) => {
       if (!cancelled) setCustomersCount(page.total);
@@ -83,6 +96,9 @@ export function useLiveCounts() {
       repo.kind === "real" ? realUnreadNotificationsCount : mockNotifications.filter((n) => n.unread).length,
     opportunitiesCount,
     quotationsCount,
+    proformaInvoicesCount,
+    salesOrdersCount,
+    salesInvoicesCount,
     customersCount,
     contactsCount: contacts.length,
     notesCount: notes.length,

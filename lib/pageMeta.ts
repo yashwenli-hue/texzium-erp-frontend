@@ -2,7 +2,18 @@ export interface NavItem {
   href: string;
   label: string;
   icon: string;
-  countKey?: "leadsCount" | "openTasksCount" | "unreadNotificationsCount" | "opportunitiesCount" | "quotationsCount" | "customersCount" | "contactsCount" | "notesCount";
+  countKey?:
+    | "leadsCount"
+    | "openTasksCount"
+    | "unreadNotificationsCount"
+    | "opportunitiesCount"
+    | "quotationsCount"
+    | "proformaInvoicesCount"
+    | "salesOrdersCount"
+    | "salesInvoicesCount"
+    | "customersCount"
+    | "contactsCount"
+    | "notesCount";
 }
 
 export interface NavSection {
@@ -35,9 +46,9 @@ export const NAV_SECTIONS: NavSection[] = [
     label: "Quote to Cash",
     items: [
       { href: "/quotations", label: "Quotations", icon: "file", countKey: "quotationsCount" },
-      { href: "/proforma-invoices", label: "Proforma Invoices", icon: "receipt" },
-      { href: "/sales-orders", label: "Sales Orders", icon: "cart" },
-      { href: "/sales-invoices", label: "Sales Invoices", icon: "file" },
+      { href: "/proforma-invoices", label: "Proforma Invoices", icon: "receipt", countKey: "proformaInvoicesCount" },
+      { href: "/sales-orders", label: "Sales Orders", icon: "cart", countKey: "salesOrdersCount" },
+      { href: "/sales-invoices", label: "Sales Invoices", icon: "file", countKey: "salesInvoicesCount" },
       { href: "/payments", label: "Payments", icon: "cash" },
     ],
   },
