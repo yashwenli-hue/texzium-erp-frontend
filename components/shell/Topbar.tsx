@@ -44,7 +44,7 @@ export function Topbar({ onMenuClick }: { onMenuClick: () => void }) {
       <div className="search">
         <Icon name="search" size={16} />
         <input
-          placeholder="Search leads, customers, quotations…"
+          placeholder="Search leads, customers, quotations, orders, invoices…"
           value={term}
           onChange={(e) => setTerm(e.target.value)}
           onKeyDown={submitSearch}

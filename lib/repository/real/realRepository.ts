@@ -47,6 +47,7 @@ export function createRealRepository(): RevenueOSRepository {
   const customers = new RealCustomerRepository();
   const opportunities = new RealOpportunityRepository(users);
   const quotations = new RealQuotationRepository(opportunities);
+  const proformaInvoices = new RealProformaInvoiceRepository(quotations);
   const salesOrders = new RealSalesOrderRepository(quotations);
   const salesInvoices = new RealSalesInvoiceRepository(salesOrders);
   return {
@@ -57,7 +58,7 @@ export function createRealRepository(): RevenueOSRepository {
     users,
     opportunities,
     quotations,
-    proformaInvoices: new RealProformaInvoiceRepository(quotations),
+    proformaInvoices,
     salesOrders,
     salesInvoices,
     dispatchOrders: new RealDispatchOrderRepository(),
@@ -77,6 +78,6 @@ export function createRealRepository(): RevenueOSRepository {
     tasks: new MockTaskRepository(),
     notes: new MockNoteRepository(),
     notifications: new RealNotificationRepository(),
-    search: new RealSearchRepository(leads, customers, quotations, opportunities, salesOrders, salesInvoices),
+    search: new RealSearchRepository(leads, customers, quotations, opportunities, proformaInvoices, salesOrders, salesInvoices),
   };
 }

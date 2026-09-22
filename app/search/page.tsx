@@ -4,7 +4,7 @@ import { useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { PageHeader, DesignNote } from "../../components/ui/PageHeader";
 import { Icon } from "../../components/ui/Icon";
-import { QuotationStatusTag, SalesOrderStatusTag, SalesInvoiceStatusTag } from "../../components/ui/Tag";
+import { QuotationStatusTag, ProformaInvoiceStatusTag, SalesOrderStatusTag, SalesInvoiceStatusTag } from "../../components/ui/Tag";
 import { useSearch } from "../../lib/hooks/useSearch";
 import { useRepository } from "../../lib/repository/RepositoryProvider";
 import { formatInr } from "../../lib/format";
@@ -40,7 +40,7 @@ function SearchInner() {
       <PageHeader
         eyebrow="RevenueOS · Search"
         title="Search"
-        subtitle="Find any lead, opportunity, quotation, sales order, sales invoice or customer in RevenueOS."
+        subtitle="Find any lead, opportunity, quotation, proforma invoice, sales order, sales invoice or customer in RevenueOS."
       />
 
       <div className="search-hero">
@@ -56,8 +56,8 @@ function SearchInner() {
 
       {!term.trim() && (
         <p style={{ color: "var(--muted)", fontSize: 13.5 }}>
-          Start typing to search across leads, opportunities, quotations, sales orders, sales
-          invoices, customers, contacts and notes.
+          Start typing to search across leads, opportunities, quotations, proforma invoices, sales
+          orders, sales invoices, customers, contacts and notes.
         </p>
       )}
 
@@ -153,6 +153,20 @@ function SearchInner() {
               ))}
             </div>
           )}
+          {results.proformaInvoices.length > 0 && (
+            <div className="search-group">
+              <h4><Icon name="brief" size={14} /> Proforma Invoices <span className="cnt">({results.proformaInvoices.length})</span></h4>
+              {results.proformaInvoices.map((p) => (
+                <div className="result" key={p.id} onClick={() => router.push(`/proforma-invoices/${p.id}`)} style={{ cursor: "pointer" }}>
+                  <div className="ic"><Icon name="brief" size={16} /></div>
+                  <div className="body">
+                    <b>{highlight(p.proformaNumber, term)}</b>
+                    <small>{highlight(p.customerName, term)} · {formatInr(p.totalAmount)} · <ProformaInvoiceStatusTag status={p.status} /></small>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
           {results.salesOrders.length > 0 && (
             <div className="search-group">
               <h4><Icon name="cart" size={14} /> Sales Orders <span className="cnt">({results.salesOrders.length})</span></h4>
@@ -202,7 +216,7 @@ function SearchInner() {
         <b>Design note.</b> Results are grouped by record type with the matching term highlighted and
         update as you type.{" "}
         {repo.kind === "real"
-          ? "Leads, Opportunities, Customers, Quotations, Sales Orders and Sales Invoices search the live connected backend (no dedicated search endpoint exists there, so this combines each entity's own real list). Contacts and Notes have no backend of their own yet and are not searched in connected mode."
+          ? "Leads, Opportunities, Customers, Quotations, Proforma Invoices, Sales Orders and Sales Invoices search the live connected backend (no dedicated search endpoint exists there, so this combines each entity's own real list). Contacts and Notes have no backend of their own yet and are not searched in connected mode."
           : "This searches the current in-memory mock dataset directly, with the same debounce behavior a real API call would need."}
       </DesignNote>
     </div>

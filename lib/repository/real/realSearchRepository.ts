@@ -2,6 +2,7 @@ import {
   ICustomerRepository,
   ILeadRepository,
   IOpportunityRepository,
+  IProformaInvoiceRepository,
   IQuotationRepository,
   ISalesInvoiceRepository,
   ISalesOrderRepository,
@@ -29,6 +30,7 @@ export class RealSearchRepository implements ISearchRepository {
     private customers: ICustomerRepository,
     private quotations: IQuotationRepository,
     private opportunities: IOpportunityRepository,
+    private proformaInvoices: IProformaInvoiceRepository,
     private salesOrders: ISalesOrderRepository,
     private salesInvoices: ISalesInvoiceRepository
   ) {}
@@ -41,6 +43,7 @@ export class RealSearchRepository implements ISearchRepository {
       quotations: [],
       notes: [],
       opportunities: [],
+      proformaInvoices: [],
       salesOrders: [],
       salesInvoices: [],
     };
@@ -50,12 +53,13 @@ export class RealSearchRepository implements ISearchRepository {
     const matches = (fields: (string | undefined)[]) =>
       fields.some((f) => (f ?? "").toLowerCase().includes(q));
 
-    const [leadsPage, customersPage, quotationsPage, opportunitiesPage, salesOrdersPage, salesInvoicesPage] =
+    const [leadsPage, customersPage, quotationsPage, opportunitiesPage, proformaInvoicesPage, salesOrdersPage, salesInvoicesPage] =
       await Promise.all([
         this.leads.list(),
         this.customers.list(),
         this.quotations.list(),
         this.opportunities.list(),
+        this.proformaInvoices.list(),
         this.salesOrders.list(),
         this.salesInvoices.list(),
       ]);
@@ -67,6 +71,9 @@ export class RealSearchRepository implements ISearchRepository {
       quotations: quotationsPage.items.filter((q2) => matches([q2.quoteNo, q2.customerName, q2.opportunityName])),
       notes: [],
       opportunities: opportunitiesPage.items.filter((o) => matches([o.title, o.customerName])),
+      proformaInvoices: proformaInvoicesPage.items.filter((p) =>
+        matches([p.proformaNumber, p.customerName, p.quoteNo])
+      ),
       salesOrders: salesOrdersPage.items.filter((so) =>
         matches([so.salesOrderCode, so.customerName, so.quoteNo, so.proformaNumber])
       ),

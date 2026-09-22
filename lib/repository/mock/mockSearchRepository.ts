@@ -19,6 +19,7 @@ export class MockSearchRepository implements ISearchRepository {
         quotations: [],
         notes: [],
         opportunities: [],
+        proformaInvoices: [],
         salesOrders: [],
         salesInvoices: [],
       });
@@ -43,6 +44,9 @@ export class MockSearchRepository implements ISearchRepository {
     const opportunities = db.opportunities.getAll().filter((o) =>
       [o.title, o.customerName].some((f) => f.toLowerCase().includes(q))
     );
+    const proformaInvoices = db.proformaInvoices.getAll().filter((p) =>
+      [p.proformaNumber, p.customerName, p.quoteNo].some((f) => f.toLowerCase().includes(q))
+    );
     const salesOrders = db.salesOrders.getAll().filter((so) =>
       [so.salesOrderCode, so.customerName, so.quoteNo ?? "", so.proformaNumber ?? ""].some((f) =>
         f.toLowerCase().includes(q)
@@ -53,6 +57,16 @@ export class MockSearchRepository implements ISearchRepository {
         f.toLowerCase().includes(q)
       )
     );
-    return delay({ leads, customers, contacts, quotations, notes, opportunities, salesOrders, salesInvoices });
+    return delay({
+      leads,
+      customers,
+      contacts,
+      quotations,
+      notes,
+      opportunities,
+      proformaInvoices,
+      salesOrders,
+      salesInvoices,
+    });
   }
 }

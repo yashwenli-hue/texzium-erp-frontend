@@ -454,14 +454,16 @@ export interface SearchResults {
   quotations: Quotation[];
   notes: Note[];
   opportunities: Opportunity[];
+  proformaInvoices: ProformaInvoice[];
   salesOrders: SalesOrder[];
   salesInvoices: SalesInvoice[];
 }
 
 // The real implementation aggregates already-real list() calls across the
 // entities RevenueOS itself owns (Leads, Customers, Quotations,
-// Opportunities, Sales Orders, Sales Invoices) — no dedicated backend search
-// endpoint exists (confirmed: nothing resembling a search controller/route
+// Opportunities, Proforma Invoices, Sales Orders, Sales Invoices) — no
+// dedicated backend search endpoint exists (confirmed: nothing resembling a
+// search controller/route
 // anywhere in the backend). Contacts and Notes have no backend counterpart
 // at all, so the real repository always returns them empty rather than
 // silently backing them with mock/fixture data.

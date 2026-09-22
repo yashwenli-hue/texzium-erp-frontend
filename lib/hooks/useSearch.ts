@@ -18,6 +18,7 @@ const EMPTY_RESULTS: SearchResults = {
   quotations: [],
   notes: [],
   opportunities: [],
+  proformaInvoices: [],
   salesOrders: [],
   salesInvoices: [],
 };
@@ -67,6 +68,7 @@ export function useSearch() {
     results.quotations.length +
     results.notes.length +
     results.opportunities.length +
+    results.proformaInvoices.length +
     results.salesOrders.length +
     results.salesInvoices.length;
 
