@@ -147,27 +147,27 @@ export function AccountsReceivableStatusTag({ status }: { status: string }) {
 // alongside it so nothing depends on color alone.
 // Theme-aware token references, not literal hex — this map is also passed
 // as KanbanBoard's colorMap for the Lead Pipeline board (app/pipeline/page.tsx),
-// so it paints full column backgrounds, not just this badge. Each stage
-// reuses the existing semantic token family it's genuinely closest to in
-// meaning (new/informational=info, qualified/won=good, proposal=warn,
-// lost=bad) plus two dedicated extra hue tokens (--stage-teal, --stage-indigo)
-// for the two stages that don't map onto an existing semantic meaning, and
-// the brand accent (--m) for Negotiation specifically — a single,
-// deliberate, restrained use of purple among many statuses, not a
-// blanket "every badge is purple" treatment. Light-mode token values are
-// set to match this map's previous literal hex exactly (see globals.css),
-// so light mode is visually unchanged.
+// so it paints full column backgrounds, not just this badge. ASSIGNED/
+// CONTACTED/PRE_SALES_ASSIGNED and REJECTED reuse the shared --stage-teal/
+// --stage-indigo hue tokens (their light values were already an exact
+// match for this map's original hex). NEW/QUALIFIED/SALES_ASSIGNED/
+// PROPOSAL_SENT/NEGOTIATION/WON/LOST use dedicated --lead-* tokens instead
+// of the shared --info/--good/--warn/--bad/--m tokens, since those shared
+// tokens' light-mode values don't equal this map's original per-status hex
+// (see app/globals.css's "Version A light-theme restoration" block) — each
+// --lead-* token carries its own exact original light hex while keeping
+// today's already-shipped dark-v1/dark-v2 appearance unchanged.
 export const LEAD_STATUS_STYLE: Record<LeadStatus, { bg: string; fg: string }> = {
-  NEW: { bg: "var(--info-bg)", fg: "var(--info)" },
+  NEW: { bg: "var(--lead-new-bg)", fg: "var(--lead-new-fg)" },
   ASSIGNED: { bg: "var(--stage-teal-bg)", fg: "var(--stage-teal)" },
   CONTACTED: { bg: "var(--stage-teal-bg)", fg: "var(--stage-teal)" },
   PRE_SALES_ASSIGNED: { bg: "var(--stage-teal-bg)", fg: "var(--stage-teal)" },
-  QUALIFIED: { bg: "var(--good-bg)", fg: "var(--good)" },
-  SALES_ASSIGNED: { bg: "var(--good-bg)", fg: "var(--good)" },
-  PROPOSAL_SENT: { bg: "var(--warn-bg)", fg: "var(--warn)" },
-  NEGOTIATION: { bg: "var(--m-soft)", fg: "var(--m)" },
-  WON: { bg: "var(--good-bg)", fg: "var(--good)" },
-  LOST: { bg: "var(--bad-bg)", fg: "var(--bad)" },
+  QUALIFIED: { bg: "var(--lead-good-bg)", fg: "var(--lead-good-fg)" },
+  SALES_ASSIGNED: { bg: "var(--lead-good-bg)", fg: "var(--lead-good-fg)" },
+  PROPOSAL_SENT: { bg: "var(--lead-proposal-bg)", fg: "var(--lead-proposal-fg)" },
+  NEGOTIATION: { bg: "var(--lead-negotiation-bg)", fg: "var(--lead-negotiation-fg)" },
+  WON: { bg: "var(--lead-good-bg)", fg: "var(--lead-good-fg)" },
+  LOST: { bg: "var(--lead-lost-bg)", fg: "var(--lead-lost-fg)" },
   REJECTED: { bg: "var(--stage-indigo-bg)", fg: "var(--stage-indigo)" },
 };
 

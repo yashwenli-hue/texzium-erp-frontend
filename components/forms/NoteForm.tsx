@@ -111,7 +111,7 @@ export function NoteForm({
         </FieldRow>
       )}
       <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, marginTop: 4 }}>
-        <input type="checkbox" checked={pinned} onChange={(e) => setPinned(e.target.checked)} style={{ width: "auto", accentColor: "var(--m)" }} />
+        <input type="checkbox" checked={pinned} onChange={(e) => setPinned(e.target.checked)} style={{ width: "auto", accentColor: "var(--control-accent)" }} />
         Pin this note
       </label>
       {errors.form && <p style={{ color: "var(--bad)", fontSize: 12.5 }}>{errors.form}</p>}

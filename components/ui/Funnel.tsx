@@ -5,9 +5,13 @@ const FUNNEL_LABELS = ["New", "Contacted", "Qualified"];
 // Theme-aware token references — a light→deep progression through the same
 // green/"good" family used for success elsewhere (not the brand purple;
 // this ramp represents lead progression, not a highlighted/active state).
+// Stops 1 and 2 use dedicated --funnel-* tokens instead of --good-bg/--good
+// directly, since those shared tokens' light-mode values don't equal this
+// ramp's original hex (see app/globals.css's "Version A light-theme
+// restoration" block); stop 3's --good-strong was already an exact match.
 const RAMP: { shade: string; txt: string }[] = [
-  { shade: "var(--good-bg)", txt: "var(--good)" },
-  { shade: "var(--good)", txt: "#fff" },
+  { shade: "var(--funnel-1-bg)", txt: "var(--funnel-1-fg)" },
+  { shade: "var(--funnel-2-bg)", txt: "#fff" },
   { shade: "var(--good-strong)", txt: "#fff" },
 ];
 

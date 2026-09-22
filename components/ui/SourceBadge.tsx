@@ -21,18 +21,21 @@
 // Theme-aware token references, not literal hex (these are presentation
 // tints, not literal third-party brand colors — the genuine brand hex for
 // Google/Meta live only in their SVG glyphs below, left untouched).
-// Website reuses the shared neutral fallback tokens; the rest map onto the
-// nearest semantic family (WhatsApp=good/green, IndiaMART=bad/red,
-// Google=warn/amber) or the two extra hue tokens also used by
-// LEAD_STATUS_STYLE (--source-orange for TradeIndia, --stage-indigo for
-// ExporterIndia's violet) rather than the brand accent (--m), so a lead
-// source badge is never mistaken for a highlighted/active state.
+// TradeIndia/ExporterIndia reuse the shared --source-orange/--stage-indigo
+// hue tokens (their light values were already an exact match for this
+// map's original hex). The rest use dedicated --src-* tokens instead of
+// the shared --line-2/--muted/--info/--warn/--good/--bad tokens, since
+// those shared tokens' light-mode values don't equal this map's original
+// per-source hex (see app/globals.css's "Version A light-theme
+// restoration" block) — each --src-* token carries its own exact original
+// light hex while keeping today's already-shipped dark-v1/dark-v2
+// appearance unchanged.
 const SOURCE_STYLES: Record<string, { bg: string; fg: string; mark: string }> = {
-  Website: { bg: "var(--line-2)", fg: "var(--muted)", mark: "W" },
-  "Meta Ads": { bg: "var(--info-bg)", fg: "var(--info)", mark: "M" },
-  "Google Ads": { bg: "var(--warn-bg)", fg: "var(--warn)", mark: "G" },
-  WhatsApp: { bg: "var(--good-bg)", fg: "var(--good)", mark: "wa" },
-  IndiaMART: { bg: "var(--bad-bg)", fg: "var(--bad)", mark: "iM" },
+  Website: { bg: "var(--src-website-bg)", fg: "var(--src-website-fg)", mark: "W" },
+  "Meta Ads": { bg: "var(--src-meta-bg)", fg: "var(--src-meta-fg)", mark: "M" },
+  "Google Ads": { bg: "var(--src-google-bg)", fg: "var(--src-google-fg)", mark: "G" },
+  WhatsApp: { bg: "var(--src-whatsapp-bg)", fg: "var(--src-whatsapp-fg)", mark: "wa" },
+  IndiaMART: { bg: "var(--src-indiamart-bg)", fg: "var(--src-indiamart-fg)", mark: "iM" },
   TradeIndia: { bg: "var(--source-orange-bg)", fg: "var(--source-orange)", mark: "T" },
   ExporterIndia: { bg: "var(--stage-indigo-bg)", fg: "var(--stage-indigo)", mark: "E" },
 };
