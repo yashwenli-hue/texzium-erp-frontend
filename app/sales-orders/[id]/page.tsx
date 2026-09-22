@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Icon } from "../../../components/ui/Icon";
 import { Panel } from "../../../components/ui/Card";
-import { SalesOrderStatusTag, SalesInvoiceStatusTag, Tag } from "../../../components/ui/Tag";
+import { SalesOrderStatusTag, SalesInvoiceStatusTag, DispatchOrderStatusTag, Tag } from "../../../components/ui/Tag";
 import { Button, EmptyState } from "../../../components/ui/Button";
 import { DataTable, Column } from "../../../components/ui/DataTable";
 import { DesignNote } from "../../../components/ui/PageHeader";
@@ -93,6 +93,10 @@ export default function SalesOrderDetailPage() {
   // so this only ever offers a Dispatch Order that's both DISPATCHED and
   // genuinely linked to this Sales Order. See the Stage 2F report.
   const matchingDispatchedOrders = dispatchOrders.filter((d) => d.salesOrderId === salesOrder.id && d.status === "DISPATCHED");
+  // Read-only OperationsOS visibility — every Dispatch Order linked to this
+  // Sales Order, regardless of status, not just the DISPATCHED ones used to
+  // gate invoice creation above. No create/pack/dispatch action exists here.
+  const linkedDispatchOrders = dispatchOrders.filter((d) => d.salesOrderId === salesOrder.id);
   const canCreateInvoice = salesOrder.status === "READY_FOR_INVOICING" && matchingDispatchedOrders.length > 0;
   const relatedInvoices = salesInvoices.filter((i) => i.salesOrderId === salesOrder.id);
   const invoiceColumns: Column<SalesInvoice>[] = [
@@ -177,6 +181,22 @@ export default function SalesOrderDetailPage() {
               }
             />
           </Panel>
+          {linkedDispatchOrders.length > 0 && (
+            <Panel title="Dispatch">
+              {linkedDispatchOrders.map((d) => (
+                <div key={d.id} className="info-grid" style={{ padding: 0, marginBottom: 12 }}>
+                  <div className="f"><label>Dispatch Order</label><div>{d.dispatchOrderNo}</div></div>
+                  <div className="f"><label>Status</label><div><DispatchOrderStatusTag status={d.status} /></div></div>
+                  {d.dispatchDate && <div className="f"><label>Dispatch Date</label><div>{formatDate(d.dispatchDate)}</div></div>}
+                  {d.transportName && <div className="f"><label>Transporter</label><div>{d.transportName}</div></div>}
+                  {d.vehicleNumber && <div className="f"><label>Vehicle</label><div>{d.vehicleNumber}</div></div>}
+                  {d.lrNumber && <div className="f"><label>LR Number</label><div>{d.lrNumber}</div></div>}
+                  {d.destination && <div className="f"><label>Destination</label><div>{d.destination}</div></div>}
+                  {d.expectedDelivery && <div className="f"><label>Expected Delivery</label><div>{formatDate(d.expectedDelivery)}</div></div>}
+                </div>
+              ))}
+            </Panel>
+          )}
           <Panel title="Downstream">
             <p style={{ fontSize: 12.5, color: "var(--muted)" }}>
               There is no verified action to approve, reject, or otherwise move this order through its own

@@ -140,12 +140,18 @@ export interface AssignableUser {
 export interface InventoryItemOption {
   id: ID;
   name: string;
+  /** VERIFIED: GET /inventory already returns these — surfaced read-only to inform item selection. Undefined only if a source (e.g. mock) doesn't model them. */
+  stockQty?: number;
+  availableQty?: number;
 }
 
 export interface GstRegistrationOption {
   id: ID;
   label: string;
   stateCode: string;
+  /** VERIFIED: GET /company-gst and GET /customer-gst already return both — the backend itself does not filter or validate on either at selection time (confirmed by reading quotations.service.ts), so this is surfaced purely to let the picker warn/disable rather than to enforce a rule the backend doesn't. */
+  isActive: boolean;
+  isDefault: boolean;
 }
 
 // VERIFIED CreateLeadDto: leadCode?, customerName, companyName?, email?,
@@ -547,6 +553,21 @@ export interface DispatchOrderOption {
   status: string;
   salesOrderId?: ID;
   dispatchDate?: string | null;
+  /** VERIFIED: GET /dispatch-orders already returns these logistics fields — surfaced read-only, never editable here (no Dispatch Order management UI exists, only visibility). Frequently null on real records that haven't reached that stage of logistics prep yet. */
+  transportName?: string | null;
+  vehicleNumber?: string | null;
+  driverName?: string | null;
+  lrNumber?: string | null;
+  destination?: string | null;
+  expectedDelivery?: string | null;
+}
+
+// DispatchOrder.status is an open-ended OperationsOS-owned backend string —
+// only LOGISTICS_PREPARING and DISPATCHED are ever offered/observed through
+// this app's own read paths, shown honestly via the neutral fallback tint
+// for anything else rather than styled as if this screen recognizes it.
+export function formatDispatchOrderStatus(status: string): string {
+  return titleCaseFromConstant(status);
 }
 
 // VERIFIED: SalesInvoice.status is a plain backend String (@default("DRAFT")
@@ -591,6 +612,13 @@ export interface SalesInvoice {
   dispatchOrderId?: ID;
   dispatchOrderNo?: string;
   dispatchStatus?: string;
+  /** VERIFIED: GET /sales-invoices already nests these on the linked DispatchOrder — same read-only logistics visibility as DispatchOrderOption, surfaced here so the invoice detail page doesn't need a separate Dispatch Order fetch. */
+  dispatchTransportName?: string | null;
+  dispatchVehicleNumber?: string | null;
+  dispatchDriverName?: string | null;
+  dispatchLrNumber?: string | null;
+  dispatchDestination?: string | null;
+  dispatchExpectedDelivery?: string | null;
   customerName: string;
   ownerName: string;
   invoiceDate: string;

@@ -298,8 +298,32 @@ export const SEED_SALES_ORDERS: SalesOrder[] = [
 // the create action's gating has a real negative case to exercise too.
 // ---------------------------------------------------------------------------
 export const SEED_DISPATCH_ORDERS: DispatchOrderOption[] = [
-  { id: "DO1", dispatchOrderNo: "DO-88031", status: "DISPATCHED", salesOrderId: "SO3", dispatchDate: daysAgo(2) },
-  { id: "DO2", dispatchOrderNo: "DO-88022", status: "DISPATCHED", salesOrderId: "SO4", dispatchDate: daysAgo(5) },
+  {
+    id: "DO1",
+    dispatchOrderNo: "DO-88031",
+    status: "DISPATCHED",
+    salesOrderId: "SO3",
+    dispatchDate: daysAgo(2),
+    transportName: "Shree Cargo Movers",
+    vehicleNumber: "GJ01AB4321",
+    driverName: "Manoj Patel",
+    lrNumber: "LR-99201",
+    destination: "Vadodara",
+    expectedDelivery: daysAgo(0),
+  },
+  {
+    id: "DO2",
+    dispatchOrderNo: "DO-88022",
+    status: "DISPATCHED",
+    salesOrderId: "SO4",
+    dispatchDate: daysAgo(5),
+    transportName: "VRL Logistics",
+    vehicleNumber: "MH12CD8890",
+    driverName: "Suresh Yadav",
+    lrNumber: "LR-99187",
+    destination: "Pune",
+    expectedDelivery: daysAgo(2),
+  },
   { id: "DO3", dispatchOrderNo: "DO-88040", status: "LOGISTICS_PREPARING", salesOrderId: "SO1", dispatchDate: null },
 ];
 
@@ -323,6 +347,12 @@ export const SEED_SALES_INVOICES: SalesInvoice[] = [
     dispatchOrderId: "DO2",
     dispatchOrderNo: "DO-88022",
     dispatchStatus: "DISPATCHED",
+    dispatchTransportName: "VRL Logistics",
+    dispatchVehicleNumber: "MH12CD8890",
+    dispatchDriverName: "Suresh Yadav",
+    dispatchLrNumber: "LR-99187",
+    dispatchDestination: "Pune",
+    dispatchExpectedDelivery: daysAgo(2),
     customerName: "Adani Green",
     ownerName: "Vikram J.",
     invoiceDate: daysAgo(4),

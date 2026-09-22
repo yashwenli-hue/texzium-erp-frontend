@@ -1,4 +1,4 @@
-import { LeadStatus, formatLeadStatus, formatQuotationStatus, formatProformaInvoiceStatus, formatSalesOrderStatus, formatSalesInvoiceStatus, formatAccountsReceivableStatus } from "../../lib/types/domain";
+import { LeadStatus, formatLeadStatus, formatQuotationStatus, formatProformaInvoiceStatus, formatSalesOrderStatus, formatSalesInvoiceStatus, formatAccountsReceivableStatus, formatDispatchOrderStatus } from "../../lib/types/domain";
 
 export type TagColor = "g" | "w" | "b" | "i" | "n";
 
@@ -90,6 +90,18 @@ export const SALES_INVOICE_STATUS_STYLE: Record<string, TagColor> = {
 
 export function SalesInvoiceStatusTag({ status }: { status: string }) {
   return <Tag color={SALES_INVOICE_STATUS_STYLE[status] ?? "n"}>{formatSalesInvoiceStatus(status)}</Tag>;
+}
+
+// DispatchOrder.status is an OperationsOS-owned open-ended string — only
+// LOGISTICS_PREPARING and DISPATCHED are ever observed through this app's
+// own read-only visibility (Sales Order / Sales Invoice detail pages).
+export const DISPATCH_ORDER_STATUS_STYLE: Record<string, TagColor> = {
+  LOGISTICS_PREPARING: "w",
+  DISPATCHED: "g",
+};
+
+export function DispatchOrderStatusTag({ status }: { status: string }) {
+  return <Tag color={DISPATCH_ORDER_STATUS_STYLE[status] ?? "n"}>{formatDispatchOrderStatus(status)}</Tag>;
 }
 
 // SalesInvoice.paymentStatus itself — kept only for completeness/reference.

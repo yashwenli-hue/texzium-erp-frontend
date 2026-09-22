@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Icon } from "../../../components/ui/Icon";
 import { Panel } from "../../../components/ui/Card";
-import { SalesInvoiceStatusTag, AccountsReceivableStatusTag, Tag } from "../../../components/ui/Tag";
+import { SalesInvoiceStatusTag, AccountsReceivableStatusTag, DispatchOrderStatusTag, Tag } from "../../../components/ui/Tag";
 import { Button, EmptyState } from "../../../components/ui/Button";
 import { DataTable, Column } from "../../../components/ui/DataTable";
 import { DesignNote } from "../../../components/ui/PageHeader";
@@ -203,7 +203,24 @@ export default function SalesInvoiceDetailPage() {
             <Panel title="Dispatch">
               <div className="info-grid" style={{ padding: 0 }}>
                 <div className="f"><label>Dispatch Order</label><div>{invoice.dispatchOrderNo}</div></div>
-                {invoice.dispatchStatus && <div className="f"><label>Status</label><div>{invoice.dispatchStatus}</div></div>}
+                {invoice.dispatchStatus && (
+                  <div className="f"><label>Status</label><div><DispatchOrderStatusTag status={invoice.dispatchStatus} /></div></div>
+                )}
+                {invoice.dispatchTransportName && (
+                  <div className="f"><label>Transporter</label><div>{invoice.dispatchTransportName}</div></div>
+                )}
+                {invoice.dispatchVehicleNumber && (
+                  <div className="f"><label>Vehicle</label><div>{invoice.dispatchVehicleNumber}</div></div>
+                )}
+                {invoice.dispatchLrNumber && (
+                  <div className="f"><label>LR Number</label><div>{invoice.dispatchLrNumber}</div></div>
+                )}
+                {invoice.dispatchDestination && (
+                  <div className="f"><label>Destination</label><div>{invoice.dispatchDestination}</div></div>
+                )}
+                {invoice.dispatchExpectedDelivery && (
+                  <div className="f"><label>Expected Delivery</label><div>{formatDate(invoice.dispatchExpectedDelivery)}</div></div>
+                )}
               </div>
             </Panel>
           )}

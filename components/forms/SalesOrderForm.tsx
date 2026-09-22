@@ -50,8 +50,13 @@ export function SalesOrderForm({
   const [submitting, setSubmitting] = useState(false);
 
   const effectiveInventoryItemId = inventoryItemId || inventoryItems[0]?.id || "";
-  const effectiveSellerGstId = sellerGstId || sellerGstOptions[0]?.id || "";
-  const effectiveBuyerGstId = buyerGstId || buyerGstOptions[0]?.id || "";
+  // Prefer an active registration as the default — the backend does not
+  // filter or validate isActive itself, so this is a frontend-only default
+  // preference, not an enforced rule. Same pattern as QuotationForm.
+  const effectiveSellerGstId =
+    sellerGstId || sellerGstOptions.find((g) => g.isActive)?.id || sellerGstOptions[0]?.id || "";
+  const effectiveBuyerGstId =
+    buyerGstId || buyerGstOptions.find((g) => g.isActive)?.id || buyerGstOptions[0]?.id || "";
   const mastersLoading = itemsLoading || sellerGstLoading || buyerGstLoading;
 
   function validate(): boolean {
@@ -117,7 +122,10 @@ export function SalesOrderForm({
         onChange={(e) => setInventoryItemId(e.target.value)}
         error={errors.inventoryItemId}
         disabled={itemsLoading}
-        options={inventoryItems.map((i) => ({ value: i.id, label: i.name }))}
+        options={inventoryItems.map((i) => ({
+          value: i.id,
+          label: i.availableQty !== undefined ? `${i.name} — ${i.availableQty} available` : i.name,
+        }))}
       />
       <SelectField
         label="Seller GST Registration"
@@ -126,7 +134,11 @@ export function SalesOrderForm({
         onChange={(e) => setSellerGstId(e.target.value)}
         error={errors.sellerGstId}
         disabled={sellerGstLoading}
-        options={sellerGstOptions.map((g) => ({ value: g.id, label: g.label }))}
+        options={sellerGstOptions.map((g) => ({
+          value: g.id,
+          label: g.isActive ? g.label : `${g.label} (Inactive)`,
+          disabled: !g.isActive,
+        }))}
       />
       <SelectField
         label="Buyer GST Registration"
@@ -135,8 +147,17 @@ export function SalesOrderForm({
         onChange={(e) => setBuyerGstId(e.target.value)}
         error={errors.buyerGstId}
         disabled={buyerGstLoading}
-        options={buyerGstOptions.map((g) => ({ value: g.id, label: g.label }))}
+        options={buyerGstOptions.map((g) => ({
+          value: g.id,
+          label: g.isActive ? g.label : `${g.label} (Inactive)`,
+          disabled: !g.isActive,
+        }))}
       />
+      {(sellerGstOptions.some((g) => !g.isActive) || buyerGstOptions.some((g) => !g.isActive)) && (
+        <p style={{ fontSize: 11.5, color: "var(--faint)" }}>
+          Inactive GST registrations are shown greyed out and can&apos;t be newly selected.
+        </p>
+      )}
       <TextField
         label="Total Amount (₹)"
         required

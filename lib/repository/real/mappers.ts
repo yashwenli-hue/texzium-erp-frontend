@@ -196,10 +196,17 @@ export interface BackendInventoryItem {
   id: string;
   productName: string;
   sku?: string;
+  stockQty?: number;
+  availableQty?: number;
 }
 
 export function mapInventoryItem(raw: BackendInventoryItem): InventoryItemOption {
-  return { id: raw.id, name: raw.sku ? `${raw.productName} (${raw.sku})` : raw.productName };
+  return {
+    id: raw.id,
+    name: raw.sku ? `${raw.productName} (${raw.sku})` : raw.productName,
+    stockQty: raw.stockQty,
+    availableQty: raw.availableQty,
+  };
 }
 
 export interface BackendGstRegistration {
@@ -208,6 +215,8 @@ export interface BackendGstRegistration {
   legalName: string;
   branchName?: string | null;
   stateCode: string;
+  isDefault: boolean;
+  isActive: boolean;
 }
 
 /** Shared shape/label rule for both GET /company-gst (seller) and GET /customer-gst (buyer) — identically-shaped GST registration records. */
@@ -216,6 +225,8 @@ export function mapGstRegistration(raw: BackendGstRegistration): GstRegistration
     id: raw.id,
     label: raw.branchName ? `${raw.legalName} — ${raw.gstin} (${raw.branchName})` : `${raw.legalName} — ${raw.gstin}`,
     stateCode: raw.stateCode,
+    isActive: raw.isActive,
+    isDefault: raw.isDefault,
   };
 }
 
@@ -384,6 +395,12 @@ export interface BackendDispatchOrder {
   status: string;
   salesOrderId?: string | null;
   dispatchDate?: string | null;
+  transportName?: string | null;
+  vehicleNumber?: string | null;
+  driverName?: string | null;
+  lrNumber?: string | null;
+  destination?: string | null;
+  expectedDelivery?: string | null;
 }
 
 export function mapDispatchOrderOption(raw: BackendDispatchOrder): DispatchOrderOption {
@@ -393,6 +410,12 @@ export function mapDispatchOrderOption(raw: BackendDispatchOrder): DispatchOrder
     status: raw.status,
     salesOrderId: raw.salesOrderId ?? undefined,
     dispatchDate: raw.dispatchDate ?? undefined,
+    transportName: raw.transportName ?? undefined,
+    vehicleNumber: raw.vehicleNumber ?? undefined,
+    driverName: raw.driverName ?? undefined,
+    lrNumber: raw.lrNumber ?? undefined,
+    destination: raw.destination ?? undefined,
+    expectedDelivery: raw.expectedDelivery ?? undefined,
   };
 }
 
@@ -452,6 +475,12 @@ export function mapSalesInvoice(raw: BackendSalesInvoice, salesOrderById: Map<st
       ? raw.dispatchOrder.dispatchOrderNo || `#${raw.dispatchOrder.id.slice(0, 8).toUpperCase()}`
       : undefined,
     dispatchStatus: raw.dispatchOrder?.status,
+    dispatchTransportName: raw.dispatchOrder?.transportName ?? undefined,
+    dispatchVehicleNumber: raw.dispatchOrder?.vehicleNumber ?? undefined,
+    dispatchDriverName: raw.dispatchOrder?.driverName ?? undefined,
+    dispatchLrNumber: raw.dispatchOrder?.lrNumber ?? undefined,
+    dispatchDestination: raw.dispatchOrder?.destination ?? undefined,
+    dispatchExpectedDelivery: raw.dispatchOrder?.expectedDelivery ?? undefined,
     customerName: raw.customerName || so?.customerName || "—",
     ownerName: so?.ownerName ?? "Unassigned",
     invoiceDate: raw.invoiceDate,

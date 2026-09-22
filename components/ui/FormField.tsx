@@ -56,14 +56,14 @@ export function SelectField({
   ...rest
 }: FieldWrapProps &
   React.SelectHTMLAttributes<HTMLSelectElement> & {
-    options: { value: string; label: string }[];
+    options: { value: string; label: string; disabled?: boolean }[];
   }) {
   const { children: _c, ...selectProps } = rest as any;
   return (
     <FieldWrap label={label} required={required} error={error}>
       <select {...selectProps}>
         {options.map((o) => (
-          <option key={o.value} value={o.value}>
+          <option key={o.value} value={o.value} disabled={o.disabled}>
             {o.label}
           </option>
         ))}
