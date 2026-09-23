@@ -61,7 +61,12 @@ export function LeadFunnel({ leads }: { leads: Lead[] }) {
               style={{
                 width: `${pct}%`,
                 background: flagged ? "var(--bad)" : ramp.shade,
-                color: ramp.txt,
+                // Flagged state always renders on the solid --bad fill, so
+                // text must switch to white with it — ramp.txt is tuned for
+                // that stop's own (much paler) normal background and clashes
+                // against --bad otherwise (e.g. stop 1's green text on a red
+                // fill under a dark theme).
+                color: flagged ? "#fff" : ramp.txt,
               }}
             >
               {label}
