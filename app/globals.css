@@ -1,6 +1,21 @@
+/* Version A light theme — surface hierarchy polish (fix/polish-version-a-light-theme):
+   --canvas/--line/--line-2/--row-hover/--lead-row-hover were verified
+   against 8045a6e to be nearly indistinguishable from --surface
+   (canvas-vs-surface contrast measured 1.044:1; row-hover-vs-surface
+   1.034:1 — both far below any perceptible threshold on real displays),
+   making cards barely separate from the page and hover states on white
+   surfaces (.mod, .icon-btn, .page-btn, table rows) read as almost
+   invisible. Values below preserve the exact same neutral cool-gray hue
+   family, just darkened enough to read as clearly-there without adding
+   borders/shadows or any new visual language — same identity, clearer
+   structure. --surface-inset is new (previously undefined in light,
+   silently falling back to --surface via the `var(--surface-inset,
+   var(--surface))` pattern already used by .field input/.fd-search/etc.)
+   so form fields read as a subtle recess instead of blending into their
+   card. No hue, brand color, or typography changed. */
 :root{
-  --ink:#14171D; --canvas:#FAFAFA; --surface:#FFFFFF;
-  --line:#EEEFF1; --line-2:#F5F5F6; --text:#1A1C20; --muted:#767A80; --faint:#B0B4BA;
+  --ink:#14171D; --canvas:#F4F5F7; --surface:#FFFFFF; --surface-inset:#F4F5F7;
+  --line:#E4E6E9; --line-2:#EEEFF1; --text:#1A1C20; --muted:#767A80; --faint:#B0B4BA;
   --good:#12805C; --good-bg:#E9F7F1; --good-strong:#059669; --warn:#9A5B00; --warn-bg:#FDF3E2; --bad:#B0223D; --bad-bg:#FBE9ED; --info:#1D4ED8; --info-bg:#EAF1FE;
   --m:#059669; --m-soft:#E7F6EF; --m-2:#10B981; --m-rgb:5,150,105;
   --radius:18px; --radius-sm:11px;
@@ -44,7 +59,7 @@
   --funnel-1-bg:#A7F3D0; --funnel-1-fg:#065F46;
   --funnel-2-bg:#34D399;
   --mod-dot-bg:rgba(5,150,105,.14);
-  --row-hover:#FBFBFC; --lead-row-hover:#FBFBFD;
+  --row-hover:#F3F4F6; --lead-row-hover:#F2F3F5;
   --scrim-rail:rgba(0,0,0,.4);
   --control-accent:auto;
 
@@ -285,7 +300,12 @@ h1.title{font-family:var(--display);font-size:26px;font-weight:800;letter-spacin
 /* table */
 .table-scroll{overflow-x:auto}
 table{width:100%;border-collapse:collapse;font-size:13px}
-th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--faint);font-weight:700;padding:11px 21px;border-bottom:1px solid var(--line);white-space:nowrap}
+/* Column headers are structural labels a user actively scans, not
+   incidental text — moved from --faint (2.08:1 on --surface, meant for
+   genuinely tertiary text like timestamps/separators) to --muted
+   (4.32:1), matching the other field-label uses elsewhere in this file
+   (.fd-date-row label) rather than the timestamp/separator tier. */
+th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:700;padding:11px 21px;border-bottom:1px solid var(--line);white-space:nowrap}
 td{padding:13px 21px;border-bottom:1px solid var(--line-2);color:var(--text)}
 tr:last-child td{border-bottom:none}
 tbody tr{cursor:default}
@@ -424,7 +444,9 @@ tbody tr.clickable:hover{background:var(--row-hover)}
 .qa:hover{background:var(--m-soft);border-color:var(--m);color:var(--m)}
 .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:16px 19px;border-bottom:1px solid var(--line-2)}
 .info-grid .f{font-size:12px}
-.info-grid .f label{display:block;color:var(--faint);font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px;font-weight:700}
+/* Same reasoning as th above — a detail-page field label (e.g. "PHONE",
+   "EMAIL") is structural, not incidental, so it belongs on --muted. */
+.info-grid .f label{display:block;color:var(--muted);font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px;font-weight:700}
 .info-grid .f div{color:var(--text);font-weight:500}
 .activity-summary{display:flex;gap:18px;flex-wrap:wrap;padding:2px 21px 16px;border-bottom:1px solid var(--line-2)}
 .as-item{display:flex;align-items:center;gap:6px;color:var(--muted)}
