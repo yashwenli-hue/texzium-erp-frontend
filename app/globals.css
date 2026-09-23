@@ -52,209 +52,34 @@
 }
 
 /* ============================================================
-   DARK MODE — Version A A/B experiment (see
-   docs/revenueos-version-a-dark-mode-ab-brief.md). Two variants, selected
-   via a `data-theme` attribute on <html> (see lib/theme/ThemeContext.tsx);
-   absence of the attribute (or `data-theme="light"`) is the untouched
-   light theme above. Only CSS custom-property VALUES differ between
-   variants — every selector in this file still resolves through the same
-   ~25 tokens, so no component or class rule needed to change for either
-   variant to exist.
-
-   --chip-ink / --mark-bg / --mark-fg are deliberately NOT redefined by
-   either dark variant below: --chip-ink backs a small set of "always-dark"
-   solid chips (topbar avatar, collapsed-sidebar tooltip, toast) that carry
-   fixed white text — letting them track --ink (which flips to a bright
-   color in dark mode) would put white text on a near-white fill. Keeping
-   --chip-ink pinned to the same near-black in every theme keeps those
-   three elements exactly as they already look today, in every theme.
-   --mark-bg/--mark-fg (the Search page's <mark> highlight) stay a fixed
-   pale-yellow/dark-text pair for the same reason search-match highlighting
-   conventionally doesn't invert with app theme in most editors/apps.
-
-   IMPORTANT: [data-theme="dark-v1"] and [data-theme="dark-v2"] are
-   mutually exclusive attribute selectors — an element can only match one
-   attribute value at a time, so a v2-only rule does NOT inherit v1's
-   values through the cascade; without this shared foundation block,
-   Variant 2 would fall back to the plain :root (light) values for
-   everything it doesn't redefine. The two selectors are combined below to
-   give both variants the same navy/purple foundation, and the separate
-   [data-theme="dark-v2"] rule further down (later in source order, so it
-   wins on equal specificity) overrides only the four semantic tokens that
-   differ. */
-:root[data-theme="dark-v1"],
-:root[data-theme="dark-v2"]{
-  --ink:#F5F6FA; --canvas:#0B0E17; --surface:#141A2C;
-  --line:#262E47; --line-2:#1B2136; --text:#E4E6F0; --muted:#8B90A8; --faint:#6B7293;
-  --good:#34D399; --good-bg:rgba(52,211,153,.16); --good-strong:#0FAE7D;
-  --warn:#FBBF24; --warn-bg:rgba(251,191,36,.16);
-  --bad:#F87171; --bad-bg:rgba(248,113,113,.16);
-  --info:#60A5FA; --info-bg:rgba(96,165,250,.16);
-  --m:#7C3AED; --m-soft:rgba(124,58,237,.18); --m-2:#A78BFA; --m-rgb:124,58,237;
-  --stage-teal:#2DD4BF; --stage-teal-bg:rgba(45,212,191,.16);
-  --stage-indigo:#A5B4FC; --stage-indigo-bg:rgba(165,180,252,.16);
-  --source-orange:#FB923C; --source-orange-bg:rgba(251,146,60,.16);
-  --shadow:0 1px 1px rgba(0,0,0,.3), 0 10px 30px -14px rgba(0,0,0,.65);
-  --scrim:rgba(3,5,14,.72);
-  color-scheme:dark;
-
-  /* Light-theme restoration counterparts (see the base :root block above)
-     — pinned to exactly what dark mode already renders today, so the
-     light-mode fix leaves dark mode byte-for-byte unchanged. */
-  --mark-fg:#3D3418;
-  --lead-new-bg:rgba(96,165,250,.16); --lead-new-fg:#60A5FA;
-  --lead-good-bg:rgba(52,211,153,.16); --lead-good-fg:#34D399;
-  --lead-proposal-bg:rgba(251,191,36,.16); --lead-proposal-fg:#FBBF24;
-  --lead-negotiation-bg:rgba(124,58,237,.18); --lead-negotiation-fg:#7C3AED;
-  --lead-lost-bg:rgba(248,113,113,.16); --lead-lost-fg:#F87171;
-  --src-website-bg:#1B2136; --src-website-fg:#8B90A8;
-  --src-meta-bg:rgba(96,165,250,.16); --src-meta-fg:#60A5FA;
-  --src-google-bg:rgba(251,191,36,.16); --src-google-fg:#FBBF24;
-  --src-whatsapp-bg:rgba(52,211,153,.16); --src-whatsapp-fg:#34D399;
-  --src-indiamart-bg:rgba(248,113,113,.16); --src-indiamart-fg:#F87171;
-  --funnel-1-bg:rgba(52,211,153,.16); --funnel-1-fg:#34D399;
-  --funnel-2-bg:#34D399;
-  --mod-dot-bg:rgba(124,58,237,.18);
-  --row-hover:#1B2136; --lead-row-hover:#1B2136;
-  --scrim-rail:rgba(3,5,14,.72);
-  --control-accent:#7C3AED;
-}
-
-/* Variant 2 override, applied on top of the shared dark foundation above.
-   The difference is purely the four core semantic tokens: more saturated
-   good/warn/bad, and --info shifted from blue to cyan specifically (per
-   the brief's "cyan/blue = informational" and the NAQIX reference), plus
-   slightly stronger tint backgrounds so KPI/status accents read a touch
-   punchier. --stage-teal/--stage-indigo/--source-orange (Lead Status/
-   Source's extra hues) stay identical to Variant 1 — the brief's
-   "more expressive" direction is specifically about the four semantic
-   families, not every hue in the app. */
-:root[data-theme="dark-v2"]{
-  --good:#22C55E; --good-bg:rgba(34,197,94,.20); --good-strong:#16A34A;
-  --warn:#F59E0B; --warn-bg:rgba(245,158,11,.20);
-  --bad:#EF4444; --bad-bg:rgba(239,68,68,.20);
-  --info:#22D3EE; --info-bg:rgba(34,211,238,.20);
-
-  /* Light-theme restoration counterparts that vary between dark variants
-     (mirrors the four semantic tokens above) — pinned to what Variant 2
-     already renders today. */
-  --lead-new-bg:rgba(34,211,238,.20); --lead-new-fg:#22D3EE;
-  --lead-good-bg:rgba(34,197,94,.20); --lead-good-fg:#22C55E;
-  --lead-proposal-bg:rgba(245,158,11,.20); --lead-proposal-fg:#F59E0B;
-  --lead-lost-bg:rgba(239,68,68,.20); --lead-lost-fg:#EF4444;
-  --src-meta-bg:rgba(34,211,238,.20); --src-meta-fg:#22D3EE;
-  --src-google-bg:rgba(245,158,11,.20); --src-google-fg:#F59E0B;
-  --src-whatsapp-bg:rgba(34,197,94,.20); --src-whatsapp-fg:#22C55E;
-  --src-indiamart-bg:rgba(239,68,68,.20); --src-indiamart-fg:#EF4444;
-  --funnel-1-bg:rgba(34,197,94,.20); --funnel-1-fg:#22C55E;
-  --funnel-2-bg:#22C55E;
-}
-
-/* ============================================================
-   DARK MODE — Version A, Variant 3 ("dark-v3"). Approved design
-   candidate; see docs/revenueos-version-a-dark-mode-v3-proposed.md.
-
-   Built as a wholly separate block (not joined to dark-v1/dark-v2's
-   combined selector list) so V1 and V2 stay byte-for-byte untouched —
-   this is a THIRD selectable theme, not a replacement or an edit to
-   either existing variant. Every token below that also exists in
-   dark-v1/dark-v2 is set to the identical value those blocks already
-   use (V3 retains V1's navy/purple foundation, per the approved
-   proposal); only the tokens listed under "V3-specific" differ.
-
-   V3-specific tokens are consumed by shared rules ONLY via a
-   `var(--token, <fallback>)` pattern, where the fallback reproduces
-   that rule's exact pre-existing light/V1/V2 output — so this block
-   never requires touching the base :root or the dark-v1/dark-v2 block
-   to stay safe. See the affected rules further down (search
-   "V3 elevation" / "V3:") for each fallback. */
-:root[data-theme="dark-v3"]{
-  --ink:#F5F6FA; --canvas:#0B0E17; --surface:#141A2C;
-  --line:#262E47; --line-2:#1B2136; --text:#E4E6F0; --muted:#8B90A8; --faint:#6B7293;
-  --good:#34D399; --good-bg:rgba(52,211,153,.16); --good-strong:#0FAE7D;
-  --warn:#FBBF24; --warn-bg:rgba(251,191,36,.16);
-  --bad:#F87171; --bad-bg:rgba(248,113,113,.16);
-  --info:#60A5FA; --info-bg:rgba(96,165,250,.16);
-  --m:#7C3AED; --m-soft:rgba(124,58,237,.18); --m-2:#A78BFA; --m-rgb:124,58,237;
-  --stage-teal:#2DD4BF; --stage-teal-bg:rgba(45,212,191,.16);
-  --stage-indigo:#A5B4FC; --stage-indigo-bg:rgba(165,180,252,.16);
-  --source-orange:#FB923C; --source-orange-bg:rgba(251,146,60,.16);
-  --shadow:0 1px 1px rgba(0,0,0,.3), 0 10px 30px -14px rgba(0,0,0,.65);
-  --scrim:rgba(3,5,14,.72);
-  color-scheme:dark;
-
-  /* Same as dark-v1/dark-v2 — V3 isn't changing any of this except
-     Negotiation, below. */
-  --mark-fg:#3D3418;
-  --lead-new-bg:rgba(96,165,250,.16); --lead-new-fg:#60A5FA;
-  --lead-good-bg:rgba(52,211,153,.16); --lead-good-fg:#34D399;
-  --lead-proposal-bg:rgba(251,191,36,.16); --lead-proposal-fg:#FBBF24;
-  --lead-lost-bg:rgba(248,113,113,.16); --lead-lost-fg:#F87171;
-  --src-website-bg:#1B2136; --src-website-fg:#8B90A8;
-  --src-meta-bg:rgba(96,165,250,.16); --src-meta-fg:#60A5FA;
-  --src-google-bg:rgba(251,191,36,.16); --src-google-fg:#FBBF24;
-  --src-whatsapp-bg:rgba(52,211,153,.16); --src-whatsapp-fg:#34D399;
-  --src-indiamart-bg:rgba(248,113,113,.16); --src-indiamart-fg:#F87171;
-  --funnel-1-bg:rgba(52,211,153,.16); --funnel-1-fg:#34D399;
-  --funnel-2-bg:#34D399;
-  --mod-dot-bg:rgba(124,58,237,.18);
-  --scrim-rail:rgba(3,5,14,.72);
-  --control-accent:#7C3AED;
-
-  /* V3-specific: --row-hover/--lead-row-hover get their own value (kept
-     as two separate tokens per the approved decision, not merged), a
-     touch lighter/warmer than dark-v1/v2's flat --line-2 copy, since V3
-     has real elevation tiers to play off. */
-  --row-hover:#1E2740; --lead-row-hover:#1E2740;
-
-  /* V3-specific: dedicated Negotiation hue, distinct from the brand
-     accent (--m) — dark-v1/dark-v2 render Negotiation as literally the
-     same color as --m/--m-soft (the exact collision the dark-mode audit
-     flagged); light mode already has its own distinct violet since the
-     restore-Version-A-light-theme milestone. --stage-violet gives dark
-     mode the same distinctiveness, parallel to --stage-teal/--stage-indigo. */
-  --stage-violet:#E879F9; --stage-violet-bg:rgba(232,121,249,.16);
-  --lead-negotiation-bg:var(--stage-violet-bg); --lead-negotiation-fg:var(--stage-violet);
-
-  /* V3-specific: elevation system — a second surface tier for raised
-     elements (modals/dropdowns/popovers/toasts), a third for sunken
-     elements (form inputs), a second shadow tier tuned to actually read
-     against a near-black canvas (dark-v1/v2's shadows are still the
-     light-tuned near-invisible literals on most floating surfaces — see
-     the audit), and an alpha-based hairline for separating a raised
-     surface's edge from whatever's behind it. */
-  --surface-2:#1C2438;
-  --surface-inset:#10141F;
-  --border-soft:rgba(255,255,255,.08);
-  --shadow-1:0 1px 1px rgba(0,0,0,.3), 0 10px 30px -14px rgba(0,0,0,.65);
-  --shadow-2:0 4px 12px rgba(0,0,0,.4), 0 24px 60px -16px rgba(0,0,0,.75);
-}
-
-/* ============================================================
-   DARK MODE — Version A, Variant 4, "Graphite & Emerald"
-   (independently designed; see
-   docs/revenueos-version-a-dark-mode-v4.md). A fourth, fully
-   self-contained selectable theme — NOT a refinement of dark-v1/v2/v3,
-   which stay exactly as shipped. Every token below is V4's own value;
-   none are copied from any other dark variant, and this block never
-   touches the base :root (light) or any other :root[data-theme="…"]
-   block.
+   DARK MODE — Version A, "Graphite & Emerald" (independently designed;
+   see docs/revenueos-version-a-dark-mode-v4.md). The single selectable
+   dark theme, chosen as the accepted dark-theme candidate after an A/B
+   process that also produced three earlier variants (Navy Purple, Navy +
+   Semantic, an elevated navy iteration) — those were removed from the
+   application once this one was accepted; see git history
+   (docs/revenueos-version-a-dark-mode-ab-brief.md,
+   docs/revenueos-version-a-dark-mode-v3-proposed.md) for that process.
+   Selected via a `data-theme="dark-v4"` attribute on <html> (see
+   lib/theme/ThemeContext.tsx); absence of the attribute (or
+   `data-theme="light"`) is the untouched light theme above.
 
    Color philosophy: neutral graphite (no navy/blue cast), a single
    emerald brand accent matching the LIGHT theme's actual brand hue
-   (--m:#059669 there) instead of the purple every other dark variant
-   introduced, alpha-white borders/hovers instead of flat per-tier hex,
-   and an inset top-highlight on raised surfaces for real elevation.
-   See the proposal doc for full rationale.
+   (--m:#059669 there) instead of the purple the earlier, now-removed
+   variants used, alpha-white borders/hovers instead of flat per-tier
+   hex, and an inset top-highlight on raised surfaces for real
+   elevation. See the proposal doc for full rationale.
 
-   Every token name here already exists in the architecture (defined by
-   light :root, by the light-theme-restoration set, or by V3's
-   surface-2/surface-inset/border-soft/shadow-1/shadow-2/focus-ring) —
-   V4 supplies only new VALUES, so none of the shared rules that
-   already reference these tokens via `var(--token, <fallback>)` need
-   any further editing. The one new token name is --surface-rail (see
-   .rail's rule further down), needed because .rail otherwise shares
-   --surface with cards/tables. */
+   Every token name below is also the name several shared rules already
+   reference via a `var(--token, <fallback>)` pattern (search
+   `var(--surface-2`, `var(--shadow-2` etc. further down this file) —
+   this block supplies the only values those tokens now resolve to in
+   any dark context, and light falls through to each rule's own
+   fallback since light never defines these names. The one token name
+   that exists only for this theme is --surface-rail (see .rail's rule
+   further down), needed because .rail otherwise shares --surface with
+   cards/tables. */
 :root[data-theme="dark-v4"]{
   --ink:#F5F5F7; --canvas:#0A0A0C; --surface:#141416;
   --line:rgba(255,255,255,.08); --line-2:rgba(255,255,255,.05);

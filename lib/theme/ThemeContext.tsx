@@ -3,21 +3,20 @@
 import { createContext, useCallback, useContext, useEffect, useState, ReactNode } from "react";
 
 /**
- * Version A Dark Mode experiments (docs/revenueos-version-a-dark-mode-ab-brief.md
- * for V1/V2's original A/B process; docs/revenueos-version-a-dark-mode-v3-proposed.md
- * for V3; docs/revenueos-version-a-dark-mode-v4.md for V4). "light" is the
- * untouched existing theme and stays the default — these experiments must
- * not change what a user with no stored preference sees. "dark-v1"/
- * "dark-v2" are the original A/B variants; "dark-v3" and "dark-v4" are
- * further, independently-built candidates (see app/globals.css's
- * `:root[data-theme="dark-v3"]`/`:root[data-theme="dark-v4"]` blocks) —
- * each required no change here beyond the union type, THEMES list, and
- * init-script check below.
+ * Version A theming. "light" is the untouched existing theme and stays
+ * the default — no stored preference means light. "dark-v4" ("Graphite &
+ * Emerald", docs/revenueos-version-a-dark-mode-v4.md) is the single
+ * accepted dark theme, selected via app/globals.css's
+ * `:root[data-theme="dark-v4"]` block. Three earlier dark candidates
+ * (dark-v1/v2/v3, see docs/revenueos-version-a-dark-mode-ab-brief.md and
+ * docs/revenueos-version-a-dark-mode-v3-proposed.md for that A/B process)
+ * were removed from the application once dark-v4 was accepted — see git
+ * history for that milestone.
  */
-export type ThemeName = "light" | "dark-v1" | "dark-v2" | "dark-v3" | "dark-v4";
+export type ThemeName = "light" | "dark-v4";
 
 const STORAGE_KEY = "revenueos.theme";
-const THEMES: ThemeName[] = ["light", "dark-v1", "dark-v2", "dark-v3", "dark-v4"];
+const THEMES: ThemeName[] = ["light", "dark-v4"];
 
 interface ThemeContextValue {
   theme: ThemeName;
@@ -82,4 +81,4 @@ export function useTheme(): ThemeContextValue {
  */
 export const THEME_INIT_SCRIPT = `(function(){try{var t=localStorage.getItem(${JSON.stringify(
   STORAGE_KEY
-)});if(t&&t!=="light"&&(t==="dark-v1"||t==="dark-v2"||t==="dark-v3"||t==="dark-v4")){document.documentElement.setAttribute("data-theme",t);}}catch(e){}})();`;
+)});if(t==="dark-v4"){document.documentElement.setAttribute("data-theme",t);}}catch(e){}})();`;

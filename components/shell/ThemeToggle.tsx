@@ -10,21 +10,19 @@ interface MenuPos {
 }
 
 /**
- * Theme selector for the Version A Dark Mode experiments
- * (docs/revenueos-version-a-dark-mode-ab-brief.md for V1/V2's original A/B
- * process; docs/revenueos-version-a-dark-mode-v3-proposed.md for V3;
- * docs/revenueos-version-a-dark-mode-v4.md for V4) — lets the same running
- * app compare Light against each dark candidate. Reuses UserMenu's exact
- * popover pattern/CSS classes (.user-menu/.user-menu-item, position:fixed
- * rect-based placement) rather than introducing a new one.
+ * Theme selector for Version A. Light is the default; "Graphite &
+ * Emerald" (docs/revenueos-version-a-dark-mode-v4.md) is the single
+ * accepted dark theme. Reuses UserMenu's exact popover pattern/CSS
+ * classes (.user-menu/.user-menu-item, position:fixed rect-based
+ * placement) rather than introducing a new one.
  *
- * Only options for themes that actually exist are offered.
+ * Only options for themes that actually exist are offered — three
+ * earlier dark candidates (Navy Purple, Navy + Semantic, an elevated
+ * navy iteration) were removed from this list once this one was
+ * accepted; see git history.
  */
 const OPTIONS: { value: ThemeName; label: string; icon: string }[] = [
   { value: "light", label: "Light", icon: "sun" },
-  { value: "dark-v1", label: "Dark — Variant 1 (Navy Purple)", icon: "moon" },
-  { value: "dark-v2", label: "Dark — Variant 2 (Navy + Semantic)", icon: "moon" },
-  { value: "dark-v3", label: "Dark — Variant 3 (Elevated)", icon: "moon" },
   { value: "dark-v4", label: "Dark — Variant 4 (Graphite & Emerald)", icon: "moon" },
 ];
 
