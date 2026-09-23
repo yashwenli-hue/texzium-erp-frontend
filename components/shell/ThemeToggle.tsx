@@ -23,7 +23,7 @@ interface MenuPos {
  */
 const OPTIONS: { value: ThemeName; label: string; icon: string }[] = [
   { value: "light", label: "Light", icon: "sun" },
-  { value: "dark-v4", label: "Dark — Variant 4 (Graphite & Emerald)", icon: "moon" },
+  { value: "dark-v4", label: "Dark", icon: "moon" },
 ];
 
 export function ThemeToggle() {
