@@ -41,6 +41,7 @@ export class MockOpportunityRepository implements IOpportunityRepository {
     };
     db.opportunities.add(opp);
     db.leadTimeline.add({
+      source: "SYSTEM",
       id: mockId("T"),
       leadId: input.leadId,
       icon: "brief",

@@ -72,20 +72,20 @@ export const SEED_LEADS: Lead[] = [
 ];
 
 export const SEED_LEAD_TIMELINE: LeadTimelineEntry[] = [
-  { id: "T1", leadId: "L1", icon: "pulse", title: "STATUS_UPDATED — moved to Qualified", detail: "", actorName: "Rohit M.", occurredAt: hoursAgo(2) },
-  { id: "T2", leadId: "L1", icon: "clock", title: "Follow-up call — asked for extended payment terms", detail: "", actorName: "Rohit M.", occurredAt: daysAgo(1) },
-  { id: "T3", leadId: "L1", icon: "check", title: "LEAD_QUALIFIED", detail: "Budget and authority confirmed", actorName: "Rohit M.", occurredAt: daysAgo(3) },
-  { id: "T4", leadId: "L1", icon: "check", title: "Meeting held — technical requirements finalised", detail: "", actorName: "Rohit M.", occurredAt: daysAgo(5) },
-  { id: "T5", leadId: "L1", icon: "user", title: "PRE_SALES_ASSIGNED — assigned to Rohit M.", detail: "", actorName: "Auto-assignment", occurredAt: daysAgo(9) },
-  { id: "T5b", leadId: "L1", icon: "funnel", title: "LEAD_CREATED", detail: "", actorName: "System", occurredAt: daysAgo(9) },
-  { id: "T6", leadId: "L2", icon: "check", title: "LEAD_QUALIFIED", detail: "", actorName: "Anita S.", occurredAt: daysAgo(1) },
-  { id: "T7", leadId: "L2", icon: "clock", title: "Discovery call completed", detail: "", actorName: "Anita S.", occurredAt: daysAgo(4) },
-  { id: "T8", leadId: "L2", icon: "funnel", title: "LEAD_CREATED — from website enquiry form", detail: "", actorName: "System", occurredAt: daysAgo(6) },
-  { id: "T9", leadId: "L3", icon: "pulse", title: "STATUS_UPDATED — moved to Contacted", detail: "", actorName: "Vikram J.", occurredAt: daysAgo(3) },
-  { id: "T10", leadId: "L3", icon: "funnel", title: "LEAD_CREATED", detail: "Referred by existing customer Havells India", actorName: "System", occurredAt: daysAgo(5) },
-  { id: "T11", leadId: "L4", icon: "funnel", title: "LEAD_CREATED", detail: "", actorName: "System", occurredAt: daysAgo(6) },
-  { id: "T12", leadId: "L11", icon: "close", title: "LEAD_REJECTED", detail: "Budget did not match minimum order value", actorName: "Vikram J.", occurredAt: daysAgo(10) },
-  { id: "T13", leadId: "L11", icon: "funnel", title: "LEAD_CREATED", detail: "", actorName: "System", occurredAt: daysAgo(12) },
+  { source: "SYSTEM", id: "T1", leadId: "L1", icon: "pulse", title: "STATUS_UPDATED — moved to Qualified", detail: "", actorName: "Rohit M.", occurredAt: hoursAgo(2) },
+  { source: "EMPLOYEE", activityType: "CALL", id: "T2", leadId: "L1", icon: "phone", title: "Call", detail: "Follow-up call — asked for extended payment terms", actorName: "Rohit M.", occurredAt: daysAgo(1) },
+  { source: "SYSTEM", id: "T3", leadId: "L1", icon: "check", title: "LEAD_QUALIFIED", detail: "Budget and authority confirmed", actorName: "Rohit M.", occurredAt: daysAgo(3) },
+  { source: "EMPLOYEE", activityType: "MEETING", id: "T4", leadId: "L1", icon: "cal", title: "Meeting", detail: "Meeting held — technical requirements finalised", actorName: "Rohit M.", occurredAt: daysAgo(5) },
+  { source: "SYSTEM", id: "T5", leadId: "L1", icon: "user", title: "PRE_SALES_ASSIGNED — assigned to Rohit M.", detail: "", actorName: "Auto-assignment", occurredAt: daysAgo(9) },
+  { source: "SYSTEM", id: "T5b", leadId: "L1", icon: "funnel", title: "LEAD_CREATED", detail: "", actorName: "System", occurredAt: daysAgo(9) },
+  { source: "SYSTEM", id: "T6", leadId: "L2", icon: "check", title: "LEAD_QUALIFIED", detail: "", actorName: "Anita S.", occurredAt: daysAgo(1) },
+  { source: "EMPLOYEE", activityType: "CALL", id: "T7", leadId: "L2", icon: "phone", title: "Call", detail: "Discovery call completed", actorName: "Anita S.", occurredAt: daysAgo(4) },
+  { source: "SYSTEM", id: "T8", leadId: "L2", icon: "funnel", title: "LEAD_CREATED — from website enquiry form", detail: "", actorName: "System", occurredAt: daysAgo(6) },
+  { source: "SYSTEM", id: "T9", leadId: "L3", icon: "pulse", title: "STATUS_UPDATED — moved to Contacted", detail: "", actorName: "Vikram J.", occurredAt: daysAgo(3) },
+  { source: "SYSTEM", id: "T10", leadId: "L3", icon: "funnel", title: "LEAD_CREATED", detail: "Referred by existing customer Havells India", actorName: "System", occurredAt: daysAgo(5) },
+  { source: "SYSTEM", id: "T11", leadId: "L4", icon: "funnel", title: "LEAD_CREATED", detail: "", actorName: "System", occurredAt: daysAgo(6) },
+  { source: "SYSTEM", id: "T12", leadId: "L11", icon: "close", title: "LEAD_REJECTED", detail: "Budget did not match minimum order value", actorName: "Vikram J.", occurredAt: daysAgo(10) },
+  { source: "SYSTEM", id: "T13", leadId: "L11", icon: "funnel", title: "LEAD_CREATED", detail: "", actorName: "System", occurredAt: daysAgo(12) },
 ];
 
 // ---------------------------------------------------------------------------

@@ -1,9 +1,10 @@
 import { ID, ListQuery, Page } from "../../types/common";
 import { Lead, LeadStatus, LeadTimelineEntry } from "../../types/domain";
-import { ILeadRepository, CreateLeadInput, UpdateLeadInput, LeadSortField } from "../interfaces";
+import { ILeadRepository, CreateLeadInput, UpdateLeadInput, LeadSortField, LogLeadActivityInput } from "../interfaces";
 import { apiFetch, ApiError } from "../../api/httpClient";
 import { applyListQuery } from "../shared/listQuery";
-import { BackendLead, mapLead, mapLeadTimeline } from "./mappers";
+import { validateLeadActivityInput } from "../shared/leadActivity";
+import { BackendLead, BackendLeadTimeline, mapLead, mapLeadTimeline } from "./mappers";
 
 const SEARCHABLE: (keyof Lead)[] = ["customerName", "companyName", "sourceName", "assignedToName", "email"];
 
@@ -93,18 +94,29 @@ export class RealLeadRepository implements ILeadRepository {
   }
 
   async getTimeline(leadId: ID): Promise<LeadTimelineEntry[]> {
-    // No standalone timeline endpoint is confirmed — timelines only come
-    // embedded in the single Lead detail response (docs/backend-ui-contract.md §9).
+    // No standalone timeline endpoint: the timeline is embedded in the lead
+    // detail response, already ordered newest-first by the backend (occurredAt,
+    // then createdAt, then id). The sort below is stable and only guards an
+    // older backend; ties keep the server's order.
     const row = await apiFetch<BackendLead>(`/leads/${leadId}`);
-    return (row.timelines ?? []).map(mapLeadTimeline).sort((a, b) => (a.occurredAt < b.occurredAt ? 1 : -1));
+    return (row.timelines ?? [])
+      .map(mapLeadTimeline)
+      .sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime());
   }
 
-  async appendTimelineEntry(): Promise<LeadTimelineEntry> {
-    // No backend endpoint creates an arbitrary timeline entry — real timeline
-    // rows are only ever written by the specific verified actions (assign,
-    // qualify, reject, status update, followups, opportunity creation). The
-    // Lead Detail page hides "Log Activity" for the real repository so this
-    // should never actually be called; it throws rather than faking a write.
-    throw new Error("Activity logging isn't available yet for the connected backend.");
+  async logActivity(leadId: ID, input: LogLeadActivityInput): Promise<LeadTimelineEntry> {
+    // Same checks the backend applies, so a bad payload fails here with the same
+    // message instead of a round trip. The actor is never sent: the backend
+    // takes it from the authenticated user.
+    const valid = validateLeadActivityInput(input);
+    const row = await apiFetch<BackendLeadTimeline>(`/leads/${leadId}/activities`, {
+      method: "POST",
+      body: {
+        activityType: valid.activityType,
+        remarks: valid.remarks,
+        ...(valid.occurredAt ? { occurredAt: valid.occurredAt } : {}),
+      },
+    });
+    return mapLeadTimeline(row);
   }
 }

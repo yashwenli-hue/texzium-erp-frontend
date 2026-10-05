@@ -7,6 +7,7 @@ import { Button } from "../ui/Button";
 import { useToast } from "../ui/Toast";
 import { UpdateLeadInput } from "../../lib/repository/interfaces";
 import { useLeadSources } from "../../lib/hooks/useLeads";
+import { useRepository } from "../../lib/repository/RepositoryProvider";
 import { Lead } from "../../lib/types/domain";
 
 /**
@@ -24,6 +25,10 @@ export function EditLeadDialog({
   onSubmit: (input: UpdateLeadInput) => Promise<unknown>;
 }) {
   const toast = useToast();
+  const repo = useRepository();
+  // Remarks are not part of the connected lead record. Employee remarks are
+  // logged under Activity & History, so the field is only offered in mock mode.
+  const showRemarks = repo.kind !== "real";
   const { sources } = useLeadSources();
   const [customerName, setCustomerName] = useState(lead.customerName);
   const [companyName, setCompanyName] = useState(lead.companyName ?? "");
@@ -60,7 +65,7 @@ export function EditLeadDialog({
         uiContext: {
           productInterest: productInterest.trim() || undefined,
           city: city.trim() || undefined,
-          remarks: remarks.trim() || undefined,
+          remarks: showRemarks ? remarks.trim() || undefined : undefined,
         },
       });
       toast.show("Lead updated", "check");
@@ -104,7 +109,9 @@ export function EditLeadDialog({
         <TextField label="Product / Interest" value={productInterest} onChange={(e) => setProductInterest(e.target.value)} placeholder="e.g. Hydraulic Pump Systems" />
         <TextField label="City" value={city} onChange={(e) => setCity(e.target.value)} placeholder="Optional" />
       </FieldRow>
-      <TextAreaField label="Remarks" rows={3} value={remarks} onChange={(e) => setRemarks(e.target.value)} placeholder="Context for the next person who talks to this account…" />
+      {showRemarks && (
+        <TextAreaField label="Remarks" rows={3} value={remarks} onChange={(e) => setRemarks(e.target.value)} placeholder="Context for the next person who talks to this account…" />
+      )}
 
       {errors.form && <p style={{ color: "var(--bad)", fontSize: 12.5 }}>{errors.form}</p>}
     </Modal>

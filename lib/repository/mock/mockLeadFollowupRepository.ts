@@ -34,6 +34,7 @@ export class MockLeadFollowupRepository implements ILeadFollowupRepository {
     db.leadFollowups.add(row);
     syncLeadFollowups(input.leadId);
     db.leadTimeline.add({
+      source: "SYSTEM",
       id: mockId("T"),
       leadId: input.leadId,
       icon: "cal",
@@ -57,7 +58,7 @@ export class MockLeadFollowupRepository implements ILeadFollowupRepository {
     const now = new Date().toISOString();
     const updated = db.leadFollowups.update(id, { status: "COMPLETED", completedAt: now, completedByName: "You", updatedAt: now })!;
     syncLeadFollowups(existing.leadId);
-    db.leadTimeline.add({ id: mockId("T"), leadId: existing.leadId, icon: "checksq", title: "Followup Completed", detail: "", actorName: "You", occurredAt: now });
+    db.leadTimeline.add({ source: "SYSTEM", id: mockId("T"), leadId: existing.leadId, icon: "checksq", title: "Followup Completed", detail: "", actorName: "You", occurredAt: now });
     return delay(updated);
   }
 
@@ -67,7 +68,7 @@ export class MockLeadFollowupRepository implements ILeadFollowupRepository {
     const now = new Date().toISOString();
     const updated = db.leadFollowups.update(id, { followupDate, status: "PENDING", updatedAt: now })!;
     syncLeadFollowups(existing.leadId);
-    db.leadTimeline.add({ id: mockId("T"), leadId: existing.leadId, icon: "clock", title: "Followup Rescheduled", detail: "", actorName: "You", occurredAt: now });
+    db.leadTimeline.add({ source: "SYSTEM", id: mockId("T"), leadId: existing.leadId, icon: "clock", title: "Followup Rescheduled", detail: "", actorName: "You", occurredAt: now });
     return delay(updated);
   }
 
@@ -77,7 +78,7 @@ export class MockLeadFollowupRepository implements ILeadFollowupRepository {
     const now = new Date().toISOString();
     const updated = db.leadFollowups.update(id, { status: "CANCELLED", updatedAt: now })!;
     syncLeadFollowups(existing.leadId);
-    db.leadTimeline.add({ id: mockId("T"), leadId: existing.leadId, icon: "close", title: "Followup Cancelled", detail: "", actorName: "You", occurredAt: now });
+    db.leadTimeline.add({ source: "SYSTEM", id: mockId("T"), leadId: existing.leadId, icon: "close", title: "Followup Cancelled", detail: "", actorName: "You", occurredAt: now });
     return delay(updated);
   }
 }

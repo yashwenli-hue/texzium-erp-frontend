@@ -1,11 +1,13 @@
 import { ID, ListQuery, Page } from "../../types/common";
-import { Lead, LeadStatus, LeadTimelineEntry } from "../../types/domain";
+import { Lead, LeadStatus, LeadTimelineEntry, leadActivityMeta } from "../../types/domain";
 import {
   ILeadRepository,
   CreateLeadInput,
   UpdateLeadInput,
   LeadSortField,
+  LogLeadActivityInput,
 } from "../interfaces";
+import { validateLeadActivityInput } from "../shared/leadActivity";
 import { db } from "./db";
 import { delay } from "./queryUtils";
 import { applyListQuery } from "./queryUtils";
@@ -44,6 +46,7 @@ export class MockLeadRepository implements ILeadRepository {
     };
     db.leads.add(lead);
     db.leadTimeline.add({
+      source: "SYSTEM",
       id: mockId("T"),
       leadId: lead.id,
       icon: "funnel",
@@ -74,6 +77,7 @@ export class MockLeadRepository implements ILeadRepository {
     const updated = db.leads.update(id, patch);
     if (!updated) throw new Error(`Lead ${id} not found`);
     db.leadTimeline.add({
+      source: "SYSTEM",
       id: mockId("T"),
       leadId: id,
       icon: "pulse",
@@ -90,6 +94,7 @@ export class MockLeadRepository implements ILeadRepository {
     const updated = db.leads.update(id, { status, updatedAt: now, lastActivityAt: now });
     if (!updated) throw new Error(`Lead ${id} not found`);
     db.leadTimeline.add({
+      source: "SYSTEM",
       id: mockId("T"),
       leadId: id,
       icon: "pulse",
@@ -106,6 +111,7 @@ export class MockLeadRepository implements ILeadRepository {
     const updated = db.leads.update(id, { assignedToId, assignedToName, status: "PRE_SALES_ASSIGNED", updatedAt: now, lastActivityAt: now });
     if (!updated) throw new Error(`Lead ${id} not found`);
     db.leadTimeline.add({
+      source: "SYSTEM",
       id: mockId("T"),
       leadId: id,
       icon: "user",
@@ -126,6 +132,7 @@ export class MockLeadRepository implements ILeadRepository {
     const updated = db.leads.update(id, { status: "SALES_ASSIGNED", assignedToId: salesUserId, updatedAt: now, lastActivityAt: now });
     if (!updated) throw new Error(`Lead ${id} not found`);
     db.leadTimeline.add({
+      source: "SYSTEM",
       id: mockId("T"),
       leadId: id,
       icon: "check",
@@ -145,6 +152,7 @@ export class MockLeadRepository implements ILeadRepository {
     const updated = db.leads.update(id, { status: "REJECTED", updatedAt: now, lastActivityAt: now });
     if (!updated) throw new Error(`Lead ${id} not found`);
     db.leadTimeline.add({
+      source: "SYSTEM",
       id: mockId("T"),
       leadId: id,
       icon: "close",
@@ -164,13 +172,27 @@ export class MockLeadRepository implements ILeadRepository {
     return delay(rows);
   }
 
-  async appendTimelineEntry(
-    leadId: ID,
-    entry: Omit<LeadTimelineEntry, "id" | "leadId">
-  ): Promise<LeadTimelineEntry> {
-    const row: LeadTimelineEntry = { ...entry, id: mockId("T"), leadId };
+  async logActivity(leadId: ID, input: LogLeadActivityInput): Promise<LeadTimelineEntry> {
+    const valid = validateLeadActivityInput(input);
+    if (!db.leads.getById(leadId)) throw new Error(`Lead ${leadId} not found`);
+
+    const now = new Date().toISOString();
+    const meta = leadActivityMeta(valid.activityType);
+    const row: LeadTimelineEntry = {
+      id: mockId("T"),
+      leadId,
+      source: "EMPLOYEE",
+      activityType: valid.activityType,
+      icon: meta.icon,
+      title: meta.label,
+      detail: valid.remarks,
+      actorName: "You",
+      occurredAt: valid.occurredAt ?? now,
+      recordedAt: now,
+    };
     db.leadTimeline.add(row);
-    db.leads.update(leadId, { lastActivityAt: entry.occurredAt, updatedAt: entry.occurredAt });
+    // Same as the backend: logging activity touches the lead's last-activity time, never its status.
+    db.leads.update(leadId, { lastActivityAt: now, updatedAt: now });
     return delay(row);
   }
 }

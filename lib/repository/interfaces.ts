@@ -4,6 +4,7 @@ import {
   LeadStatus,
   LeadSourceRecord,
   LeadTimelineEntry,
+  LeadActivityType,
   LeadUIContext,
   LeadFollowup,
   AssignableUser,
@@ -85,6 +86,14 @@ export interface UpdateLeadInput {
   uiContext?: LeadUIContext;
 }
 
+// Mirrors the VERIFIED CreateLeadActivityDto { activityType, remarks, occurredAt? }.
+export interface LogLeadActivityInput {
+  activityType: LeadActivityType;
+  remarks: string;
+  /** ISO 8601. Omit for "now"; may be in the past, never the future. */
+  occurredAt?: string;
+}
+
 export interface ILeadRepository {
   list(query?: ListQuery<LeadSortField>): Promise<Page<Lead>>;
   getById(id: ID): Promise<Lead | null>;
@@ -98,11 +107,14 @@ export interface ILeadRepository {
   qualify(id: ID, salesUserId: ID): Promise<Lead>;
   /** VERIFIED: PATCH /:id/reject, body { reason } — writes LEAD_REJECTED. Gated by leads.reject. */
   reject(id: ID, reason: string): Promise<Lead>;
+  /** System lifecycle events and employee activity together, newest first (by occurredAt). */
   getTimeline(leadId: ID): Promise<LeadTimelineEntry[]>;
-  appendTimelineEntry(
-    leadId: ID,
-    entry: Omit<LeadTimelineEntry, "id" | "leadId">
-  ): Promise<LeadTimelineEntry>;
+  /**
+   * VERIFIED: POST /leads/:id/activities (leads.edit). Records employee sales
+   * activity without changing the lead's status. The actor is the signed-in
+   * user, set by the backend — never sent from here.
+   */
+  logActivity(leadId: ID, input: LogLeadActivityInput): Promise<LeadTimelineEntry>;
 }
 
 export interface ILeadSourceRepository {

@@ -6,6 +6,8 @@ import {
   LeadSourceRecord,
   LeadStatus,
   LeadTimelineEntry,
+  LeadTimelineSource,
+  LeadActivityType,
   AssignableUser,
   Opportunity,
   Quotation,
@@ -30,6 +32,7 @@ import {
   GstRegistrationOption,
   AppNotification,
   titleCaseFromConstant,
+  leadActivityMeta,
 } from "../../types/domain";
 
 /**
@@ -64,6 +67,13 @@ export interface BackendLeadTimeline {
   leadId: string;
   action: string;
   remarks?: string | null;
+  /** Absent on responses from a backend that predates attributed activity. */
+  source?: LeadTimelineSource;
+  activityType?: LeadActivityType | null;
+  actorId?: string | null;
+  /** Selected as { id, fullName } only — never a full User row. */
+  actor?: { id: string; fullName?: string | null } | null;
+  occurredAt?: string;
   createdAt: string;
 }
 
@@ -140,21 +150,45 @@ const TIMELINE_ICON_BY_ACTION: Record<string, string> = {
 };
 
 /**
- * Maps the real LeadTimeline { action, remarks?, createdAt } into the shape
- * the existing Lead Detail timeline UI already renders. actorName is left
- * empty — the backend timeline entry has no actor/user relation at all
- * (confirmed against leadTimeline.create() call sites) — never fabricate a
- * name for it.
+ * Maps a real LeadTimeline row into the shape the Lead timeline UI renders.
+ *
+ * SYSTEM rows (and every pre-attribution historical row, which the backend
+ * migration marks SYSTEM) keep the action-code presentation and have no actor.
+ * EMPLOYEE rows are typed activity: the title is the activity type, the detail
+ * is the employee's remarks, and the actor is the selected { id, fullName }.
+ * An EMPLOYEE row can legitimately have no actor (the author's account was
+ * later deleted) — that renders as an unattributed entry, never a made-up name.
  */
 export function mapLeadTimeline(raw: BackendLeadTimeline): LeadTimelineEntry {
+  const occurredAt = raw.occurredAt ?? raw.createdAt;
+
+  if (raw.source === "EMPLOYEE") {
+    const meta = leadActivityMeta(raw.activityType ?? "OTHER");
+    return {
+      id: raw.id,
+      leadId: raw.leadId,
+      source: "EMPLOYEE",
+      activityType: raw.activityType ?? "OTHER",
+      icon: meta.icon,
+      title: meta.label,
+      detail: raw.remarks ?? "",
+      actorName: raw.actor?.fullName ?? "",
+      actorId: raw.actor?.id ?? undefined,
+      occurredAt,
+      recordedAt: raw.createdAt,
+    };
+  }
+
   return {
     id: raw.id,
     leadId: raw.leadId,
+    source: "SYSTEM",
     icon: TIMELINE_ICON_BY_ACTION[raw.action] ?? "pulse",
     title: titleCaseFromConstant(raw.action),
     detail: raw.remarks ?? "",
     actorName: "",
-    occurredAt: raw.createdAt,
+    occurredAt,
+    recordedAt: raw.createdAt,
   };
 }
 

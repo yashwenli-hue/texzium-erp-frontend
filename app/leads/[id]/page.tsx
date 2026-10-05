@@ -14,7 +14,8 @@ import { DesignNote } from "../../../components/ui/PageHeader";
 import { DocumentTrail } from "../../../components/ui/DocumentTrail";
 import { NoteForm } from "../../../components/forms/NoteForm";
 import { NoteDetailModal } from "../../../components/forms/NoteDetailModal";
-import { ActivityForm } from "../../../components/forms/ActivityForm";
+import { LeadActivityForm } from "../../../components/forms/LeadActivityForm";
+import { LeadHistoryTimeline } from "../../../components/ui/LeadHistoryTimeline";
 import { AssignLeadDialog } from "../../../components/forms/AssignLeadDialog";
 import { EditLeadDialog } from "../../../components/forms/EditLeadDialog";
 import { QualifyLeadDialog } from "../../../components/forms/QualifyLeadDialog";
@@ -33,10 +34,9 @@ import { useToast } from "../../../components/ui/Toast";
 import { initials } from "../../../components/ui/Who";
 import { formatInr, formatDateTime } from "../../../lib/format";
 import { nextPendingFollowup } from "../../../lib/followup";
-import { isQualifiedLeadStatus, LeadFollowup, Quotation, Opportunity, Note } from "../../../lib/types/domain";
+import { isQualifiedLeadStatus, leadActivityMeta, LeadActivityType, LeadFollowup, Quotation, Opportunity, Note } from "../../../lib/types/domain";
 
-const ACTIVITY_TYPES = ["Call", "Email", "Meeting", "WhatsApp"] as const;
-const ACTIVITY_ICONS: Record<string, string> = { Call: "phone", Email: "mail", Meeting: "cal", WhatsApp: "wa" };
+const SUMMARY_TYPES: LeadActivityType[] = ["CALL", "MEETING", "EMAIL", "WHATSAPP"];
 
 function goBackOrTo(router: ReturnType<typeof useRouter>, fallback: string) {
   if (typeof window !== "undefined" && window.history.length > 1) {
@@ -57,7 +57,7 @@ export default function LeadDetailPage() {
   const router = useRouter();
   const toast = useToast();
   const id = params?.id;
-  const { lead, timeline, loading, error, refetch, appendActivity, assignLead, qualifyLead, rejectLead, updateLead } = useLeadDetail(id);
+  const { lead, timeline, loading, error, refetch, logActivity, assignLead, qualifyLead, rejectLead, updateLead } = useLeadDetail(id);
   const { notes, refetch: refetchNotes } = useNotesByRelated(id);
   const { followups, createFollowup, completeFollowup, rescheduleFollowup, cancelFollowup } = useLeadFollowups(id);
   const { quotations } = useQuotations();
@@ -82,15 +82,11 @@ export default function LeadDetailPage() {
   const primaryOpportunity = relatedOpportunities[0];
   const nextFollowup = useMemo(() => nextPendingFollowup(followups), [followups]);
 
-  // Mock-only prioritization surface — see the Activity & History panel below.
-  // Real timeline action codes never start with these prefixes, so this is
-  // always 0 for a real lead; the panel itself is gated on !isReal anyway.
+  // Employee activity counts by type, from the same history stream in connected and mock mode.
   const activityCounts = useMemo(() => {
-    const counts: Record<string, number> = { Call: 0, Email: 0, Meeting: 0, WhatsApp: 0 };
+    const counts: Record<string, number> = { CALL: 0, MEETING: 0, EMAIL: 0, WHATSAPP: 0 };
     for (const t of timeline) {
-      for (const type of ACTIVITY_TYPES) {
-        if (t.title.startsWith(`${type}:`)) counts[type] += 1;
-      }
+      if (t.source === "EMPLOYEE" && t.activityType && t.activityType in counts) counts[t.activityType] += 1;
     }
     return counts;
   }, [timeline]);
@@ -160,8 +156,9 @@ export default function LeadDetailPage() {
     { key: "expectedValue", header: "Value", render: (o) => formatInr(o.expectedValue) },
   ];
 
-  // Real notes are read-only (no create endpoint exists — docs/backend-ui-contract.md
-  // §20); mock keeps the original cross-entity Note demo experience.
+  // Real notes are the read-only text imported with the lead (e.g. a webhook's
+  // requirement); employee remarks live in Activity & History. Mock keeps the
+  // original cross-entity Note demo experience.
   const displayNotes = isReal
     ? (lead.notes ?? []).map((n) => ({ id: n.id, text: n.note, createdAt: n.createdAt, authorName: "", pinned: false }))
     : notes.map((n) => ({ id: n.id, text: n.text, createdAt: n.createdAt, authorName: n.authorName, pinned: n.pinned }));
@@ -361,42 +358,26 @@ export default function LeadDetailPage() {
             title="Activity & History"
             flush
             extraHead={
-              !isReal ? (
+              hasPermission("leads.edit") ? (
                 <a className="more" href="#" onClick={(e) => { e.preventDefault(); setShowActivityForm(true); }}>
                   <Icon name="plus" size={14} /> Log Activity
                 </a>
               ) : undefined
             }
           >
-            {!isReal && (
-              <div className="activity-summary">
-                {ACTIVITY_TYPES.map((type) => (
+            <div className="activity-summary">
+              {SUMMARY_TYPES.map((type) => {
+                const meta = leadActivityMeta(type);
+                return (
                   <div className="as-item" key={type}>
-                    <Icon name={ACTIVITY_ICONS[type]} size={14} />
+                    <Icon name={meta.icon} size={14} />
                     <b>{activityCounts[type]}</b>
-                    <span>{type}{activityCounts[type] === 1 ? "" : "s"}</span>
+                    <span>{meta.label}{activityCounts[type] === 1 ? "" : "s"}</span>
                   </div>
-                ))}
-              </div>
-            )}
-            <div className="tl">
-              {timeline.length === 0 && (
-                <p style={{ color: "var(--muted)", fontSize: 13, padding: "4px 0 12px" }}>No activity logged yet.</p>
-              )}
-              {timeline.map((t) => (
-                <div className="tl-item" key={t.id}>
-                  <div className="dot"><Icon name={t.icon} size={14} /></div>
-                  <div className="body">
-                    <div className="r1">
-                      <b>{t.title}</b>
-                      <span className="when">{formatDateTime(t.occurredAt)}</span>
-                    </div>
-                    {t.detail && <p>{t.detail}</p>}
-                    {t.actorName && <p>{t.actorName}</p>}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
+            <LeadHistoryTimeline entries={timeline} />
           </Panel>
         </div>
 
@@ -431,7 +412,7 @@ export default function LeadDetailPage() {
           >
             <p style={{ color: "var(--faint)", fontSize: 11.5, marginBottom: 10 }}>
               {isReal
-                ? "Notes recorded against this lead in the connected backend. Note creation isn't available from RevenueOS yet."
+                ? "Text imported with this lead, for example the requirement from a connected lead source. Log your own calls, meetings and remarks under Activity & History."
                 : "General context that stays useful across every call and meeting — not a record of a specific interaction. Log what happened on a call or email above instead."}
             </p>
             {displayNotes.length === 0 ? (
@@ -484,18 +465,10 @@ export default function LeadDetailPage() {
         />
       )}
       {showActivityForm && (
-        <ActivityForm
+        <LeadActivityForm
+          customerName={lead.customerName}
           onClose={() => setShowActivityForm(false)}
-          onSubmit={async (input) => {
-            await appendActivity(
-              input.type === "Call" ? "phone" : input.type === "Email" ? "mail" : input.type === "WhatsApp" ? "wa" : input.type === "Meeting" ? "cal" : "pulse",
-              `${input.type}: ${input.note}`,
-              input.ownerName
-            );
-          }}
-          defaultRelatedType="Lead"
-          defaultRelatedName={lead.customerName}
-          defaultRelatedId={lead.id}
+          onSubmit={(input) => logActivity(input)}
         />
       )}
       {showAssign && (

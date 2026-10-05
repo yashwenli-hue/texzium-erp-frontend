@@ -178,15 +178,15 @@ export interface Lead {
   uiContext?: LeadUIContext;
   /** VERIFIED: both lead list and lead detail embed the followups relation. */
   followups?: LeadFollowup[];
-  /** VERIFIED: lead detail embeds the LeadNote relation; there is no create endpoint for it yet. */
+  /** VERIFIED: lead detail embeds the LeadNote relation (imported requirement text). Read-only. */
   notes?: LeadNoteEntry[];
-  /** VERIFIED: lead detail embeds the LeadTimeline relation. */
+  /** VERIFIED: lead detail embeds the LeadTimeline relation, newest first. */
   timelines?: LeadTimelineEntry[];
 }
 
-// VERIFIED: LeadNote { id, leadId, note, createdAt } — Lead-scoped only, and
-// read-only from the frontend: no backend endpoint creates one. See
-// docs/backend-ui-contract.md §20.
+// VERIFIED: LeadNote { id, leadId, note, createdAt } — written only by the
+// lead-import webhook (the inbound "requirement" text). Read-only here: employee
+// remarks are recorded as LeadTimeline activity, not as LeadNote.
 export interface LeadNoteEntry {
   id: ID;
   leadId: ID;
@@ -194,14 +194,46 @@ export interface LeadNoteEntry {
   createdAt: string;
 }
 
+// VERIFIED: LeadTimeline.source. SYSTEM entries are lifecycle events written by
+// trusted backend workflows (created, assigned, qualified, follow-up events…).
+// EMPLOYEE entries are sales work logged by a user via POST /leads/:id/activities.
+export type LeadTimelineSource = "SYSTEM" | "EMPLOYEE";
+
+// VERIFIED: LeadActivityType enum. Follow-up scheduling is NOT an activity type —
+// it stays in LeadFollowup.
+export type LeadActivityType = "NOTE" | "CALL" | "MEETING" | "EMAIL" | "WHATSAPP" | "REQUIREMENT" | "OTHER";
+
+export const LEAD_ACTIVITY_REMARKS_MAX_LENGTH = 2000;
+
+export const LEAD_ACTIVITY_TYPES: { value: LeadActivityType; label: string; icon: string }[] = [
+  { value: "CALL", label: "Call", icon: "phone" },
+  { value: "MEETING", label: "Meeting", icon: "cal" },
+  { value: "EMAIL", label: "Email", icon: "mail" },
+  { value: "WHATSAPP", label: "WhatsApp", icon: "wa" },
+  { value: "REQUIREMENT", label: "Requirement", icon: "file" },
+  { value: "NOTE", label: "Note", icon: "notepad" },
+  { value: "OTHER", label: "Other", icon: "pulse" },
+];
+
+export function leadActivityMeta(type: LeadActivityType) {
+  return LEAD_ACTIVITY_TYPES.find((t) => t.value === type) ?? LEAD_ACTIVITY_TYPES[LEAD_ACTIVITY_TYPES.length - 1];
+}
+
 export interface LeadTimelineEntry {
   id: ID;
   leadId: ID;
+  source: LeadTimelineSource;
+  /** Set only on EMPLOYEE entries. */
+  activityType?: LeadActivityType;
   icon: string; // maps to an icon key in the icon set
   title: string;
   detail: string;
+  /** Empty for system events, and for employee entries whose author was not recorded. */
   actorName: string;
-  occurredAt: string; // ISO 8601
+  actorId?: ID;
+  occurredAt: string; // ISO 8601 — when it happened (employee entries may be back-dated)
+  /** ISO 8601 — when it was recorded. Differs from occurredAt for back-dated entries. */
+  recordedAt?: string;
 }
 
 // UI ASSUMPTION — carried over from the prototype. The VERIFIED

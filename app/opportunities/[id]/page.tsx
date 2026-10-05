@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Icon } from "../../../components/ui/Icon";
+import { LeadHistoryTimeline } from "../../../components/ui/LeadHistoryTimeline";
 import { Panel } from "../../../components/ui/Card";
 import { StatusTag, QuotationStatusTag, Tag } from "../../../components/ui/Tag";
 import { Button, EmptyState } from "../../../components/ui/Button";
@@ -186,7 +187,7 @@ export default function OpportunityDetailPage() {
             {lead?.notes && lead.notes.length > 0 && (
               <div style={{ padding: "14px 19px", borderBottom: "1px solid var(--line-2)" }}>
                 <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8 }}>
-                  Notes & Comments
+                  Imported notes
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                   {lead.notes.map((note) => (
@@ -201,28 +202,11 @@ export default function OpportunityDetailPage() {
               </div>
             )}
 
-            <div className="tl" style={{ padding: "14px 19px" }}>
-              {timeline.length === 0 && (!lead?.notes || lead.notes.length === 0) && (
-                <p style={{ color: "var(--muted)", fontSize: 13, padding: "4px 0 12px" }}>
-                  No Pre-Sales history available.
-                </p>
-              )}
-
-              {timeline.map((t) => (
-                <div className="tl-item" key={t.id}>
-                  <div className="dot">
-                    <Icon name={t.icon} size={14} />
-                  </div>
-                  <div className="body">
-                    <div className="r1">
-                      <b>{t.title}</b>
-                      <span className="when">{formatDate(t.occurredAt)}</span>
-                    </div>
-                    {t.detail && <p>{t.detail}</p>}
-                    {t.actorName && <p>{t.actorName}</p>}
-                  </div>
-                </div>
-              ))}
+            <div style={{ padding: "6px 0" }}>
+              <LeadHistoryTimeline
+                entries={timeline}
+                emptyText={lead?.notes && lead.notes.length > 0 ? "No activity logged yet." : "No Pre-Sales history available."}
+              />
             </div>
           </Panel>
         </div>

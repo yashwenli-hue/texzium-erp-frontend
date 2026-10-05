@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { useRepository } from "../repository/RepositoryProvider";
 import { useAsyncList } from "./useAsyncList";
-import { CreateLeadInput, UpdateLeadInput } from "../repository/interfaces";
+import { CreateLeadInput, UpdateLeadInput, LogLeadActivityInput } from "../repository/interfaces";
 import { LeadStatus } from "../types/domain";
 import { FilterMap, SortState } from "../types/common";
 import { LeadSortField } from "../repository/interfaces";
@@ -98,18 +98,16 @@ export function useLeadDetail(id: string | undefined) {
     [repo, id]
   );
 
-  const appendActivity = useCallback(
-    async (icon: string, title: string, actorName: string) => {
+  // Employee sales activity. Never changes the lead's status; the backend
+  // records the signed-in user as the actor. Errors propagate so the form can
+  // show them — nothing is faked locally.
+  const logActivity = useCallback(
+    async (input: LogLeadActivityInput) => {
       if (!id) return;
-      await repo.leads.appendTimelineEntry(id, {
-        icon,
-        title,
-        detail: "",
-        actorName,
-        occurredAt: new Date().toISOString(),
-      });
+      const entry = await repo.leads.logActivity(id, input);
       refetchTimeline();
       refetch();
+      return entry;
     },
     [id, repo, refetch, refetchTimeline]
   );
@@ -159,7 +157,7 @@ export function useLeadDetail(id: string | undefined) {
     timeline: timeline ?? [],
     loading,
     error,
-    appendActivity,
+    logActivity,
     assignLead,
     qualifyLead,
     rejectLead,
