@@ -35,7 +35,7 @@ export default function OpportunityDetailPage() {
   const router = useRouter();
   const toast = useToast();
   const id = params?.id;
-  const { opportunity, lead, loading, error, updateStage, refetch } = useOpportunityDetail(id);
+  const { opportunity, lead, timeline, loading, error, updateStage, refetch } = useOpportunityDetail(id);
   const { quotations, createQuotation, refetch: refetchQuotations } = useQuotations();
   const [pendingAction, setPendingAction] = useState<StageAction | null>(null);
   const [showQuotationForm, setShowQuotationForm] = useState(false);
@@ -181,7 +181,52 @@ export default function OpportunityDetailPage() {
             <div className="f"><label>Expected Close</label><div>{formatDate(opportunity.expectedCloseDate)}</div></div>
             <div className="f"><label>Expected Value</label><div>{formatInr(opportunity.expectedValue)}</div></div>
           </div>
+
+          <Panel title="Pre-Sales History" flush>
+            {lead?.notes && lead.notes.length > 0 && (
+              <div style={{ padding: "14px 19px", borderBottom: "1px solid var(--line-2)" }}>
+                <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8 }}>
+                  Notes & Comments
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {lead.notes.map((note) => (
+                    <div key={note.id} style={{ fontSize: 13.5 }}>
+                      <div>{note.note}</div>
+                      <div style={{ color: "var(--muted)", fontSize: 11.5, marginTop: 3 }}>
+                        {formatDate(note.createdAt)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="tl" style={{ padding: "14px 19px" }}>
+              {timeline.length === 0 && (!lead?.notes || lead.notes.length === 0) && (
+                <p style={{ color: "var(--muted)", fontSize: 13, padding: "4px 0 12px" }}>
+                  No Pre-Sales history available.
+                </p>
+              )}
+
+              {timeline.map((t) => (
+                <div className="tl-item" key={t.id}>
+                  <div className="dot">
+                    <Icon name={t.icon} size={14} />
+                  </div>
+                  <div className="body">
+                    <div className="r1">
+                      <b>{t.title}</b>
+                      <span className="when">{formatDate(t.occurredAt)}</span>
+                    </div>
+                    {t.detail && <p>{t.detail}</p>}
+                    {t.actorName && <p>{t.actorName}</p>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Panel>
         </div>
+
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <Panel
             title="Related Quotations"

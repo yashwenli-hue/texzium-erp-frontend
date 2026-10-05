@@ -110,7 +110,7 @@ export interface BackendOpportunity {
   status: string;
   createdAt: string;
   updatedAt?: string;
-  lead?: { id: string; customerName: string; assignedToId?: string | null } | null;
+  lead?: BackendLead | null;
 }
 
 export function mapLeadSource(raw: BackendLeadSource): LeadSourceRecord {
@@ -190,6 +190,7 @@ export function mapLead(raw: BackendLead): Lead {
     lastActivityAt: raw.updatedAt,
     followups: raw.followups?.map(mapLeadFollowup),
     notes: raw.notes?.map(mapLeadNote),
+    timelines: raw.timelines?.map(mapLeadTimeline),
   };
 }
 

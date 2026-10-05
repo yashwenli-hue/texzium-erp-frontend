@@ -1,9 +1,9 @@
 import { ID, ListQuery, Page } from "../../types/common";
-import { Opportunity, OpportunityStage } from "../../types/domain";
+import { Lead, Opportunity, OpportunityStage } from "../../types/domain";
 import { IOpportunityRepository, CreateOpportunityInput, OpportunitySortField, IUserRepository } from "../interfaces";
-import { apiFetch } from "../../api/httpClient";
+import { apiFetch, ApiError } from "../../api/httpClient";
 import { applyListQuery } from "../shared/listQuery";
-import { BackendOpportunity } from "./mappers";
+import { BackendOpportunity, mapLead } from "./mappers";
 
 const SEARCHABLE: (keyof Opportunity)[] = ["title", "customerName", "ownerName"];
 const STAGE_KEY = "revenueos.real.opportunityStage";
@@ -28,13 +28,36 @@ function writeStageOverride(id: ID, stage: OpportunityStage): void {
   }
 }
 
+function toOpportunity(
+  raw: BackendOpportunity,
+  overrides: Record<string, OpportunityStage>,
+  ownerName: string | undefined,
+  lead?: Lead,
+): Opportunity {
+  return {
+    id: raw.id,
+    leadId: raw.leadId,
+    title: raw.title,
+    customerName: raw.lead?.customerName ?? "—",
+    stage: overrides[raw.id] ?? "Qualified",
+    expectedValue: raw.expectedValue,
+    probability: raw.probability,
+    expectedCloseDate: raw.expectedCloseDate,
+    ownerName: ownerName || "Unassigned",
+    createdAt: raw.createdAt,
+    lead,
+  };
+}
+
 /**
- * VERIFIED routes: POST/GET /opportunities only — no GET /:id and no stage/
- * status mutation endpoint (docs/backend-ui-contract.md §7, §16, §17). `stage`
+ * VERIFIED routes: POST /opportunities, GET /opportunities and GET
+ * /opportunities/:id (which embeds the lead — source, assignee {id, fullName},
+ * notes, timelines, followups). There is still no stage/status mutation
+ * endpoint (docs/backend-ui-contract.md §7, §16, §17). `stage`
  * is therefore held entirely client-side (localStorage), separate from the
  * backend's own Opportunity.status (a plain string, always "OPEN", never
  * changed by any code path) — moving a card never claims the backend
- * changed. getById() works from the same full list, since no per-id route exists.
+ * changed.
  */
 export class RealOpportunityRepository implements IOpportunityRepository {
   constructor(private users: IUserRepository) {}
@@ -53,18 +76,7 @@ export class RealOpportunityRepository implements IOpportunityRepository {
 
     return rows.map((raw) => {
       const assignedToId = raw.lead?.assignedToId ?? undefined;
-      return {
-        id: raw.id,
-        leadId: raw.leadId,
-        title: raw.title,
-        customerName: raw.lead?.customerName ?? "—",
-        stage: overrides[raw.id] ?? "Qualified",
-        expectedValue: raw.expectedValue,
-        probability: raw.probability,
-        expectedCloseDate: raw.expectedCloseDate,
-        ownerName: (assignedToId && ownerNameById.get(assignedToId)) || "Unassigned",
-        createdAt: raw.createdAt,
-      };
+      return toOpportunity(raw, overrides, assignedToId ? ownerNameById.get(assignedToId) : undefined);
     });
   }
 
@@ -74,8 +86,18 @@ export class RealOpportunityRepository implements IOpportunityRepository {
   }
 
   async getById(id: ID): Promise<Opportunity | null> {
-    const all = await this.fetchAll();
-    return all.find((o) => o.id === id) ?? null;
+    try {
+      const raw = await apiFetch<BackendOpportunity>(`/opportunities/${id}`);
+      return toOpportunity(
+        raw,
+        readStageOverrides(),
+        raw.lead?.assignedTo?.fullName,
+        raw.lead ? mapLead(raw.lead) : undefined,
+      );
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 404) return null;
+      throw err;
+    }
   }
 
   async create(input: CreateOpportunityInput): Promise<Opportunity> {

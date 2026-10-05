@@ -55,10 +55,22 @@ export function useOpportunityDetail(id: string | undefined) {
     [repo, id]
   );
 
-  const { data: lead } = useAsyncList(
-    () => (opportunity ? repo.leads.getById(opportunity.leadId) : Promise.resolve(null)),
-    [repo, opportunity?.leadId]
+  // GET /opportunities/:id embeds the lead (with notes and timelines), so the
+  // separate lead and timeline fetches only run when it was not embedded
+  // (the mock repository).
+  const embeddedLead = opportunity?.lead;
+
+  const { data: fetchedLead } = useAsyncList(
+    () => (opportunity && !opportunity.lead ? repo.leads.getById(opportunity.leadId) : Promise.resolve(null)),
+    [repo, opportunity?.leadId, !!opportunity?.lead]
   );
+  const lead = embeddedLead ?? fetchedLead;
+
+  const { data: fetchedTimeline } = useAsyncList(
+    () => (lead && !lead.timelines ? repo.leads.getTimeline(lead.id) : Promise.resolve([])),
+    [repo, lead?.id, !!lead?.timelines]
+  );
+  const timeline = lead?.timelines ?? fetchedTimeline ?? [];
 
   const updateStage = useCallback(
     async (stage: OpportunityStage) => {
@@ -69,5 +81,13 @@ export function useOpportunityDetail(id: string | undefined) {
     [id, repo, refetch]
   );
 
-  return { opportunity, lead, loading, error, updateStage, refetch };
+  return {
+    opportunity,
+    lead,
+    timeline,
+    loading,
+    error,
+    updateStage,
+    refetch,
+  };
 }

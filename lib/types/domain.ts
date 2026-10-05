@@ -178,8 +178,10 @@ export interface Lead {
   uiContext?: LeadUIContext;
   /** VERIFIED: both lead list and lead detail embed the followups relation. */
   followups?: LeadFollowup[];
-  /** VERIFIED: lead detail (not list) embeds the LeadNote relation; there is no create endpoint for it yet. */
+  /** VERIFIED: lead detail embeds the LeadNote relation; there is no create endpoint for it yet. */
   notes?: LeadNoteEntry[];
+  /** VERIFIED: lead detail embeds the LeadTimeline relation. */
+  timelines?: LeadTimelineEntry[];
 }
 
 // VERIFIED: LeadNote { id, leadId, note, createdAt } — Lead-scoped only, and
@@ -390,6 +392,8 @@ export interface Opportunity {
   expectedCloseDate: string; // ISO 8601
   ownerName: string;
   createdAt: string; // ISO 8601
+  /** Present only when loaded via GET /opportunities/:id, which embeds the lead. */
+  lead?: Lead;
 }
 
 // VERIFIED: Quotation.status is a plain backend String (@default("DRAFT")),
