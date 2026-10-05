@@ -8,6 +8,7 @@ import {
 import { db } from "./db";
 import { delay, applyListQuery } from "./queryUtils";
 import { mockId } from "./entityStore";
+import { assertMockLeadActive } from "./leadGuards";
 
 const SEARCHABLE: (keyof Opportunity)[] = ["title", "customerName", "ownerName"];
 
@@ -23,6 +24,7 @@ export class MockOpportunityRepository implements IOpportunityRepository {
   async create(input: CreateOpportunityInput): Promise<Opportunity> {
     const lead = db.leads.getById(input.leadId);
     if (!lead) throw new Error(`Lead ${input.leadId} not found`);
+    assertMockLeadActive(input.leadId);
     if (!isQualifiedLeadStatus(lead.status)) {
       throw new Error("Only a qualified lead can become an opportunity");
     }

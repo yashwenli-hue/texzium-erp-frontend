@@ -4,6 +4,7 @@ import { CreateFollowupInput, ILeadFollowupRepository } from "../interfaces";
 import { db } from "./db";
 import { delay } from "./queryUtils";
 import { mockId } from "./entityStore";
+import { assertMockLeadActive } from "./leadGuards";
 
 function syncLeadFollowups(leadId: ID) {
   const followups = db.leadFollowups.getAll().filter((f) => f.leadId === leadId);
@@ -21,6 +22,7 @@ export class MockLeadFollowupRepository implements ILeadFollowupRepository {
   }
 
   async create(input: CreateFollowupInput): Promise<LeadFollowup> {
+    assertMockLeadActive(input.leadId);
     const now = new Date().toISOString();
     const row: LeadFollowup = {
       id: mockId("F"),

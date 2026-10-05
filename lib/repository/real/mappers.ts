@@ -102,6 +102,13 @@ export interface BackendLead {
   status: string;
   assignedToId?: string | null;
   assignedTo?: BackendUser | null;
+  /** Absent on a backend that predates lead deactivation: such leads are all active. */
+  isActive?: boolean;
+  deactivatedAt?: string | null;
+  deactivatedById?: string | null;
+  /** Selected as { id, fullName } only. */
+  deactivatedBy?: { id: string; fullName?: string | null } | null;
+  deactivationReason?: string | null;
   createdAt: string;
   updatedAt: string;
   notes?: BackendLeadNote[];
@@ -147,13 +154,18 @@ const TIMELINE_ICON_BY_ACTION: Record<string, string> = {
   FOLLOWUP_RESCHEDULED: "clock",
   FOLLOWUP_CANCELLED: "close",
   OPPORTUNITY_CREATED: "brief",
+  LEAD_DEACTIVATED: "alert",
+  LEAD_REACTIVATED: "check",
 };
 
 /**
  * Maps a real LeadTimeline row into the shape the Lead timeline UI renders.
  *
  * SYSTEM rows (and every pre-attribution historical row, which the backend
- * migration marks SYSTEM) keep the action-code presentation and have no actor.
+ * migration marks SYSTEM) keep the action-code presentation. Most have no actor;
+ * lifecycle events performed by a person (LEAD_DEACTIVATED, LEAD_REACTIVATED)
+ * carry one, shown as "by <name>". They are still system events, never
+ * employee activity.
  * EMPLOYEE rows are typed activity: the title is the activity type, the detail
  * is the employee's remarks, and the actor is the selected { id, fullName }.
  * An EMPLOYEE row can legitimately have no actor (the author's account was
@@ -186,7 +198,8 @@ export function mapLeadTimeline(raw: BackendLeadTimeline): LeadTimelineEntry {
     icon: TIMELINE_ICON_BY_ACTION[raw.action] ?? "pulse",
     title: titleCaseFromConstant(raw.action),
     detail: raw.remarks ?? "",
-    actorName: "",
+    actorName: raw.actor?.fullName ?? "",
+    actorId: raw.actor?.id ?? undefined,
     occurredAt,
     recordedAt: raw.createdAt,
   };
@@ -219,6 +232,11 @@ export function mapLead(raw: BackendLead): Lead {
     status: raw.status as LeadStatus,
     assignedToId: raw.assignedToId ?? undefined,
     assignedToName: raw.assignedTo?.fullName ?? undefined,
+    isActive: raw.isActive ?? true,
+    deactivatedAt: raw.deactivatedAt ?? undefined,
+    deactivatedById: raw.deactivatedById ?? undefined,
+    deactivatedByName: raw.deactivatedBy?.fullName ?? undefined,
+    deactivationReason: raw.deactivationReason ?? undefined,
     createdAt: raw.createdAt,
     updatedAt: raw.updatedAt,
     lastActivityAt: raw.updatedAt,

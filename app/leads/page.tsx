@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { PageHeader, DesignNote } from "../../components/ui/PageHeader";
 import { Panel } from "../../components/ui/Card";
 import { Button, EmptyState } from "../../components/ui/Button";
-import { LeadStatusTag, LeadScoreTag } from "../../components/ui/Tag";
+import { LeadStatusTag, LeadDeactivatedTag, LeadScoreTag, Chip, ChipGroup } from "../../components/ui/Tag";
 import { SourceTag } from "../../components/ui/SourceBadge";
 import { FollowupTag } from "../../components/ui/FollowupTag";
 import { initials } from "../../components/ui/Who";
@@ -24,7 +24,9 @@ const PAGE_SIZE = 8;
 
 export default function LeadsPage() {
   const router = useRouter();
-  const { leads: allLeads, loading, error, createLead, refetch } = useLeads();
+  // Deactivated leads stay out of the normal list; the toggle below brings them in.
+  const [showDeactivated, setShowDeactivated] = useState(false);
+  const { leads: allLeads, loading, error, createLead, refetch } = useLeads({ includeInactive: showDeactivated });
   const { sources } = useLeadSources();
   const { hasPermission } = useAuth();
   const [showForm, setShowForm] = useState(false);
@@ -122,7 +124,7 @@ export default function LeadsPage() {
       header: "Lead",
       sortable: true,
       render: (l) => (
-        <div className="who">
+        <div className="who" style={l.isActive ? undefined : { opacity: 0.65 }}>
           <div className="av">{initials(l.customerName)}</div>
           <div className="lead-id">
             <b>{l.customerName}</b>
@@ -139,7 +141,16 @@ export default function LeadsPage() {
       render: (l) => l.uiContext?.productInterest ?? <span style={{ color: "var(--faint)" }}>—</span>,
     },
     { key: "score", header: "Score", render: (l) => (l.score ? <LeadScoreTag score={l.score} /> : <span style={{ color: "var(--faint)" }}>—</span>) },
-    { key: "status", header: "Status", render: (l) => <LeadStatusTag status={l.status} /> },
+    {
+      key: "status",
+      header: "Status",
+      render: (l) => (
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          <LeadStatusTag status={l.status} />
+          {!l.isActive && <LeadDeactivatedTag />}
+        </div>
+      ),
+    },
     {
       key: "followup",
       header: "Follow-up",
@@ -221,6 +232,16 @@ export default function LeadsPage() {
           value={search}
           onChange={(e) => { setSearch(e.target.value); setPage(1); }}
         />
+      </div>
+
+      <div style={{ marginBottom: 8 }}>
+        <ChipGroup>
+          <Chip
+            label="Show deactivated"
+            active={showDeactivated}
+            onClick={() => { setShowDeactivated((v) => !v); setPage(1); }}
+          />
+        </ChipGroup>
       </div>
 
       <FilterBar

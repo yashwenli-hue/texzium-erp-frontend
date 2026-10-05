@@ -1,9 +1,10 @@
 import { ID, ListQuery, Page } from "../../types/common";
 import { Lead, LeadStatus, LeadTimelineEntry } from "../../types/domain";
-import { ILeadRepository, CreateLeadInput, UpdateLeadInput, LeadSortField, LogLeadActivityInput } from "../interfaces";
+import { ILeadRepository, CreateLeadInput, UpdateLeadInput, LeadSortField, LeadListOptions, LogLeadActivityInput } from "../interfaces";
 import { apiFetch, ApiError } from "../../api/httpClient";
 import { applyListQuery } from "../shared/listQuery";
 import { validateLeadActivityInput } from "../shared/leadActivity";
+import { validateDeactivationReason } from "../shared/leadLifecycle";
 import { BackendLead, BackendLeadTimeline, mapLead, mapLeadTimeline } from "./mappers";
 
 const SEARCHABLE: (keyof Lead)[] = ["customerName", "companyName", "sourceName", "assignedToName", "email"];
@@ -16,8 +17,10 @@ const SEARCHABLE: (keyof Lead)[] = ["customerName", "companyName", "sourceName",
  * backend field (Stage 2A brief §6) and is dropped entirely here.
  */
 export class RealLeadRepository implements ILeadRepository {
-  async list(query?: ListQuery<LeadSortField>): Promise<Page<Lead>> {
-    const rows = await apiFetch<BackendLead[]>("/leads");
+  async list(query?: ListQuery<LeadSortField>, options?: LeadListOptions): Promise<Page<Lead>> {
+    // Inactive leads are left out by the backend unless asked for. The dedup key
+    // is the full path, so the two variants never share a request.
+    const rows = await apiFetch<BackendLead[]>(options?.includeInactive ? "/leads?includeInactive=true" : "/leads");
     return applyListQuery(rows.map(mapLead), query, SEARCHABLE);
   }
 
@@ -118,5 +121,21 @@ export class RealLeadRepository implements ILeadRepository {
       },
     });
     return mapLeadTimeline(row);
+  }
+
+  async deactivate(id: ID, reason: string): Promise<Lead> {
+    // Checked here with the backend's own rule, so a bad reason fails without a
+    // round trip. The actor is never sent: the backend uses the signed-in user.
+    const clean = validateDeactivationReason(reason);
+    const row = await apiFetch<BackendLead>(`/leads/${id}/deactivate`, {
+      method: "PATCH",
+      body: { reason: clean },
+    });
+    return mapLead(row);
+  }
+
+  async reactivate(id: ID): Promise<Lead> {
+    const row = await apiFetch<BackendLead>(`/leads/${id}/reactivate`, { method: "PATCH" });
+    return mapLead(row);
   }
 }

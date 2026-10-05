@@ -51,6 +51,9 @@ export function LeadHistoryTimeline({
                     {recordedLater(t) && t.recordedAt ? ` · recorded ${formatDateTime(t.recordedAt)}` : ""}
                   </small>
                 )}
+                {!employee && t.actorName && (
+                  <small style={{ color: "var(--muted)", fontSize: 11.5 }}>by {t.actorName}</small>
+                )}
               </div>
             </div>
           </div>

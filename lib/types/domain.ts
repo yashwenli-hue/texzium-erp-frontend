@@ -166,6 +166,20 @@ export interface Lead {
   sourceId: ID;
   sourceName: string; // denormalized — VERIFIED: lead list/detail includes the source relation
   status: LeadStatus;
+  /**
+   * VERIFIED: Lead.isActive. Deactivation is the safe way to remove an
+   * erroneous, duplicate, junk, test, or otherwise invalid lead from active
+   * sales without deleting its historical record. It is not a substitute for
+   * correcting valid lead information (use Edit for that). An inactive lead is
+   * hidden from normal lists and takes no sales writes until reactivated.
+   */
+  isActive: boolean;
+  /** Describe the CURRENT deactivation; all cleared when the lead is reactivated. */
+  deactivatedAt?: string; // ISO 8601
+  deactivatedById?: ID;
+  /** From the safe { id, fullName } the backend returns; absent if that user no longer exists. */
+  deactivatedByName?: string;
+  deactivationReason?: string;
   /** Frontend-only heuristic with no backend basis at all — leave unset for real leads rather than fabricate it. */
   score?: LeadScore;
   // Unset until the dedicated Assign action fires (AssignLeadDto / PRE_SALES_ASSIGNED).

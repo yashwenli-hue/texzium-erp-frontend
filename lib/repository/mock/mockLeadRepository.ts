@@ -5,9 +5,12 @@ import {
   CreateLeadInput,
   UpdateLeadInput,
   LeadSortField,
+  LeadListOptions,
   LogLeadActivityInput,
 } from "../interfaces";
 import { validateLeadActivityInput } from "../shared/leadActivity";
+import { describeDeactivationBlockers, validateDeactivationReason } from "../shared/leadLifecycle";
+import { assertMockLeadActive } from "./leadGuards";
 import { db } from "./db";
 import { delay } from "./queryUtils";
 import { applyListQuery } from "./queryUtils";
@@ -16,8 +19,9 @@ import { mockId } from "./entityStore";
 const SEARCHABLE: (keyof Lead)[] = ["customerName", "companyName", "sourceName", "assignedToName", "email"];
 
 export class MockLeadRepository implements ILeadRepository {
-  async list(query?: ListQuery<LeadSortField>): Promise<Page<Lead>> {
-    const page = applyListQuery(db.leads.getAll(), query, SEARCHABLE);
+  async list(query?: ListQuery<LeadSortField>, options?: LeadListOptions): Promise<Page<Lead>> {
+    const rows = db.leads.getAll().filter((l) => options?.includeInactive || l.isActive);
+    const page = applyListQuery(rows, query, SEARCHABLE);
     return delay(page);
   }
 
@@ -38,6 +42,7 @@ export class MockLeadRepository implements ILeadRepository {
       sourceId: input.sourceId,
       sourceName: source?.name ?? "Unknown source",
       status: "NEW",
+      isActive: true,
       score: "Warm",
       createdAt: now,
       updatedAt: now,
@@ -59,6 +64,7 @@ export class MockLeadRepository implements ILeadRepository {
   }
 
   async update(id: ID, input: UpdateLeadInput): Promise<Lead> {
+    assertMockLeadActive(id);
     const existing = db.leads.getById(id);
     if (!existing) throw new Error(`Lead ${id} not found`);
     const now = new Date().toISOString();
@@ -90,6 +96,7 @@ export class MockLeadRepository implements ILeadRepository {
   }
 
   async updateStatus(id: ID, status: LeadStatus): Promise<Lead> {
+    assertMockLeadActive(id);
     const now = new Date().toISOString();
     const updated = db.leads.update(id, { status, updatedAt: now, lastActivityAt: now });
     if (!updated) throw new Error(`Lead ${id} not found`);
@@ -107,6 +114,7 @@ export class MockLeadRepository implements ILeadRepository {
   }
 
   async assign(id: ID, assignedToId: ID, assignedToName: string): Promise<Lead> {
+    assertMockLeadActive(id);
     const now = new Date().toISOString();
     const updated = db.leads.update(id, { assignedToId, assignedToName, status: "PRE_SALES_ASSIGNED", updatedAt: now, lastActivityAt: now });
     if (!updated) throw new Error(`Lead ${id} not found`);
@@ -124,6 +132,7 @@ export class MockLeadRepository implements ILeadRepository {
   }
 
   async qualify(id: ID, salesUserId: ID): Promise<Lead> {
+    assertMockLeadActive(id);
     const lead = db.leads.getById(id);
     if (!lead) throw new Error(`Lead ${id} not found`);
     if (lead.status === "SALES_ASSIGNED" || lead.status === "QUALIFIED") throw new Error("Lead is already qualified");
@@ -145,6 +154,7 @@ export class MockLeadRepository implements ILeadRepository {
   }
 
   async reject(id: ID, reason: string): Promise<Lead> {
+    assertMockLeadActive(id);
     const lead = db.leads.getById(id);
     if (!lead) throw new Error(`Lead ${id} not found`);
     if (lead.status === "REJECTED") throw new Error("Lead is already rejected");
@@ -174,7 +184,7 @@ export class MockLeadRepository implements ILeadRepository {
 
   async logActivity(leadId: ID, input: LogLeadActivityInput): Promise<LeadTimelineEntry> {
     const valid = validateLeadActivityInput(input);
-    if (!db.leads.getById(leadId)) throw new Error(`Lead ${leadId} not found`);
+    assertMockLeadActive(leadId);
 
     const now = new Date().toISOString();
     const meta = leadActivityMeta(valid.activityType);
@@ -194,5 +204,75 @@ export class MockLeadRepository implements ILeadRepository {
     // Same as the backend: logging activity touches the lead's last-activity time, never its status.
     db.leads.update(leadId, { lastActivityAt: now, updatedAt: now });
     return delay(row);
+  }
+
+  // Same rules as the backend: a reason is required, an already deactivated lead
+  // is refused, and a lead with any opportunity or pending follow-up cannot be
+  // deactivated. Neither of those is ever changed.
+  async deactivate(id: ID, reason: string): Promise<Lead> {
+    const clean = validateDeactivationReason(reason);
+    const lead = db.leads.getById(id);
+    if (!lead) throw new Error("Lead not found.");
+    if (!lead.isActive) throw new Error("This lead is already deactivated.");
+
+    const blockers = describeDeactivationBlockers({
+      opportunities: db.opportunities.getAll().filter((o) => o.leadId === id).length,
+      pendingFollowups: db.leadFollowups.getAll().filter((f) => f.leadId === id && f.status === "PENDING").length,
+    });
+    if (blockers) throw new Error(blockers);
+
+    const now = new Date().toISOString();
+    const updated = db.leads.update(id, {
+      isActive: false,
+      deactivatedAt: now,
+      deactivatedById: "mock-user",
+      deactivatedByName: "You",
+      deactivationReason: clean,
+      updatedAt: now,
+      lastActivityAt: now,
+    });
+    if (!updated) throw new Error("Lead not found.");
+    db.leadTimeline.add({
+      source: "SYSTEM",
+      id: mockId("T"),
+      leadId: id,
+      icon: "alert",
+      title: "Lead Deactivated",
+      detail: clean,
+      actorName: "You",
+      actorId: "mock-user",
+      occurredAt: now,
+    });
+    return delay(updated);
+  }
+
+  async reactivate(id: ID): Promise<Lead> {
+    const lead = db.leads.getById(id);
+    if (!lead) throw new Error("Lead not found.");
+    if (lead.isActive) throw new Error("This lead is already active.");
+
+    const now = new Date().toISOString();
+    const updated = db.leads.update(id, {
+      isActive: true,
+      deactivatedAt: undefined,
+      deactivatedById: undefined,
+      deactivatedByName: undefined,
+      deactivationReason: undefined,
+      updatedAt: now,
+      lastActivityAt: now,
+    });
+    if (!updated) throw new Error("Lead not found.");
+    db.leadTimeline.add({
+      source: "SYSTEM",
+      id: mockId("T"),
+      leadId: id,
+      icon: "check",
+      title: "Lead Reactivated",
+      detail: "Lead reactivated.",
+      actorName: "You",
+      actorId: "mock-user",
+      occurredAt: now,
+    });
+    return delay(updated);
   }
 }

@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Icon } from "../../../components/ui/Icon";
 import { Panel } from "../../../components/ui/Card";
-import { StatusTag, QuotationStatusTag, LeadStatusTag, LeadScoreTag, Tag } from "../../../components/ui/Tag";
+import { StatusTag, QuotationStatusTag, LeadStatusTag, LeadDeactivatedTag, LeadScoreTag, Tag } from "../../../components/ui/Tag";
 import { SourceBadge } from "../../../components/ui/SourceBadge";
 import { FollowupTag } from "../../../components/ui/FollowupTag";
 import { QuickActions } from "../../../components/ui/QuickActions";
@@ -16,6 +16,8 @@ import { NoteForm } from "../../../components/forms/NoteForm";
 import { NoteDetailModal } from "../../../components/forms/NoteDetailModal";
 import { LeadActivityForm } from "../../../components/forms/LeadActivityForm";
 import { LeadHistoryTimeline } from "../../../components/ui/LeadHistoryTimeline";
+import { LeadDeactivationBanner } from "../../../components/ui/LeadDeactivationBanner";
+import { DeactivateLeadDialog } from "../../../components/forms/DeactivateLeadDialog";
 import { AssignLeadDialog } from "../../../components/forms/AssignLeadDialog";
 import { EditLeadDialog } from "../../../components/forms/EditLeadDialog";
 import { QualifyLeadDialog } from "../../../components/forms/QualifyLeadDialog";
@@ -57,7 +59,7 @@ export default function LeadDetailPage() {
   const router = useRouter();
   const toast = useToast();
   const id = params?.id;
-  const { lead, timeline, loading, error, refetch, logActivity, assignLead, qualifyLead, rejectLead, updateLead } = useLeadDetail(id);
+  const { lead, timeline, loading, error, refetch, logActivity, deactivateLead, reactivateLead, assignLead, qualifyLead, rejectLead, updateLead } = useLeadDetail(id);
   const { notes, refetch: refetchNotes } = useNotesByRelated(id);
   const { followups, createFollowup, completeFollowup, rescheduleFollowup, cancelFollowup } = useLeadFollowups(id);
   const { quotations } = useQuotations();
@@ -70,6 +72,8 @@ export default function LeadDetailPage() {
   const [showAssign, setShowAssign] = useState(false);
   const [showQualify, setShowQualify] = useState(false);
   const [showReject, setShowReject] = useState(false);
+  const [showDeactivate, setShowDeactivate] = useState(false);
+  const [reactivating, setReactivating] = useState(false);
   const [showConvert, setShowConvert] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
   const [followupDialog, setFollowupDialog] = useState<{ mode: "create" | "reschedule"; target?: LeadFollowup } | null>(null);
@@ -143,6 +147,22 @@ export default function LeadDetailPage() {
   const relatedQuotes = quotations.filter((q) => q.opportunityId && opportunityIds.has(q.opportunityId));
   const canQualify = !isQualifiedLeadStatus(lead.status) && lead.status !== "REJECTED";
   const canReject = lead.status !== "REJECTED";
+  // A deactivated lead takes no normal sales actions until it is reactivated.
+  const inactive = !lead.isActive;
+  const INACTIVE_HINT = "Reactivate this lead to make changes.";
+  const pendingFollowupCount = followups.filter((f) => f.status === "PENDING").length;
+
+  async function handleReactivate() {
+    setReactivating(true);
+    try {
+      await reactivateLead();
+      toast.show(`${lead!.customerName} reactivated`, "check");
+    } catch (err) {
+      toast.show(err instanceof Error ? err.message : "Could not reactivate this lead. Please try again.", "alert");
+    } finally {
+      setReactivating(false);
+    }
+  }
 
   const quoteColumns: Column<Quotation>[] = [
     { key: "quoteNo", header: "No.", render: (q) => q.quoteNo },
@@ -170,6 +190,16 @@ export default function LeadDetailPage() {
       </a>
       <div className="crm-grid">
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          {inactive && (
+            <LeadDeactivationBanner
+              deactivatedAt={lead.deactivatedAt}
+              deactivatedByName={lead.deactivatedByName}
+              reason={lead.deactivationReason}
+              canReactivate={hasPermission("leads.deactivate")}
+              busy={reactivating}
+              onReactivate={handleReactivate}
+            />
+          )}
           <div className="card panel">
             <div className="profile-head">
               <div className="top">
@@ -177,7 +207,7 @@ export default function LeadDetailPage() {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
                     <h3>{lead.customerName}</h3>
-                    {hasPermission("leads.edit") && (
+                    {hasPermission("leads.edit") && !inactive && (
                       <button className="iconlink" onClick={() => setShowEdit(true)} aria-label="Edit lead">
                         <Icon name="edit" size={14} /> Edit
                       </button>
@@ -190,6 +220,7 @@ export default function LeadDetailPage() {
               </div>
               <div className="tagrow">
                 <LeadStatusTag status={lead.status} />
+                {inactive && <LeadDeactivatedTag />}
                 <SourceBadge source={lead.sourceName} size={18} />
                 <Tag color="n">{lead.sourceName}</Tag>
                 <Tag color="n">{lead.assignedToName ? `Assigned: ${lead.assignedToName}` : "Unassigned"}</Tag>
@@ -201,8 +232,8 @@ export default function LeadDetailPage() {
                   variant="ghost"
                   icon="user"
                   onClick={() => setShowAssign(true)}
-                  disabled={!hasPermission("leads.assign")}
-                  title={hasPermission("leads.assign") ? undefined : "You don't have permission to assign leads"}
+                  disabled={inactive || !hasPermission("leads.assign")}
+                  title={inactive ? INACTIVE_HINT : hasPermission("leads.assign") ? undefined : "You don't have permission to assign leads"}
                 >
                   {lead.assignedToId ? "Reassign" : "Assign"}
                 </Button>
@@ -210,8 +241,8 @@ export default function LeadDetailPage() {
                   variant="ghost"
                   icon="check"
                   onClick={() => setShowQualify(true)}
-                  disabled={!canQualify || !hasPermission("leads.qualify")}
-                  title={hasPermission("leads.qualify") ? undefined : "You don't have permission to qualify leads"}
+                  disabled={inactive || !canQualify || !hasPermission("leads.qualify")}
+                  title={inactive ? INACTIVE_HINT : hasPermission("leads.qualify") ? undefined : "You don't have permission to qualify leads"}
                 >
                   Qualify
                 </Button>
@@ -220,11 +251,23 @@ export default function LeadDetailPage() {
                   className="danger-ghost"
                   icon="close"
                   onClick={() => setShowReject(true)}
-                  disabled={!canReject || !hasPermission("leads.reject")}
-                  title={hasPermission("leads.reject") ? undefined : "You don't have permission to reject leads"}
+                  disabled={inactive || !canReject || !hasPermission("leads.reject")}
+                  title={inactive ? INACTIVE_HINT : hasPermission("leads.reject") ? undefined : "You don't have permission to reject leads"}
                 >
                   Reject
                 </Button>
+                {!inactive && (
+                  <Button
+                    variant="ghost"
+                    className="danger-ghost"
+                    icon="alert"
+                    onClick={() => setShowDeactivate(true)}
+                    disabled={!hasPermission("leads.deactivate")}
+                    title={hasPermission("leads.deactivate") ? "Take this lead out of active sales without deleting it" : "You don't have permission to deactivate leads"}
+                  >
+                    Deactivate
+                  </Button>
+                )}
               </div>
             </div>
             <div className="info-grid">
@@ -235,7 +278,7 @@ export default function LeadDetailPage() {
                 <label>Next Follow-up</label>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <FollowupTag urgency={nextFollowup.urgency} dueAt={nextFollowup.dueAt} />
-                  {hasPermission("leads.followups.create") && (
+                  {hasPermission("leads.followups.create") && !inactive && (
                     <button className="iconlink" style={{ fontSize: 11.5 }} onClick={() => setFollowupDialog({ mode: "create" })}>
                       <Icon name="plus" size={12} /> Schedule
                     </button>
@@ -273,8 +316,8 @@ export default function LeadDetailPage() {
                       variant="primary"
                       icon="brief"
                       onClick={() => setShowConvert(true)}
-                      disabled={!hasPermission("opportunities.create")}
-                      title={hasPermission("opportunities.create") ? undefined : "You don't have permission to create opportunities"}
+                      disabled={inactive || !hasPermission("opportunities.create")}
+                      title={inactive ? INACTIVE_HINT : hasPermission("opportunities.create") ? undefined : "You don't have permission to create opportunities"}
                     >
                       Convert to Opportunity
                     </Button>
@@ -358,7 +401,7 @@ export default function LeadDetailPage() {
             title="Activity & History"
             flush
             extraHead={
-              hasPermission("leads.edit") ? (
+              hasPermission("leads.edit") && !inactive ? (
                 <a className="more" href="#" onClick={(e) => { e.preventDefault(); setShowActivityForm(true); }}>
                   <Icon name="plus" size={14} /> Log Activity
                 </a>
@@ -505,6 +548,15 @@ export default function LeadDetailPage() {
             await rejectLead(reason!);
             toast.show(`${lead.customerName} rejected`, "close");
           }}
+        />
+      )}
+      {showDeactivate && (
+        <DeactivateLeadDialog
+          customerName={lead.customerName}
+          opportunities={relatedOpportunities.length}
+          pendingFollowups={pendingFollowupCount}
+          onClose={() => setShowDeactivate(false)}
+          onSubmit={(reason) => deactivateLead(reason)}
         />
       )}
       {showConvert && (

@@ -3,13 +3,16 @@
 import { useCallback, useMemo, useState } from "react";
 import { useRepository } from "../repository/RepositoryProvider";
 import { useAsyncList } from "./useAsyncList";
-import { CreateLeadInput, UpdateLeadInput, LogLeadActivityInput } from "../repository/interfaces";
+import { CreateLeadInput, UpdateLeadInput, LogLeadActivityInput, LeadListOptions } from "../repository/interfaces";
 import { LeadStatus } from "../types/domain";
 import { FilterMap, SortState } from "../types/common";
 import { LeadSortField } from "../repository/interfaces";
 
-export function useLeads() {
+// Normal lists leave deactivated leads out. Pass { includeInactive: true } only
+// where they are explicitly wanted (e.g. the Leads list's "Show deactivated").
+export function useLeads(options?: LeadListOptions) {
   const repo = useRepository();
+  const includeInactive = !!options?.includeInactive;
   const [search, setSearch] = useState("");
   const [filters, setFilters] = useState<FilterMap>({});
   const [sort, setSort] = useState<SortState<LeadSortField>>({
@@ -20,8 +23,8 @@ export function useLeads() {
   const query = useMemo(() => ({ search, filters, sort }), [search, filters, sort]);
 
   const { data, loading, error, refetch } = useAsyncList(
-    () => repo.leads.list(query),
-    [repo, JSON.stringify(query)]
+    () => repo.leads.list(query, { includeInactive }),
+    [repo, JSON.stringify(query), includeInactive]
   );
 
   const createLead = useCallback(
@@ -112,6 +115,25 @@ export function useLeadDetail(id: string | undefined) {
     [id, repo, refetch, refetchTimeline]
   );
 
+  // Errors propagate (the backend's own message, e.g. why a lead cannot be
+  // deactivated) so the dialog can show them. Nothing is faked locally.
+  const deactivateLead = useCallback(
+    async (reason: string) => {
+      if (!id) return;
+      await repo.leads.deactivate(id, reason);
+      refetch();
+      refetchTimeline();
+    },
+    [id, repo, refetch, refetchTimeline]
+  );
+
+  const reactivateLead = useCallback(async () => {
+    if (!id) return;
+    await repo.leads.reactivate(id);
+    refetch();
+    refetchTimeline();
+  }, [id, repo, refetch, refetchTimeline]);
+
   const assignLead = useCallback(
     async (assignedToId: string, assignedToName: string) => {
       if (!id) return;
@@ -158,6 +180,8 @@ export function useLeadDetail(id: string | undefined) {
     loading,
     error,
     logActivity,
+    deactivateLead,
+    reactivateLead,
     assignLead,
     qualifyLead,
     rejectLead,

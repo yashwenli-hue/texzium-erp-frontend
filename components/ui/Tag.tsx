@@ -180,6 +180,15 @@ export function LeadStatusTag({ status }: { status: string }) {
   );
 }
 
+/** Shown next to (never instead of) the lead's pipeline status. Neutral on purpose: it is a record state, not a stage. */
+export function LeadDeactivatedTag() {
+  return (
+    <span className="tag" style={{ background: "var(--line-2)", color: "var(--muted)" }}>
+      Deactivated
+    </span>
+  );
+}
+
 // Light-tint treatment for Lead Score (Hot/Warm/Cold) — the same
 // restrained "pale background + dark readable text + small dot" pill every
 // other badge in the app uses, reusing the app's existing red/amber/blue

@@ -98,13 +98,13 @@ async function performRequest<T>(path: string, options: RequestOptions): Promise
  * GET only: every mutation (POST/PATCH/PUT/DELETE) always fires immediately
  * and is never deduplicated or shared.
  *
- * Keyed by path alone — verified safe: no GET call anywhere in this app
- * uses a query string, a request body, or a non-default `auth` flag (the
+ * Keyed by the full request path string — verified safe: no GET call
+ * anywhere in this app uses a request body or a non-default `auth` flag (the
  * one `auth: false` call, /auth/login, is a POST and never reaches this
- * branch). IDs are embedded directly in the path (e.g. `/leads/${id}`), so
- * the path already is the full request identity for every current call
- * site. If a future GET ever needs query parameters, include them in the
- * dedup key too — path-alone would then be wrong.
+ * branch). IDs and any query string are embedded directly in the path (e.g.
+ * `/leads/${id}`, `/leads?includeInactive=true`), so the path string already
+ * is the full request identity for every current call site, and two query
+ * variants of the same route never share a request.
  */
 const inFlightGets = new Map<string, Promise<unknown>>();
 

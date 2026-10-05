@@ -94,8 +94,13 @@ export interface LogLeadActivityInput {
   occurredAt?: string;
 }
 
+export interface LeadListOptions {
+  /** Include deactivated leads. Off by default: inactive leads stay out of normal lists. */
+  includeInactive?: boolean;
+}
+
 export interface ILeadRepository {
-  list(query?: ListQuery<LeadSortField>): Promise<Page<Lead>>;
+  list(query?: ListQuery<LeadSortField>, options?: LeadListOptions): Promise<Page<Lead>>;
   getById(id: ID): Promise<Lead | null>;
   create(input: CreateLeadInput): Promise<Lead>;
   update(id: ID, input: UpdateLeadInput): Promise<Lead>;
@@ -115,6 +120,15 @@ export interface ILeadRepository {
    * user, set by the backend — never sent from here.
    */
   logActivity(leadId: ID, input: LogLeadActivityInput): Promise<LeadTimelineEntry>;
+  /**
+   * VERIFIED: PATCH /leads/:id/deactivate { reason } (leads.deactivate). Takes an
+   * erroneous, duplicate, junk, test or otherwise invalid lead out of active
+   * sales without deleting its history. Refused for a lead that has any
+   * opportunity or pending follow-up. Never changes either of those.
+   */
+  deactivate(id: ID, reason: string): Promise<Lead>;
+  /** VERIFIED: PATCH /leads/:id/reactivate (leads.deactivate). Only restores the lead to active. */
+  reactivate(id: ID): Promise<Lead>;
 }
 
 export interface ILeadSourceRepository {
