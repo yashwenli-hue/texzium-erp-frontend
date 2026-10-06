@@ -552,20 +552,23 @@ export interface ProformaInvoice {
 // values: "OPEN" (via quotations.service.ts convertToSalesOrder(), and the
 // AdminOS Workflow Executor's unrelated QUOTATION_APPROVED trigger) and
 // "PENDING_STORE_APPROVAL" (via sales-orders.service.ts create(), the direct
-// POST /sales-orders path from an approved Proforma Invoice). Other values
-// observed in real data (e.g. "READY_FOR_INVOICING") are written exclusively
-// by unrelated OperationsOS (Dispatch Orders) and AdminOS (Workflow
-// Executor) modules — there is no RevenueOS-scoped endpoint that transitions
-// a Sales Order's status, so this stays a plain string rather than a closed
-// union, and no frontend action is offered for those other values. See the
-// Stage 2E report.
+// POST /sales-orders path from an approved Proforma Invoice). Since backend
+// commit 85c3666 RevenueOS also moves an order through its pre-dispatch
+// lifecycle: PENDING_STORE_APPROVAL -> PENDING_ACCOUNTS_APPROVAL (an advance
+// receipt is verified) -> READY_FOR_DISPATCH_ORDER (Accounts commercial
+// approval) — see lib/repository/shared/salesOrderLifecycle.ts. Other values
+// observed in real data (e.g. "READY_FOR_INVOICING", "DISPATCH_ORDER_CREATED")
+// are written exclusively by unrelated OperationsOS (Dispatch Orders) and
+// AdminOS (Workflow Executor) modules, so this stays a plain string rather
+// than a closed union, and no frontend action is offered for those values.
 export function formatSalesOrderStatus(status: string): string {
   return titleCaseFromConstant(status);
 }
 
-// VERIFIED CreateSalesOrderDto: proformaInvoiceId, orderDate, totalAmount,
+// VERIFIED CreateSalesOrderDto: proformaInvoiceId, orderDate,
 // inventoryItemId, orderQty, sellerGstId, buyerGstId — see
-// CreateSalesOrderInput. A Sales Order can also be created without any of
+// CreateSalesOrderInput. The order's total is NOT sent: the backend takes it
+// from the approved Proforma Invoice's totalAmount. A Sales Order can also be created without any of
 // those fields via POST /quotations/:id/convert (quotationId only) — the
 // two backend creation paths are independent and never cross-reference each
 // other, so a given Sales Order carries either quotationId or
@@ -594,6 +597,98 @@ export interface SalesOrder {
   taxType?: string;
   inventoryItemId?: ID;
   createdAt: string;
+}
+
+// ---------------------------------------------------------------------------
+// Sales Order commercial workflow (backend commits 1aa1a6c + 85c3666).
+// Payment types, modes and verification outcomes mirror the backend's accepted
+// values (and the Prisma enums PaymentType / PaymentMode).
+// ---------------------------------------------------------------------------
+export const SALES_ORDER_PAYMENT_TYPES = ["FULL_ADVANCE", "PARTIAL_ADVANCE", "CREDIT"] as const;
+export type SalesOrderPaymentType = (typeof SALES_ORDER_PAYMENT_TYPES)[number];
+
+export const SALES_ORDER_PAYMENT_MODES = ["CASH", "CHEQUE", "BANK_TRANSFER", "RTGS", "NEFT", "IMPS", "UPI"] as const;
+export type SalesOrderPaymentMode = (typeof SALES_ORDER_PAYMENT_MODES)[number];
+
+/** The only outcomes a verification can have. A receipt starts PENDING. */
+export const ADVANCE_RECEIPT_OUTCOMES = ["VERIFIED", "REJECTED"] as const;
+export type AdvanceReceiptOutcome = (typeof ADVANCE_RECEIPT_OUTCOMES)[number];
+
+export function formatPaymentType(value: string): string {
+  return titleCaseFromConstant(value);
+}
+
+export function formatPaymentMode(value: string): string {
+  return titleCaseFromConstant(value);
+}
+
+export interface SalesOrderPaymentTerm {
+  id: ID;
+  salesOrderId: ID;
+  paymentType: string;
+  advanceAmount: number;
+  balanceAmount: number;
+  creditDays?: number;
+  dueDate?: string;
+  remarks?: string;
+  createdAt: string;
+}
+
+export interface SalesOrderAdvanceReceipt {
+  id: ID;
+  salesOrderId: ID;
+  receiptDate: string;
+  amountReceived: number;
+  paymentMode: string;
+  referenceNo?: string;
+  remarks?: string;
+  /** PENDING until verified; then VERIFIED or REJECTED. */
+  verificationStatus: string;
+  /** Legacy display name the backend fills from the signed-in user. Not the actor of record (that is the lifecycle event's actor). */
+  verifiedBy?: string;
+  verifiedAt?: string;
+  createdAt: string;
+}
+
+export interface SalesOrderCommercialApproval {
+  id: ID;
+  salesOrderId: ID;
+  /** Legacy display name the backend fills from the signed-in user. Not the actor of record. */
+  approvedBy: string;
+  remarks?: string;
+  createdAt: string;
+}
+
+/**
+ * One row of a Sales Order's lifecycle (audit) history: who verified, rejected
+ * or approved, with what result. Separate from general notes. The backend
+ * writes these only for advance verification, rejection and accounts approval
+ * (not for order creation, payment terms or receipt entry).
+ */
+export interface SalesOrderEvent {
+  id: ID;
+  salesOrderId: ID;
+  /** e.g. ADVANCE_RECEIPT_VERIFIED, ADVANCE_RECEIPT_REJECTED, ACCOUNTS_APPROVED */
+  action: string;
+  /** VERIFIED, REJECTED or APPROVED */
+  result?: string;
+  fromStatus?: string;
+  toStatus?: string;
+  remarks?: string;
+  /** From the event's actor { id, fullName }; empty when the account no longer exists. */
+  actorName: string;
+  actorId?: ID;
+  occurredAt: string;
+}
+
+const SALES_ORDER_EVENT_LABEL: Record<string, string> = {
+  ADVANCE_RECEIPT_VERIFIED: "Advance receipt verified",
+  ADVANCE_RECEIPT_REJECTED: "Advance receipt rejected",
+  ACCOUNTS_APPROVED: "Accounts commercial approval given",
+};
+
+export function formatSalesOrderEventAction(action: string): string {
+  return SALES_ORDER_EVENT_LABEL[action] ?? titleCaseFromConstant(action);
 }
 
 // VERIFIED: DispatchOrder is an OperationsOS resource (dispatch-orders

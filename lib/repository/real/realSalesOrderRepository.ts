@@ -1,27 +1,28 @@
 import { ID, ListQuery, Page } from "../../types/common";
-import { Quotation, SalesOrder } from "../../types/domain";
+import { Quotation, SalesOrder, SalesOrderEvent } from "../../types/domain";
 import { CreateSalesOrderInput, IQuotationRepository, ISalesOrderRepository, SalesOrderSortField } from "../interfaces";
-import { apiFetch } from "../../api/httpClient";
+import { apiFetch, ApiError } from "../../api/httpClient";
 import { applyListQuery } from "../shared/listQuery";
-import { BackendSalesOrder, mapSalesOrder } from "./mappers";
+import { SalesOrderConflictError, toCreateSalesOrderBody } from "../shared/salesOrderLifecycle";
+import { BackendSalesOrder, BackendSalesOrderEvent, mapSalesOrder, mapSalesOrderEvent } from "./mappers";
 
 const SEARCHABLE: (keyof SalesOrder)[] = ["salesOrderCode", "customerName", "opportunityName", "ownerName", "quoteNo"];
 
 /**
- * VERIFIED sales-orders routes: POST /, GET / only — no GET /:id and no
- * approve/reject/status-transition route of any kind, despite
- * sales-orders.service.ts having an unused updateStatus() method with no
- * controller route calling it (confirmed by reading both files directly).
- * getById() list-scans, same pattern as Quotations/Proforma Invoices. GET
- * /sales-orders nests the raw ProformaInvoice only (never the Quotation),
- * so this repository takes the real Quotation repository as a dependency to
- * resolve customerName/opportunityName/ownerName/quoteNo, same pattern as
- * RealProformaInvoiceRepository.
+ * VERIFIED sales-orders routes (backend 85c3666): POST /, GET / and
+ * GET /:id/events — still no GET /:id, so getById() list-scans, same pattern
+ * as Quotations/Proforma Invoices. The order's status is never changed from
+ * here: it moves only through the advance-receipt and accounts-approval actions
+ * (see RealSalesOrderCommercialRepository). GET /sales-orders nests the raw
+ * ProformaInvoice only (never the Quotation), so this repository takes the real
+ * Quotation repository as a dependency to resolve customerName/opportunityName/
+ * ownerName/quoteNo, same pattern as RealProformaInvoiceRepository.
  *
- * SECURITY NOTE (not fixed — backend is read-only): the sales-orders
- * controller has no `@UseGuards`/`@Permissions` at all — every route here
- * is reachable without a JWT, same as Quotations and Proforma Invoices.
- * Confirmed by reading sales-orders.controller.ts directly.
+ * Every route needs a signed-in user and its salesorders.* permission
+ * (salesorders.view for the two reads, salesorders.create for create).
+ *
+ * The create body carries no total: the backend takes it from the approved
+ * Proforma Invoice and refuses any other value (see toCreateSalesOrderBody).
  */
 export class RealSalesOrderRepository implements ISalesOrderRepository {
   constructor(private quotations: IQuotationRepository) {}
@@ -50,21 +51,28 @@ export class RealSalesOrderRepository implements ISalesOrderRepository {
   }
 
   async create(input: CreateSalesOrderInput): Promise<SalesOrder> {
-    const raw = await apiFetch<BackendSalesOrder>("/sales-orders", {
-      method: "POST",
-      body: {
-        proformaInvoiceId: input.proformaInvoiceId,
-        orderDate: input.orderDate,
-        totalAmount: input.totalAmount,
-        inventoryItemId: input.inventoryItemId,
-        orderQty: input.orderQty,
-        sellerGstId: input.sellerGstId,
-        buyerGstId: input.buyerGstId,
-      },
-    });
+    let raw: BackendSalesOrder;
+    try {
+      raw = await apiFetch<BackendSalesOrder>("/sales-orders", {
+        method: "POST",
+        body: toCreateSalesOrderBody(input),
+      });
+    } catch (err) {
+      if (err instanceof ApiError) {
+        // 409: the Proforma is not approved, or already has a Sales Order.
+        if (err.status === 409) throw new SalesOrderConflictError(err.message);
+        if (err.status === 403) throw new ApiError("You don't have permission to create Sales Orders.", 403, err.details);
+      }
+      throw err;
+    }
     const created = await this.getById(raw.id);
     if (created) return created;
     // Fallback in the unlikely event the immediate re-fetch races the write.
     return mapSalesOrder(raw, new Map());
+  }
+
+  async listEvents(id: ID): Promise<SalesOrderEvent[]> {
+    const rows = await apiFetch<BackendSalesOrderEvent[]>(`/sales-orders/${id}/events`);
+    return rows.map(mapSalesOrderEvent);
   }
 }

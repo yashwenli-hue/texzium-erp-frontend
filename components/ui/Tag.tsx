@@ -89,10 +89,23 @@ export function ProformaInvoiceStatusTag({ status }: { status: string }) {
 export const SALES_ORDER_STATUS_STYLE: Record<string, TagColor> = {
   OPEN: "n",
   PENDING_STORE_APPROVAL: "w",
+  PENDING_ACCOUNTS_APPROVAL: "w",
+  READY_FOR_DISPATCH_ORDER: "g",
 };
 
 export function SalesOrderStatusTag({ status }: { status: string }) {
   return <Tag color={SALES_ORDER_STATUS_STYLE[status] ?? "i"}>{formatSalesOrderStatus(status)}</Tag>;
+}
+
+// Advance receipt verification: PENDING until a person verifies or rejects it.
+export const ADVANCE_RECEIPT_STATUS_STYLE: Record<string, TagColor> = {
+  PENDING: "w",
+  VERIFIED: "g",
+  REJECTED: "b",
+};
+
+export function AdvanceReceiptStatusTag({ status }: { status: string }) {
+  return <Tag color={ADVANCE_RECEIPT_STATUS_STYLE[status] ?? "n"}>{formatSalesOrderStatus(status)}</Tag>;
 }
 
 // Sales Invoice status is an open-ended backend string — the RevenueOS

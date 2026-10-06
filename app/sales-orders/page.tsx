@@ -121,10 +121,11 @@ export default function SalesOrdersPage() {
       <DesignNote>
         <b>Design note.</b> A Sales Order is created one of two independent, verified ways: converting an
         approved Quotation (<code>POST /quotations/:id/convert</code>), or directly from an approved Proforma
-        Invoice (<code>POST /sales-orders</code>) — the backend never links these two paths together. There is
-        no verified endpoint to approve, reject, or otherwise transition a Sales Order&apos;s status from this
-        screen; the multi-gate approval workflow described in the RevenueOS data model (store approval, advance
-        receipt verification, accounts approval) has no RevenueOS-scoped API route behind it yet. Order No.
+        Invoice (<code>POST /sales-orders</code>) — the backend never links these two paths together. Orders
+        created from a Proforma enter the commercial workflow on their detail page: verifying an advance receipt
+        moves them to Pending Accounts Approval, and Accounts approval makes them Ready For Dispatch Order, with
+        who did each step recorded in the order&apos;s lifecycle history. Orders created by converting a Quotation
+        (status Open) do not enter that workflow. Order No.
         falls back to a short reference when the backend hasn&apos;t assigned a real code (no verified code path
         in this controller sets one).
       </DesignNote>

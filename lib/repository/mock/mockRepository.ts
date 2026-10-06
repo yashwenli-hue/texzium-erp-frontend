@@ -12,6 +12,7 @@ import { MockOpportunityRepository } from "./mockOpportunityRepository";
 import { MockQuotationRepository } from "./mockQuotationRepository";
 import { MockProformaInvoiceRepository } from "./mockProformaInvoiceRepository";
 import { MockSalesOrderRepository } from "./mockSalesOrderRepository";
+import { MockSalesOrderCommercialRepository } from "./mockSalesOrderCommercialRepository";
 import { MockSalesInvoiceRepository } from "./mockSalesInvoiceRepository";
 import { MockDispatchOrderRepository } from "./mockDispatchOrderRepository";
 import { MockAccountsReceivableRepository } from "./mockAccountsReceivableRepository";
@@ -50,6 +51,7 @@ export function createMockRepository(): RevenueOSRepository {
     quotations: new MockQuotationRepository(),
     proformaInvoices: new MockProformaInvoiceRepository(),
     salesOrders: new MockSalesOrderRepository(),
+    salesOrderCommercial: new MockSalesOrderCommercialRepository(),
     salesInvoices: new MockSalesInvoiceRepository(),
     dispatchOrders: new MockDispatchOrderRepository(),
     accountsReceivable: new MockAccountsReceivableRepository(),

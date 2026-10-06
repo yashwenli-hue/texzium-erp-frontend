@@ -21,6 +21,11 @@ import {
   Quotation,
   ProformaInvoice,
   SalesOrder,
+  SalesOrderEvent,
+  SalesOrderPaymentTerm,
+  SalesOrderAdvanceReceipt,
+  SalesOrderCommercialApproval,
+  AdvanceReceiptOutcome,
   SalesInvoice,
   DispatchOrderOption,
   AccountsReceivable,
@@ -332,19 +337,18 @@ export interface IProformaInvoiceRepository {
   approve(id: ID): Promise<ProformaInvoice>;
 }
 
-// Mirrors the VERIFIED CreateSalesOrderDto exactly: proformaInvoiceId,
-// orderDate, totalAmount, inventoryItemId, orderQty, sellerGstId,
-// buyerGstId. This is the direct POST /sales-orders creation path, which
-// hard-requires an APPROVED Proforma Invoice (validated server-side in
-// sales-orders.service.ts, along with the inventory item and both GST
-// registrations). It is independent of IQuotationRepository.convert() —
-// the backend does not connect the two, so a Sales Order created this way
-// is never a duplicate of one created via Quotation conversion. See the
-// Stage 2E report.
+// Mirrors the VERIFIED CreateSalesOrderDto: proformaInvoiceId, orderDate,
+// inventoryItemId, orderQty, sellerGstId, buyerGstId. This is the direct
+// POST /sales-orders creation path, which hard-requires an APPROVED Proforma
+// Invoice (validated server-side, along with the inventory item and both GST
+// registrations). There is deliberately NO total: the backend takes the
+// order's total from the approved Proforma Invoice's totalAmount and refuses
+// any other value, so the frontend neither collects nor sends one. Only one
+// Sales Order can be created per Proforma Invoice (a second is a 409). It is
+// independent of IQuotationRepository.convert().
 export interface CreateSalesOrderInput {
   proformaInvoiceId: ID;
   orderDate: string; // ISO 8601
-  totalAmount: number;
   inventoryItemId: ID;
   orderQty: number;
   sellerGstId: ID;
@@ -354,7 +358,71 @@ export interface CreateSalesOrderInput {
 export interface ISalesOrderRepository {
   list(query?: ListQuery<SalesOrderSortField>): Promise<Page<SalesOrder>>;
   getById(id: ID): Promise<SalesOrder | null>;
+  /** Throws SalesOrderConflictError (409) when the Proforma is not approved or already has a Sales Order. */
   create(input: CreateSalesOrderInput): Promise<SalesOrder>;
+  /**
+   * VERIFIED: `GET /sales-orders/:id/events` (permission salesorders.view) — the
+   * order's lifecycle history, newest first: advance verified / rejected and
+   * accounts approval, each with its actor. Not general notes.
+   */
+  listEvents(id: ID): Promise<SalesOrderEvent[]>;
+}
+
+export interface CreatePaymentTermInput {
+  salesOrderId: ID;
+  paymentType: string;
+  advanceAmount: number;
+  balanceAmount: number;
+  creditDays?: number;
+  dueDate?: string; // date or ISO 8601
+  remarks?: string;
+}
+
+export interface CreateAdvanceReceiptInput {
+  salesOrderId: ID;
+  receiptDate: string; // date or ISO 8601
+  amountReceived: number;
+  paymentMode: string;
+  referenceNo?: string;
+  remarks?: string;
+}
+
+/**
+ * The RevenueOS commercial workflow of a Sales Order, against the verified
+ * backend routes (backend commit 85c3666). Every action's actor is the signed-in
+ * user, decided by the backend — none of these inputs carries an actor, a
+ * verifier or an approver. Lifecycle remarks are optional and belong to the
+ * lifecycle event, not to the general Notes system.
+ *
+ * The three list methods return every row for one Sales Order and are only
+ * allowed with their own view permission (salesorders.paymentterms.view,
+ * salesorders.advancereceipts.view, salesorders.commercialapproval.view).
+ *
+ * Mutations throw SalesOrderConflictError (409) when the order or receipt is
+ * no longer in the expected state; the backend's status is authoritative.
+ */
+export interface ISalesOrderCommercialRepository {
+  listPaymentTerms(salesOrderId: ID): Promise<SalesOrderPaymentTerm[]>;
+  createPaymentTerm(input: CreatePaymentTermInput): Promise<SalesOrderPaymentTerm>;
+  listAdvanceReceipts(salesOrderId: ID): Promise<SalesOrderAdvanceReceipt[]>;
+  createAdvanceReceipt(input: CreateAdvanceReceiptInput): Promise<SalesOrderAdvanceReceipt>;
+  /**
+   * `PATCH /sales-order-advance-receipt/:id/verify` { verificationStatus, remarks? }.
+   * VERIFIED moves the order PENDING_STORE_APPROVAL -> PENDING_ACCOUNTS_APPROVAL;
+   * REJECTED leaves the order's status unchanged. Returns the status the backend
+   * reports for the order afterwards.
+   */
+  verifyAdvanceReceipt(
+    receiptId: ID,
+    outcome: AdvanceReceiptOutcome,
+    remarks?: string
+  ): Promise<{ receipt: SalesOrderAdvanceReceipt; salesOrderStatus: string }>;
+  listApprovals(salesOrderId: ID): Promise<SalesOrderCommercialApproval[]>;
+  /** `POST /accounts-commercial-approval/create` { salesOrderId, remarks? }: PENDING_ACCOUNTS_APPROVAL -> READY_FOR_DISPATCH_ORDER only. */
+  approve(
+    salesOrderId: ID,
+    remarks?: string
+  ): Promise<{ approval: SalesOrderCommercialApproval; salesOrderStatus: string }>;
 }
 
 // Mirrors the VERIFIED CreateSalesInvoiceDto exactly: salesOrderId,
@@ -518,6 +586,7 @@ export interface RevenueOSRepository {
   quotations: IQuotationRepository;
   proformaInvoices: IProformaInvoiceRepository;
   salesOrders: ISalesOrderRepository;
+  salesOrderCommercial: ISalesOrderCommercialRepository;
   salesInvoices: ISalesInvoiceRepository;
   dispatchOrders: IDispatchOrderRepository;
   accountsReceivable: IAccountsReceivableRepository;

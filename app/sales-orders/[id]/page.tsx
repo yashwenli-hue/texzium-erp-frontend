@@ -4,18 +4,40 @@ import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Icon } from "../../../components/ui/Icon";
 import { Panel } from "../../../components/ui/Card";
-import { SalesOrderStatusTag, SalesInvoiceStatusTag, DispatchOrderStatusTag, Tag } from "../../../components/ui/Tag";
+import { SalesOrderStatusTag, SalesInvoiceStatusTag, DispatchOrderStatusTag, AdvanceReceiptStatusTag, Tag } from "../../../components/ui/Tag";
 import { Button, EmptyState } from "../../../components/ui/Button";
 import { DataTable, Column } from "../../../components/ui/DataTable";
 import { DesignNote } from "../../../components/ui/PageHeader";
 import { DocumentTrail } from "../../../components/ui/DocumentTrail";
 import { SalesInvoiceForm } from "../../../components/forms/SalesInvoiceForm";
+import { SalesOrderPaymentTermForm } from "../../../components/forms/SalesOrderPaymentTermForm";
+import { SalesOrderAdvanceReceiptForm } from "../../../components/forms/SalesOrderAdvanceReceiptForm";
+import { SalesOrderLifecycleHistory } from "../../../components/ui/SalesOrderLifecycleHistory";
+import { LifecycleStepper } from "../../../components/ui/LifecycleStepper";
+import { ConfirmDialog } from "../../../components/ui/ConfirmDialog";
+import { useToast } from "../../../components/ui/Toast";
+import { useAuth } from "../../../lib/auth/AuthContext";
 import { useSalesOrderDetail } from "../../../lib/hooks/useSalesOrders";
 import { useSalesInvoices } from "../../../lib/hooks/useSalesInvoices";
 import { useDispatchOrders } from "../../../lib/hooks/useDispatchOrders";
 import { initials } from "../../../components/ui/Who";
 import { formatInr, formatDate } from "../../../lib/format";
-import { SalesInvoice } from "../../../lib/types/domain";
+import {
+  SalesInvoice,
+  SalesOrderAdvanceReceipt,
+  SalesOrderPaymentTerm,
+  formatPaymentMode,
+  formatPaymentType,
+  formatSalesOrderStatus,
+} from "../../../lib/types/domain";
+import {
+  SALES_ORDER_LIFECYCLE_STATUS,
+  SALES_ORDER_PERMISSIONS,
+  canGiveAccountsApproval,
+  canRecordCommercialDocuments,
+  canVerifyAdvanceReceipt,
+  isInSalesOrderLifecycle,
+} from "../../../lib/repository/shared/salesOrderLifecycle";
 
 function goBackOrTo(router: ReturnType<typeof useRouter>, fallback: string) {
   if (typeof window !== "undefined" && window.history.length > 1) {
@@ -29,10 +51,38 @@ export default function SalesOrderDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const id = params?.id;
-  const { salesOrder, proforma, quotation, opportunity, loading, error, refetch } = useSalesOrderDetail(id);
+  const toast = useToast();
+  const { hasPermission } = useAuth();
+  const {
+    salesOrder,
+    proforma,
+    quotation,
+    opportunity,
+    loading,
+    error,
+    refetch,
+    access,
+    paymentTerms,
+    paymentTermsError,
+    advanceReceipts,
+    advanceReceiptsError,
+    approvals,
+    approvalsError,
+    events,
+    eventsLoading,
+    eventsError,
+    createPaymentTerm,
+    createAdvanceReceipt,
+    verifyAdvanceReceipt,
+    approveCommercially,
+  } = useSalesOrderDetail(id);
   const { salesInvoices, createSalesInvoice, refetch: refetchInvoices } = useSalesInvoices();
   const { dispatchOrders } = useDispatchOrders();
   const [showInvoiceForm, setShowInvoiceForm] = useState(false);
+  const [showTermForm, setShowTermForm] = useState(false);
+  const [showReceiptForm, setShowReceiptForm] = useState(false);
+  const [receiptAction, setReceiptAction] = useState<{ kind: "verify" | "reject"; receipt: SalesOrderAdvanceReceipt } | null>(null);
+  const [showApprove, setShowApprove] = useState(false);
 
   if (loading && !salesOrder) {
     return (
@@ -99,6 +149,73 @@ export default function SalesOrderDetailPage() {
   const linkedDispatchOrders = dispatchOrders.filter((d) => d.salesOrderId === salesOrder.id);
   const canCreateInvoice = salesOrder.status === "READY_FOR_INVOICING" && matchingDispatchedOrders.length > 0;
   const relatedInvoices = salesInvoices.filter((i) => i.salesOrderId === salesOrder.id);
+
+  // ---- Commercial workflow. An action is offered when the order's status fits it
+  // AND the person holds its permission (shown disabled, with the reason, when
+  // they do not). The backend re-checks both and its answer wins: a refused
+  // action shows the backend's message and reloads everything.
+  const status = salesOrder.status;
+  const inWorkflow = isInSalesOrderLifecycle(status);
+  const mayRecordTerms = hasPermission(SALES_ORDER_PERMISSIONS.paymentTermsCreate);
+  const mayRecordReceipts = hasPermission(SALES_ORDER_PERMISSIONS.advanceReceiptsCreate);
+  const mayVerify = hasPermission(SALES_ORDER_PERMISSIONS.advanceReceiptsVerify);
+  const mayApprove = hasPermission(SALES_ORDER_PERMISSIONS.commercialApprovalApprove);
+  const documentsOpen = canRecordCommercialDocuments(status);
+  const noPermission = (what: string) => `You don't have permission to ${what}`;
+
+  const termColumns: Column<SalesOrderPaymentTerm>[] = [
+    { key: "type", header: "Type", render: (t) => formatPaymentType(t.paymentType) },
+    { key: "advance", header: "Advance", render: (t) => formatInr(t.advanceAmount) },
+    { key: "balance", header: "Balance", render: (t) => formatInr(t.balanceAmount) },
+    {
+      key: "credit",
+      header: "Credit / Due",
+      render: (t) =>
+        [t.creditDays !== undefined ? `${t.creditDays} days` : null, t.dueDate ? `due ${formatDate(t.dueDate)}` : null].filter(Boolean).join(" · ") || "—",
+    },
+    { key: "remarks", header: "Remarks", render: (t) => t.remarks ?? "—" },
+  ];
+
+  const receiptColumns: Column<SalesOrderAdvanceReceipt>[] = [
+    { key: "date", header: "Date", render: (r) => formatDate(r.receiptDate) },
+    { key: "amount", header: "Amount", render: (r) => formatInr(r.amountReceived) },
+    { key: "mode", header: "Mode", render: (r) => formatPaymentMode(r.paymentMode) + (r.referenceNo ? ` · ${r.referenceNo}` : "") },
+    { key: "status", header: "Status", render: (r) => <AdvanceReceiptStatusTag status={r.verificationStatus} /> },
+    {
+      key: "verified",
+      header: "Decided",
+      render: (r) => (r.verifiedAt ? `${r.verifiedBy ?? "—"} · ${formatDate(r.verifiedAt)}` : "—"),
+    },
+    {
+      key: "actions",
+      header: "",
+      render: (r) =>
+        r.verificationStatus === "PENDING" ? (
+          <div style={{ display: "flex", gap: 6 }}>
+            {canVerifyAdvanceReceipt(status) && (
+              <Button
+                variant="primary"
+                disabled={!mayVerify}
+                title={mayVerify ? undefined : noPermission("verify advance receipts")}
+                onClick={() => setReceiptAction({ kind: "verify", receipt: r })}
+              >
+                Verify
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              className="danger-ghost"
+              disabled={!mayVerify}
+              title={mayVerify ? undefined : noPermission("reject advance receipts")}
+              onClick={() => setReceiptAction({ kind: "reject", receipt: r })}
+            >
+              Reject
+            </Button>
+          </div>
+        ) : null,
+    },
+  ];
+
   const invoiceColumns: Column<SalesInvoice>[] = [
     { key: "invoiceNumber", header: "Invoice No.", render: (i) => i.invoiceNumber },
     { key: "totalAmount", header: "Amount", render: (i) => formatInr(i.totalAmount) },
@@ -199,29 +316,205 @@ export default function SalesOrderDetailPage() {
           )}
           <Panel title="Downstream">
             <p style={{ fontSize: 12.5, color: "var(--muted)" }}>
-              There is no verified action to approve, reject, or otherwise move this order through its own
-              status from this screen — the RevenueOS Sales Orders API only supports creating and listing
-              orders. Its remaining lifecycle (store approval, advance receipt, accounts approval) belongs to
-              separate backend modules with no confirmed screen here yet. Dispatch is the one exception: once
-              a Dispatch Order linked to this order is marked DISPATCHED (an OperationsOS action outside this
-              app), this order&apos;s status becomes &quot;Ready For Invoicing&quot; and Create Sales Invoice
-              above becomes available.
+              Payment terms, advance receipts and Accounts approval are handled in the Commercial workflow below.
+              Once Accounts approves, the order is &quot;Ready For Dispatch Order&quot;. Dispatch itself is an
+              OperationsOS action outside this app: when a Dispatch Order linked to this order is marked DISPATCHED,
+              the order&apos;s status becomes &quot;Ready For Invoicing&quot; and Create Sales Invoice above becomes available.
             </p>
+          </Panel>
+        </div>
+      </div>
+
+      <div className="crm-grid" style={{ marginTop: 16 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <Panel title="Commercial workflow">
+            {inWorkflow ? (
+              <LifecycleStepper
+                steps={[
+                  { key: SALES_ORDER_LIFECYCLE_STATUS.PENDING_STORE_APPROVAL, label: "Store approval" },
+                  { key: SALES_ORDER_LIFECYCLE_STATUS.PENDING_ACCOUNTS_APPROVAL, label: "Accounts approval" },
+                  { key: SALES_ORDER_LIFECYCLE_STATUS.READY_FOR_DISPATCH_ORDER, label: "Ready for dispatch" },
+                ]}
+                currentKey={status}
+              />
+            ) : (
+              <p style={{ fontSize: 12.5, color: "var(--muted)" }}>
+                This order is {formatSalesOrderStatus(status)}, which is outside the commercial approval steps (Pending
+                Store Approval → Pending Accounts Approval → Ready For Dispatch Order) that apply to orders created from
+                a Proforma Invoice.
+              </p>
+            )}
+            {canGiveAccountsApproval(status) && (
+              <div style={{ marginTop: 14 }}>
+                <Button
+                  variant="primary"
+                  icon="check"
+                  disabled={!mayApprove}
+                  title={mayApprove ? undefined : noPermission("give accounts commercial approval")}
+                  onClick={() => setShowApprove(true)}
+                >
+                  Give Accounts Approval
+                </Button>
+              </div>
+            )}
+            {approvals.length > 0 && (
+              <div style={{ marginTop: 14 }}>
+                {approvals.map((a) => (
+                  <p key={a.id} style={{ fontSize: 12.5, color: "var(--muted)" }}>
+                    Accounts approval given by <b style={{ color: "var(--text)" }}>{a.approvedBy}</b> on {formatDate(a.createdAt)}
+                    {a.remarks ? ` — “${a.remarks}”` : ""}
+                  </p>
+                ))}
+              </div>
+            )}
+            {!access.viewApprovals && (
+              <p style={{ fontSize: 12, color: "var(--faint)", marginTop: 10 }}>
+                You don&apos;t have permission to view accounts approvals.
+              </p>
+            )}
+            {approvalsError && <p style={{ fontSize: 12, color: "var(--bad)", marginTop: 10 }}>{approvalsError.message}</p>}
+          </Panel>
+
+          <Panel
+            title="Payment Terms"
+            flush
+            extraHead={
+              documentsOpen && mayRecordTerms ? (
+                <a className="more" href="#" onClick={(e) => { e.preventDefault(); setShowTermForm(true); }}>
+                  <Icon name="plus" size={14} /> Set Payment Terms
+                </a>
+              ) : undefined
+            }
+          >
+            {!access.viewTerms ? (
+              <p style={{ fontSize: 12.5, color: "var(--muted)", padding: "14px 19px" }}>
+                You don&apos;t have permission to view payment terms.
+              </p>
+            ) : paymentTermsError ? (
+              <p style={{ fontSize: 12.5, color: "var(--bad)", padding: "14px 19px" }}>{paymentTermsError.message}</p>
+            ) : (
+              <DataTable
+                columns={termColumns}
+                rows={paymentTerms}
+                emptyTitle="No payment terms yet"
+                emptyBody={documentsOpen ? "Set the payment terms agreed for this order." : "Payment terms can be set while the order is waiting for store or accounts approval."}
+              />
+            )}
+          </Panel>
+
+          <Panel
+            title="Advance Receipts"
+            flush
+            extraHead={
+              documentsOpen && mayRecordReceipts ? (
+                <a className="more" href="#" onClick={(e) => { e.preventDefault(); setShowReceiptForm(true); }}>
+                  <Icon name="plus" size={14} /> Record Advance Receipt
+                </a>
+              ) : undefined
+            }
+          >
+            {!access.viewReceipts ? (
+              <p style={{ fontSize: 12.5, color: "var(--muted)", padding: "14px 19px" }}>
+                You don&apos;t have permission to view advance receipts.
+              </p>
+            ) : advanceReceiptsError ? (
+              <p style={{ fontSize: 12.5, color: "var(--bad)", padding: "14px 19px" }}>{advanceReceiptsError.message}</p>
+            ) : (
+              <DataTable
+                columns={receiptColumns}
+                rows={advanceReceipts}
+                emptyTitle="No advance receipts yet"
+                emptyBody={
+                  documentsOpen
+                    ? "Record the advance payment received. Verifying it moves the order to Accounts approval."
+                    : "Advance receipts can be recorded while the order is waiting for store or accounts approval."
+                }
+              />
+            )}
+          </Panel>
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <Panel title="Lifecycle history">
+            <p style={{ fontSize: 12, color: "var(--faint)", marginBottom: 10 }}>
+              Audit trail of advance verifications, rejections and accounts approvals for this order. It is not a
+              place for general notes.
+            </p>
+            {!access.viewHistory ? (
+              <p style={{ fontSize: 12.5, color: "var(--muted)" }}>You don&apos;t have permission to view this order&apos;s history.</p>
+            ) : eventsError ? (
+              <p style={{ fontSize: 12.5, color: "var(--bad)" }}>{eventsError.message}</p>
+            ) : eventsLoading && events.length === 0 ? (
+              <div className="skeleton" style={{ height: 80 }} />
+            ) : (
+              <SalesOrderLifecycleHistory events={events} />
+            )}
           </Panel>
         </div>
       </div>
 
       <DesignNote>
         <b>Design note.</b> This order was created either by converting an approved Quotation (
-        <code>POST /quotations/:id/convert</code>, linked by quotationId, always status <code>OPEN</code>) or
+        <code>POST /quotations/:id/convert</code>, linked by quotationId, status <code>OPEN</code>) or
         directly from an approved Proforma Invoice (<code>POST /sales-orders</code>, linked by
-        proformaInvoiceId, always status <code>PENDING_STORE_APPROVAL</code>) — never both, and the backend
-        does not connect the two paths. &quot;Ready For Invoicing&quot; is written by the OperationsOS
-        Dispatch Orders service the moment a linked Dispatch Order is marked DISPATCHED — the intended
-        lifecycle is Sales Order → Dispatch Order → Sales Invoice, so Create Sales Invoice above only appears
-        once that real status is reached and a matching dispatched order is found; there is no
-        Quotation/Proforma → Sales Invoice shortcut anywhere in this app.
+        proformaInvoiceId, status <code>PENDING_STORE_APPROVAL</code>, total taken from that Proforma) — never
+        both. Only orders from a Proforma enter the commercial workflow: verifying an advance receipt moves the
+        order to Pending Accounts Approval, and Accounts approval makes it Ready For Dispatch Order. The backend
+        decides who did what (the signed-in user) and keeps it in the lifecycle history; a rejected advance leaves
+        the status unchanged. &quot;Ready For Invoicing&quot; is written by the OperationsOS Dispatch Orders service
+        when a linked Dispatch Order is marked DISPATCHED, so Create Sales Invoice only appears once that real
+        status is reached and a matching dispatched order is found.
       </DesignNote>
+
+      {showTermForm && (
+        <SalesOrderPaymentTermForm
+          salesOrderCode={salesOrder.salesOrderCode}
+          orderTotal={salesOrder.totalAmount}
+          onClose={() => setShowTermForm(false)}
+          onSubmit={(input) => createPaymentTerm(input)}
+        />
+      )}
+
+      {showReceiptForm && (
+        <SalesOrderAdvanceReceiptForm
+          salesOrderCode={salesOrder.salesOrderCode}
+          onClose={() => setShowReceiptForm(false)}
+          onSubmit={(input) => createAdvanceReceipt(input)}
+        />
+      )}
+
+      {receiptAction && (
+        <ConfirmDialog
+          title={receiptAction.kind === "verify" ? "Verify Advance Receipt" : "Reject Advance Receipt"}
+          body={
+            receiptAction.kind === "verify"
+              ? `Verify the advance receipt of ${formatInr(receiptAction.receipt.amountReceived)} (${formatPaymentMode(receiptAction.receipt.paymentMode)})? ${salesOrder.salesOrderCode} will move to Pending Accounts Approval.`
+              : `Reject the advance receipt of ${formatInr(receiptAction.receipt.amountReceived)} (${formatPaymentMode(receiptAction.receipt.paymentMode)})? ${salesOrder.salesOrderCode} stays at ${formatSalesOrderStatus(status)}, and the rejection is recorded in its history.`
+          }
+          confirmLabel={receiptAction.kind === "verify" ? "Verify" : "Reject"}
+          destructive={receiptAction.kind === "reject"}
+          noteLabel="Remarks (optional)"
+          onClose={() => setReceiptAction(null)}
+          onConfirm={async (note) => {
+            await verifyAdvanceReceipt(receiptAction.receipt.id, receiptAction.kind === "verify" ? "VERIFIED" : "REJECTED", note);
+            toast.show(receiptAction.kind === "verify" ? "Advance receipt verified" : "Advance receipt rejected", receiptAction.kind === "verify" ? "check" : "close");
+          }}
+        />
+      )}
+
+      {showApprove && (
+        <ConfirmDialog
+          title="Give Accounts Commercial Approval"
+          body={`Approve ${salesOrder.salesOrderCode} commercially? It will become Ready For Dispatch Order.`}
+          confirmLabel="Approve"
+          noteLabel="Remarks (optional)"
+          onClose={() => setShowApprove(false)}
+          onConfirm={async (note) => {
+            await approveCommercially(note);
+            toast.show("Accounts commercial approval given", "check");
+          }}
+        />
+      )}
 
       {showInvoiceForm && (
         <SalesInvoiceForm

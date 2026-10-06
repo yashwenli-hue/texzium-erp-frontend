@@ -7,6 +7,7 @@ import { RealUserRepository } from "./realUserRepository";
 import { RealQuotationRepository } from "./realQuotationRepository";
 import { RealProformaInvoiceRepository } from "./realProformaInvoiceRepository";
 import { RealSalesOrderRepository } from "./realSalesOrderRepository";
+import { RealSalesOrderCommercialRepository } from "./realSalesOrderCommercialRepository";
 import { RealSalesInvoiceRepository } from "./realSalesInvoiceRepository";
 import { RealDispatchOrderRepository } from "./realDispatchOrderRepository";
 import { RealAccountsReceivableRepository } from "./realAccountsReceivableRepository";
@@ -60,6 +61,7 @@ export function createRealRepository(): RevenueOSRepository {
     quotations,
     proformaInvoices,
     salesOrders,
+    salesOrderCommercial: new RealSalesOrderCommercialRepository(),
     salesInvoices,
     dispatchOrders: new RealDispatchOrderRepository(),
     accountsReceivable: new RealAccountsReceivableRepository(),

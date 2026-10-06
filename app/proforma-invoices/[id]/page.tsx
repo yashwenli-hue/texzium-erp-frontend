@@ -14,6 +14,8 @@ import { SalesOrderForm } from "../../../components/forms/SalesOrderForm";
 import { useProformaInvoiceDetail } from "../../../lib/hooks/useProformaInvoices";
 import { useSalesOrders } from "../../../lib/hooks/useSalesOrders";
 import { useToast } from "../../../components/ui/Toast";
+import { useAuth } from "../../../lib/auth/AuthContext";
+import { SALES_ORDER_PERMISSIONS } from "../../../lib/repository/shared/salesOrderLifecycle";
 import { initials } from "../../../components/ui/Who";
 import { formatInr, formatDate } from "../../../lib/format";
 import { SalesOrder } from "../../../lib/types/domain";
@@ -30,6 +32,7 @@ export default function ProformaInvoiceDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const toast = useToast();
+  const { hasPermission } = useAuth();
   const id = params?.id;
   const { proforma, quotation, opportunity, loading, error, refetch, approveProformaInvoice } = useProformaInvoiceDetail(id);
   const { salesOrders, createSalesOrder, refetch: refetchSalesOrders } = useSalesOrders();
@@ -90,8 +93,11 @@ export default function ProformaInvoiceDetailPage() {
   // (validated server-side in sales-orders.service.ts) — this is a real
   // backend precondition, not just a UX safeguard, unlike the equivalent
   // gates on the Quotation detail page.
-  const canCreateSalesOrder = proforma.status === "APPROVED";
   const relatedSalesOrders = salesOrders.filter((o) => o.proformaInvoiceId === proforma.id);
+  // One Sales Order per Proforma: the backend refuses a second (409), so the
+  // action is only offered while none exists. It also needs salesorders.create.
+  const mayCreateSalesOrders = hasPermission(SALES_ORDER_PERMISSIONS.create);
+  const canCreateSalesOrder = proforma.status === "APPROVED" && relatedSalesOrders.length === 0 && mayCreateSalesOrders;
   const salesOrderColumns: Column<SalesOrder>[] = [
     { key: "salesOrderCode", header: "Order No.", render: (o) => o.salesOrderCode },
     { key: "totalAmount", header: "Amount", render: (o) => formatInr(o.totalAmount) },
@@ -168,14 +174,24 @@ export default function ProformaInvoiceDetailPage() {
               rows={relatedSalesOrders}
               onRowClick={(o) => router.push(`/sales-orders/${o.id}`)}
               emptyTitle="No sales orders yet"
-              emptyBody={canCreateSalesOrder ? "Create one to move into Quote-to-Cash." : "Approve this proforma invoice first."}
+              emptyBody={
+                proforma.status !== "APPROVED"
+                  ? "Approve this proforma invoice first."
+                  : mayCreateSalesOrders
+                  ? "Create one to move into Quote-to-Cash."
+                  : "You don't have permission to create sales orders."
+              }
             />
           </Panel>
           <Panel title="Downstream">
             <p style={{ fontSize: 12.5, color: "var(--muted)" }}>
-              {proforma.status === "APPROVED"
-                ? "This proforma invoice is approved. Create a Sales Order above — the backend allows creating more than one from the same proforma (no duplicate check exists server-side), so check the list above before creating another."
-                : "Approve this proforma invoice to create a Sales Order from it."}
+              {proforma.status !== "APPROVED"
+                ? "Approve this proforma invoice to create a Sales Order from it."
+                : relatedSalesOrders.length > 0
+                ? "A Sales Order already exists for this proforma invoice. Only one can be created from each."
+                : mayCreateSalesOrders
+                ? "This proforma invoice is approved. Create a Sales Order above — its total is this proforma's total, and only one order can be created from it."
+                : "This proforma invoice is approved. You don't have permission to create sales orders from it."}
             </p>
           </Panel>
         </div>
@@ -206,7 +222,7 @@ export default function ProformaInvoiceDetailPage() {
         <SalesOrderForm
           proformaInvoiceId={proforma.id}
           proformaNumber={proforma.proformaNumber}
-          defaultTotalAmount={proforma.totalAmount}
+          proformaTotalAmount={proforma.totalAmount}
           onClose={() => setShowSalesOrderForm(false)}
           onSubmit={async (input) => {
             const o = await createSalesOrder(input);

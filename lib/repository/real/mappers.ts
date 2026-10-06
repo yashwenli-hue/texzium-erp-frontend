@@ -16,6 +16,10 @@ import {
   ProformaInvoice,
   ProformaInvoiceStatus,
   SalesOrder,
+  SalesOrderEvent,
+  SalesOrderPaymentTerm,
+  SalesOrderAdvanceReceipt,
+  SalesOrderCommercialApproval,
   SalesInvoice,
   DispatchOrderOption,
   AccountsReceivable,
@@ -456,6 +460,112 @@ export function mapSalesOrder(raw: BackendSalesOrder, quotationById: Map<string,
     taxType: raw.taxType ?? undefined,
     inventoryItemId: raw.inventoryItemId ?? undefined,
     createdAt: raw.createdAt,
+  };
+}
+
+export interface BackendSalesOrderPaymentTerm {
+  id: string;
+  salesOrderId: string;
+  paymentType: string;
+  advanceAmount: number;
+  balanceAmount: number;
+  creditDays?: number | null;
+  dueDate?: string | null;
+  remarks?: string | null;
+  createdAt: string;
+}
+
+export function mapSalesOrderPaymentTerm(raw: BackendSalesOrderPaymentTerm): SalesOrderPaymentTerm {
+  return {
+    id: raw.id,
+    salesOrderId: raw.salesOrderId,
+    paymentType: raw.paymentType,
+    advanceAmount: raw.advanceAmount,
+    balanceAmount: raw.balanceAmount,
+    creditDays: raw.creditDays ?? undefined,
+    dueDate: raw.dueDate ?? undefined,
+    remarks: raw.remarks ?? undefined,
+    createdAt: raw.createdAt,
+  };
+}
+
+export interface BackendSalesOrderAdvanceReceipt {
+  id: string;
+  salesOrderId: string;
+  receiptDate: string;
+  amountReceived: number;
+  paymentMode: string;
+  referenceNo?: string | null;
+  remarks?: string | null;
+  verificationStatus: string;
+  verifiedBy?: string | null;
+  verifiedAt?: string | null;
+  createdAt: string;
+}
+
+export function mapSalesOrderAdvanceReceipt(raw: BackendSalesOrderAdvanceReceipt): SalesOrderAdvanceReceipt {
+  return {
+    id: raw.id,
+    salesOrderId: raw.salesOrderId,
+    receiptDate: raw.receiptDate,
+    amountReceived: raw.amountReceived,
+    paymentMode: raw.paymentMode,
+    referenceNo: raw.referenceNo ?? undefined,
+    remarks: raw.remarks ?? undefined,
+    verificationStatus: raw.verificationStatus,
+    verifiedBy: raw.verifiedBy ?? undefined,
+    verifiedAt: raw.verifiedAt ?? undefined,
+    createdAt: raw.createdAt,
+  };
+}
+
+export interface BackendAccountsCommercialApproval {
+  id: string;
+  salesOrderId: string;
+  approvedBy: string;
+  remarks?: string | null;
+  status?: string;
+  createdAt: string;
+}
+
+export function mapSalesOrderCommercialApproval(raw: BackendAccountsCommercialApproval): SalesOrderCommercialApproval {
+  return {
+    id: raw.id,
+    salesOrderId: raw.salesOrderId,
+    approvedBy: raw.approvedBy,
+    remarks: raw.remarks ?? undefined,
+    createdAt: raw.createdAt,
+  };
+}
+
+export interface BackendSalesOrderEvent {
+  id: string;
+  salesOrderId: string;
+  action: string;
+  result?: string | null;
+  fromStatus?: string | null;
+  toStatus?: string | null;
+  referenceId?: string | null;
+  remarks?: string | null;
+  actorId?: string | null;
+  /** Exposed as { id, fullName } only. Null when the actor's account no longer exists. */
+  actor?: { id: string; fullName: string } | null;
+  occurredAt: string;
+  createdAt: string;
+}
+
+export function mapSalesOrderEvent(raw: BackendSalesOrderEvent): SalesOrderEvent {
+  return {
+    id: raw.id,
+    salesOrderId: raw.salesOrderId,
+    action: raw.action,
+    result: raw.result ?? undefined,
+    fromStatus: raw.fromStatus ?? undefined,
+    toStatus: raw.toStatus ?? undefined,
+    remarks: raw.remarks ?? undefined,
+    actorName: raw.actor?.fullName ?? "",
+    actorId: raw.actor?.id ?? raw.actorId ?? undefined,
+    occurredAt: raw.occurredAt ?? raw.createdAt,
   };
 }
 

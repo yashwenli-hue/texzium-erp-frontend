@@ -10,28 +10,31 @@ import { useInventoryItems, useSellerGstRegistrations, useBuyerGstRegistrations 
 import { formatInr } from "../../lib/format";
 
 /**
- * Field-for-field mirror of the VERIFIED CreateSalesOrderDto: proformaInvoiceId
- * (fixed — always created from a specific, already-APPROVED Proforma Invoice),
- * orderDate, totalAmount, inventoryItemId, orderQty, sellerGstId, buyerGstId.
- * Reuses the same Inventory Item / Seller GST / Buyer GST lookups the
- * Quotation creation form uses — the backend validates all three the same way
- * (sales-orders.service.ts) and re-derives taxType/placeOfSupply from the GST
- * pair server-side, so none of that is computed or sent here. totalAmount is
- * NOT backend-computed for Sales Orders (unlike Quotations) — it defaults to
- * the source Proforma's own total but remains editable, since the backend
- * imposes no cross-check against it, same as ProformaInvoiceForm. See the
- * Stage 2E report.
+ * Mirror of the VERIFIED CreateSalesOrderDto: proformaInvoiceId (fixed —
+ * always created from a specific, already-APPROVED Proforma Invoice),
+ * orderDate, inventoryItemId, orderQty, sellerGstId, buyerGstId. Reuses the
+ * same Inventory Item / Seller GST / Buyer GST lookups the Quotation creation
+ * form uses — the backend validates all three the same way and re-derives
+ * taxType/placeOfSupply from the GST pair server-side, so none of that is
+ * computed or sent here.
+ *
+ * There is NO total field. The order's total is the approved Proforma
+ * Invoice's totalAmount, set by the backend: this form shows it read-only and
+ * neither collects nor sends an amount, so it cannot be overridden. No tax is
+ * calculated here. Only one Sales Order can be created per Proforma Invoice;
+ * if one already exists the backend refuses and its message is shown.
  */
 export function SalesOrderForm({
   proformaInvoiceId,
   proformaNumber,
-  defaultTotalAmount,
+  proformaTotalAmount,
   onClose,
   onSubmit,
 }: {
   proformaInvoiceId: string;
   proformaNumber: string;
-  defaultTotalAmount: number;
+  /** The approved Proforma Invoice's total — the order's total, shown read-only. */
+  proformaTotalAmount: number;
   onClose: () => void;
   onSubmit: (input: CreateSalesOrderInput) => Promise<unknown>;
 }) {
@@ -41,7 +44,6 @@ export function SalesOrderForm({
   const { registrations: buyerGstOptions, loading: buyerGstLoading } = useBuyerGstRegistrations();
 
   const [orderDate, setOrderDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const [totalAmount, setTotalAmount] = useState(String(defaultTotalAmount));
   const [inventoryItemId, setInventoryItemId] = useState("");
   const [orderQty, setOrderQty] = useState("1");
   const [sellerGstId, setSellerGstId] = useState("");
@@ -62,8 +64,6 @@ export function SalesOrderForm({
   function validate(): boolean {
     const e: Record<string, string> = {};
     if (!orderDate) e.orderDate = "Order date is required";
-    if (!totalAmount.trim() || isNaN(Number(totalAmount)) || Number(totalAmount) <= 0)
-      e.totalAmount = "Enter a valid amount greater than 0";
     if (!effectiveInventoryItemId) e.inventoryItemId = "Select an inventory item";
     if (!orderQty.trim() || isNaN(Number(orderQty)) || Number(orderQty) <= 0)
       e.orderQty = "Enter a quantity greater than 0";
@@ -80,7 +80,6 @@ export function SalesOrderForm({
       await onSubmit({
         proformaInvoiceId,
         orderDate: new Date(orderDate).toISOString(),
-        totalAmount: Number(totalAmount),
         inventoryItemId: effectiveInventoryItemId,
         orderQty: Number(orderQty),
         sellerGstId: effectiveSellerGstId,
@@ -158,18 +157,15 @@ export function SalesOrderForm({
           Inactive GST registrations are shown greyed out and can&apos;t be newly selected.
         </p>
       )}
-      <TextField
-        label="Total Amount (₹)"
-        required
-        type="number"
-        min={0}
-        value={totalAmount}
-        onChange={(e) => setTotalAmount(e.target.value)}
-        error={errors.totalAmount}
-      />
-      <p style={{ fontSize: 11.5, color: "var(--faint)", marginTop: -10 }}>
-        Defaulted from the proforma invoice&apos;s total ({formatInr(defaultTotalAmount)}) — the backend
-        doesn&apos;t recompute this, so double-check it before creating.
+      <div
+        data-testid="sales-order-total"
+        style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", padding: "10px 12px", border: "1px solid var(--line-2)", borderRadius: 10, marginBottom: 6 }}
+      >
+        <span style={{ fontSize: 12.5, color: "var(--muted)" }}>Order total</span>
+        <b style={{ fontSize: 15 }}>{formatInr(proformaTotalAmount)}</b>
+      </div>
+      <p style={{ fontSize: 11.5, color: "var(--faint)", marginTop: 0 }}>
+        The order total is the approved proforma invoice&apos;s total. It is set when the order is created and can&apos;t be changed here.
       </p>
       <p style={{ fontSize: 11.5, color: "var(--faint)" }}>
         If the selected item&apos;s available stock is short of the order quantity, the backend

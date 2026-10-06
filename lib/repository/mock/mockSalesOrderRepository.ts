@@ -1,5 +1,5 @@
 import { ID, ListQuery, Page } from "../../types/common";
-import { SalesOrder } from "../../types/domain";
+import { SalesOrder, SalesOrderEvent } from "../../types/domain";
 import {
   ISalesOrderRepository,
   CreateSalesOrderInput,
@@ -8,6 +8,12 @@ import {
 import { db } from "./db";
 import { delay, applyListQuery } from "./queryUtils";
 import { mockId } from "./entityStore";
+import {
+  SALES_ORDER_ALREADY_EXISTS_MESSAGE,
+  SALES_ORDER_LIFECYCLE_STATUS,
+  SALES_ORDER_PROFORMA_NOT_APPROVED_MESSAGE,
+  SalesOrderConflictError,
+} from "../shared/salesOrderLifecycle";
 
 const SEARCHABLE: (keyof SalesOrder)[] = ["salesOrderCode", "customerName", "opportunityName", "ownerName", "quoteNo"];
 
@@ -18,6 +24,11 @@ let orderCounter = 5210;
  * verified path (Quotation conversion) is mock-modeled on
  * MockQuotationRepository.convert() instead, same split as the real
  * repositories (RealSalesOrderRepository vs RealQuotationRepository.convert()).
+ *
+ * Follows the backend's rules (commit 85c3666): the order's total is the
+ * approved Proforma's total (the input carries none), the Proforma must be
+ * APPROVED, and only one Sales Order can be created per Proforma. The
+ * lifecycle that follows lives in MockSalesOrderCommercialRepository.
  */
 export class MockSalesOrderRepository implements ISalesOrderRepository {
   async list(query?: ListQuery<SalesOrderSortField>): Promise<Page<SalesOrder>> {
@@ -30,16 +41,20 @@ export class MockSalesOrderRepository implements ISalesOrderRepository {
 
   async create(input: CreateSalesOrderInput): Promise<SalesOrder> {
     const proforma = db.proformaInvoices.getById(input.proformaInvoiceId);
-    if (!proforma) throw new Error(`Proforma invoice ${input.proformaInvoiceId} not found`);
-    if (proforma.status !== "APPROVED") throw new Error("Sales Order can only be created from APPROVED Proforma Invoice");
+    if (!proforma) throw new Error("Proforma Invoice not found.");
+    if (proforma.status !== "APPROVED") throw new SalesOrderConflictError(SALES_ORDER_PROFORMA_NOT_APPROVED_MESSAGE);
+    if (db.salesOrders.getAll().some((o) => o.proformaInvoiceId === proforma.id)) {
+      throw new SalesOrderConflictError(SALES_ORDER_ALREADY_EXISTS_MESSAGE);
+    }
     orderCounter += 1;
     const now = new Date().toISOString();
     const salesOrder: SalesOrder = {
       id: mockId("SO"),
       salesOrderCode: `SO-${orderCounter}`,
       orderDate: input.orderDate,
-      totalAmount: input.totalAmount,
-      status: "PENDING_STORE_APPROVAL",
+      // Never the caller's: the approved Proforma's total is authoritative.
+      totalAmount: proforma.totalAmount,
+      status: SALES_ORDER_LIFECYCLE_STATUS.PENDING_STORE_APPROVAL,
       proformaInvoiceId: proforma.id,
       proformaNumber: proforma.proformaNumber,
       quotationId: proforma.quotationId,
@@ -53,5 +68,14 @@ export class MockSalesOrderRepository implements ISalesOrderRepository {
     };
     db.salesOrders.add(salesOrder);
     return delay(salesOrder);
+  }
+
+  async listEvents(id: ID): Promise<SalesOrderEvent[]> {
+    if (!db.salesOrders.getById(id)) throw new Error("Sales Order not found.");
+    const events = db.salesOrderEvents
+      .getAll()
+      .filter((e) => e.salesOrderId === id)
+      .sort((a, b) => +new Date(b.occurredAt) - +new Date(a.occurredAt));
+    return delay(events);
   }
 }

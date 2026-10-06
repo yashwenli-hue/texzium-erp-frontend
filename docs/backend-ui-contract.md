@@ -53,7 +53,7 @@ FRONTEND RULE: Use the existing auth contract. Do not invent a second authentica
 - Opportunities: `POST /`, `GET /`, `GET /:id`, `PATCH /:id/stage`
 - Quotations: `POST /`, `PATCH /:id/status`, `PATCH /:id/revise`, `PATCH /:id/approve`, `POST /:id/convert`, `GET /`
 - Proforma invoices: `POST /`, `GET /`, `PATCH /:id/approve`
-- Sales orders: `POST /`, `GET /`
+- Sales orders: `POST /`, `GET /`, `GET /:id/events`
 - Sales order payment terms: `POST /create`, `GET /`
 - Sales order advance receipts: `POST /create`, `PATCH /:id/verify`, `GET /`
 - Sales invoices: `POST /`, `GET /`
@@ -242,10 +242,9 @@ VERIFIED: approval sets customer status to `APPROVED`.
 
 ## 10. Sales orders
 
-VERIFIED CreateSalesOrderDto:
+VERIFIED CreateSalesOrderDto (backend commit `85c3666`):
 - `proformaInvoiceId`
 - `orderDate`
-- `totalAmount`
 - `inventoryItemId`
 - `orderQty`
 - `sellerGstId`
@@ -255,6 +254,10 @@ VERIFIED: creation validates approved proforma, inventory item, seller/buyer GST
 
 VERIFIED: inventory shortage can create a PurchaseRequisition.
 VERIFIED: creation starts at `PENDING_STORE_APPROVAL`.
+VERIFIED: the order's total is the approved Proforma's `totalAmount`. The frontend sends no total (a differing client total is refused with 400), shows the Proforma total read-only, and calculates no tax.
+VERIFIED: only one Sales Order can be created per Proforma (a second is a 409). Existing duplicates are untouched.
+VERIFIED: every Sales Order route (and payment terms, advance receipts, accounts approval) needs a signed-in user and a `salesorders.*` permission: `salesorders.view`, `.create`, `.paymentterms.view|create`, `.advancereceipts.view|create|verify`, `.commercialapproval.view|approve`. Users must sign in again after the permissions are granted.
+VERIFIED: `GET /sales-orders/:id/events` (`salesorders.view`) returns the lifecycle history, newest first, with the actor as `{ id, fullName }`. Events exist only for advance verified, advance rejected and accounts approved.
 
 FRONTEND RULE: Do not bypass store approval, GST validation or inventory validation.
 
@@ -279,18 +282,19 @@ VERIFIED CreateSalesOrderAdvanceReceiptDto:
 - `referenceNo?`
 - `remarks?`
 
-VERIFIED VerifySalesOrderAdvanceReceiptDto:
-- `verifiedBy`
-- `verificationStatus`
+VERIFIED VerifySalesOrderAdvanceReceiptDto (backend commit `85c3666`):
+- `verificationStatus` (only `VERIFIED` or `REJECTED`)
+- `remarks?` (lifecycle remarks, stored on the event; not general Notes)
 
-VERIFIED: verification moves the sales order to `PENDING_ACCOUNTS_APPROVAL`.
+VERIFIED: `VERIFIED` moves the order `PENDING_STORE_APPROVAL` -> `PENDING_ACCOUNTS_APPROVAL`; `REJECTED` leaves the order's status unchanged and is recorded as an `ADVANCE_RECEIPT_REJECTED` event. There is no `ADVANCE_REJECTED` status. A receipt can be decided once; a refused state is a 409.
 
 VERIFIED CreateAccountsCommercialApprovalDto:
 - `salesOrderId`
-- `approvedBy`
 - `remarks?`
 
-VERIFIED: commercial approval works when order is `PENDING_ACCOUNTS_APPROVAL` and successful approval moves it to `READY_FOR_DISPATCH_ORDER`.
+VERIFIED: commercial approval only works when the order is `PENDING_ACCOUNTS_APPROVAL` (otherwise 409) and moves it to `READY_FOR_DISPATCH_ORDER`.
+
+VERIFIED: the actor of every verification and approval is the signed-in user, recorded on the lifecycle event. `verifiedBy` / `approvedBy` are legacy columns the backend fills from the user's name; the frontend never sends them (nor `actorId`, a status or a total), and the backend rejects them.
 
 FRONTEND RULE: Do not invent status values.
 
