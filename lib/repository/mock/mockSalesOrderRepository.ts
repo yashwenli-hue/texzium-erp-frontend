@@ -9,6 +9,13 @@ import { db } from "./db";
 import { delay, applyListQuery } from "./queryUtils";
 import { mockId } from "./entityStore";
 import {
+  isProformaExpired,
+  proformaExpiredMessage,
+  proformaParentQuotationNotApprovedMessage,
+  proformaTotalsDifferMessage,
+} from "../shared/proformaLifecycle";
+import { QUOTATION_AMOUNT_TOLERANCE } from "../shared/quotationLifecycle";
+import {
   SALES_ORDER_ALREADY_EXISTS_MESSAGE,
   SALES_ORDER_LIFECYCLE_STATUS,
   SALES_ORDER_PROFORMA_NOT_APPROVED_MESSAGE,
@@ -21,10 +28,8 @@ const SEARCHABLE: (keyof SalesOrder)[] = ["salesOrderCode", "customerName", "opp
 let orderCounter = 5210;
 
 /**
- * Mirrors the direct POST /sales-orders creation path only — the other
- * verified path (Quotation conversion) is mock-modeled on
- * MockQuotationRepository.convert() instead, same split as the real
- * repositories (RealSalesOrderRepository vs RealQuotationRepository.convert()).
+ * Mirrors POST /sales-orders, the only way a Sales Order is created (the old
+ * Quotation conversion no longer exists, in the backend or here).
  *
  * Follows the backend's rules (commit 85c3666): the order's total is the
  * approved Proforma's total (the input carries none), the Proforma must be
@@ -44,6 +49,19 @@ export class MockSalesOrderRepository implements ISalesOrderRepository {
     const proforma = db.proformaInvoices.getById(input.proformaInvoiceId);
     if (!proforma) throw new Error("Proforma Invoice not found.");
     if (proforma.status !== "APPROVED") throw new SalesOrderConflictError(SALES_ORDER_PROFORMA_NOT_APPROVED_MESSAGE);
+    // The same extra checks as the backend (commit 1d0b1dc), in its order: the
+    // Proforma must not have expired, its quotation must still be APPROVED, and
+    // the two totals must agree within a paisa.
+    if (proforma.validityDate && isProformaExpired(proforma.validityDate)) {
+      throw new SalesOrderConflictError(proformaExpiredMessage(proforma.validityDate, "used to create a Sales Order"));
+    }
+    const quotation = db.quotations.getById(proforma.quotationId);
+    if (quotation && quotation.status !== "APPROVED") {
+      throw new SalesOrderConflictError(proformaParentQuotationNotApprovedMessage(quotation.status));
+    }
+    if (quotation && Math.abs(proforma.totalAmount - (quotation.totalAmount ?? quotation.amount)) > QUOTATION_AMOUNT_TOLERANCE + 1e-6) {
+      throw new SalesOrderConflictError(proformaTotalsDifferMessage(proforma.totalAmount, quotation.totalAmount ?? quotation.amount));
+    }
     // One NON-cancelled order per Proforma: a cancelled order stays in history but no longer blocks a replacement.
     if (db.salesOrders.getAll().some((o) => o.proformaInvoiceId === proforma.id && isLiveSalesOrder(o.status))) {
       throw new SalesOrderConflictError(SALES_ORDER_ALREADY_EXISTS_MESSAGE);

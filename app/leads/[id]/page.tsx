@@ -166,7 +166,7 @@ export default function LeadDetailPage() {
 
   const quoteColumns: Column<Quotation>[] = [
     { key: "quoteNo", header: "No.", render: (q) => q.quoteNo },
-    { key: "amount", header: "Amount", render: (q) => `${formatInr(q.amount)} · V${q.version}` },
+    { key: "amount", header: "Amount", render: (q) => formatInr(q.amount) },
     { key: "status", header: "Status", render: (q) => <QuotationStatusTag status={q.status} /> },
   ];
 

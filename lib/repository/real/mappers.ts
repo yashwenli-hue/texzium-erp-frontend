@@ -12,6 +12,8 @@ import {
   Opportunity,
   OpportunityStage,
   Quotation,
+  QuotationEvent,
+  ProformaEvent,
   QuotationStatus,
   ProformaInvoice,
   ProformaInvoiceStatus,
@@ -40,6 +42,7 @@ import {
   leadActivityMeta,
   isOpportunityStage,
 } from "../../types/domain";
+import { isProformaExpired } from "../shared/proformaLifecycle";
 
 /**
  * Raw shapes as the backend actually returns them (Stage 2A discovery
@@ -344,11 +347,8 @@ export function mapQuotation(raw: BackendQuotation, opportunityById: Map<string,
     opportunityName: opp?.title ?? "—",
     amount: raw.totalAmount,
     status: raw.status as QuotationStatus,
-    validUntil: null,
     ownerName: opp?.ownerName ?? "Unassigned",
     createdAt: raw.createdAt,
-    version: 1,
-    revisions: [],
     quoteDate: raw.quoteDate,
     quantity: raw.quantity,
     unitPrice: raw.unitPrice,
@@ -361,6 +361,42 @@ export function mapQuotation(raw: BackendQuotation, opportunityById: Map<string,
   };
 }
 
+export interface BackendQuotationEvent {
+  id: string;
+  quotationId: string;
+  action: string;
+  fromStatus?: string | null;
+  toStatus?: string | null;
+  remarks?: string | null;
+  previousTaxableAmount?: number | null;
+  newTaxableAmount?: number | null;
+  previousTotalAmount?: number | null;
+  newTotalAmount?: number | null;
+  actorId?: string | null;
+  /** Exposed as { id, fullName } only. Null when the actor's account no longer exists. */
+  actor?: { id: string; fullName: string } | null;
+  occurredAt: string;
+  createdAt: string;
+}
+
+export function mapQuotationEvent(raw: BackendQuotationEvent): QuotationEvent {
+  return {
+    id: raw.id,
+    quotationId: raw.quotationId,
+    action: raw.action,
+    fromStatus: raw.fromStatus ?? undefined,
+    toStatus: raw.toStatus ?? undefined,
+    remarks: raw.remarks ?? undefined,
+    previousTaxableAmount: raw.previousTaxableAmount ?? undefined,
+    newTaxableAmount: raw.newTaxableAmount ?? undefined,
+    previousTotalAmount: raw.previousTotalAmount ?? undefined,
+    newTotalAmount: raw.newTotalAmount ?? undefined,
+    actorName: raw.actor?.fullName ?? "",
+    actorId: raw.actor?.id ?? raw.actorId ?? undefined,
+    occurredAt: raw.occurredAt ?? raw.createdAt,
+  };
+}
+
 export interface BackendProformaInvoice {
   id: string;
   proformaNumber?: string | null;
@@ -369,6 +405,8 @@ export interface BackendProformaInvoice {
   totalAmount: number;
   customerStatus: string;
   validityDate?: string | null;
+  /** Derived by the backend from validityDate (valid through the end of that day, UTC). */
+  isExpired?: boolean;
   remarks?: string | null;
   createdAt: string;
   updatedAt?: string;
@@ -397,9 +435,40 @@ export function mapProformaInvoice(raw: BackendProformaInvoice, quotationById: M
     totalAmount: raw.totalAmount,
     status: raw.customerStatus as ProformaInvoiceStatus,
     validityDate: raw.validityDate ?? null,
+    // The backend reports expiry. A response that predates it (a Sales Order's
+    // nested Proforma carries none) is judged by the same rule.
+    isExpired: raw.isExpired ?? isProformaExpired(raw.validityDate),
     remarks: raw.remarks ?? undefined,
     ownerName: q?.ownerName ?? "Unassigned",
     createdAt: raw.createdAt,
+  };
+}
+
+export interface BackendProformaEvent {
+  id: string;
+  proformaInvoiceId: string;
+  action: string;
+  fromStatus?: string | null;
+  toStatus?: string | null;
+  remarks?: string | null;
+  actorId?: string | null;
+  /** Exposed as { id, fullName } only. Null when the actor's account no longer exists. */
+  actor?: { id: string; fullName: string } | null;
+  occurredAt: string;
+  createdAt: string;
+}
+
+export function mapProformaEvent(raw: BackendProformaEvent): ProformaEvent {
+  return {
+    id: raw.id,
+    proformaInvoiceId: raw.proformaInvoiceId,
+    action: raw.action,
+    fromStatus: raw.fromStatus ?? undefined,
+    toStatus: raw.toStatus ?? undefined,
+    remarks: raw.remarks ?? undefined,
+    actorName: raw.actor?.fullName ?? "",
+    actorId: raw.actor?.id ?? raw.actorId ?? undefined,
+    occurredAt: raw.occurredAt ?? raw.createdAt,
   };
 }
 

@@ -28,8 +28,15 @@ export class RealSalesOrderRepository implements ISalesOrderRepository {
   constructor(private quotations: IQuotationRepository) {}
 
   private async quotationMap(): Promise<Map<string, Quotation>> {
-    const page = await this.quotations.list();
-    return new Map(page.items.map((q) => [q.id, q]));
+    try {
+      const page = await this.quotations.list();
+      return new Map(page.items.map((q) => [q.id, q]));
+    } catch (err) {
+      // Someone with salesorders.view but not quotations.view still gets their
+      // orders; the denormalized quotation fields then show "—".
+      if (err instanceof ApiError && err.status === 403) return new Map();
+      throw err;
+    }
   }
 
   private async fetchAll(): Promise<SalesOrder[]> {

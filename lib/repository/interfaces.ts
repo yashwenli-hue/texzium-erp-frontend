@@ -19,7 +19,9 @@ import {
   Opportunity,
   OpportunityStage,
   Quotation,
+  QuotationEvent,
   ProformaInvoice,
+  ProformaEvent,
   SalesOrder,
   SalesOrderEvent,
   SalesOrderPaymentTerm,
@@ -57,7 +59,7 @@ export type LeadSortField = "customerName" | "lastActivityAt" | "createdAt";
 export type CustomerSortField = "customerName" | "customerCode" | "createdAt";
 export type ContactSortField = "name" | "lastContactedAt";
 export type OpportunitySortField = "expectedValue" | "probability" | "expectedCloseDate";
-export type QuotationSortField = "amount" | "validUntil" | "createdAt";
+export type QuotationSortField = "amount" | "createdAt";
 export type ProformaInvoiceSortField = "totalAmount" | "issueDate" | "createdAt";
 export type SalesOrderSortField = "totalAmount" | "orderDate" | "createdAt";
 export type SalesInvoiceSortField = "totalAmount" | "invoiceDate" | "createdAt";
@@ -295,46 +297,62 @@ export interface CreateQuotationInput {
   buyerGstId: ID;
 }
 
+/**
+ * Quotation lifecycle (backend commit 1246647). Every mutation sends no actor:
+ * the backend takes it from the signed-in user's token. Mutations throw
+ * QuotationConflictError (409) when the quotation is no longer in the state the
+ * caller saw (or a rule forbids the action), and an ApiError with status 403
+ * when the user lacks the permission, which must never change anything locally.
+ */
 export interface IQuotationRepository {
   list(query?: ListQuery<QuotationSortField>): Promise<Page<Quotation>>;
   getById(id: ID): Promise<Quotation | null>;
   create(input: CreateQuotationInput): Promise<Quotation>;
-  /** VERIFIED: `PATCH /:id/revise`, body `{ totalAmount }` — sets REVISED. Version/history trail is mock-only. */
-  revise(id: ID, amount: number, note?: string): Promise<Quotation>;
-  /** VERIFIED: `PATCH /:id/approve`, no body — sets APPROVED. */
-  approve(id: ID): Promise<Quotation>;
   /**
-   * VERIFIED: `POST /:id/convert` — creates a real SalesOrder linked to this
-   * quotation, but does NOT write CONVERTED (or any status) back onto the
-   * Quotation itself; confirmed by reading quotations.service.ts directly.
-   * Returns the quotation as re-fetched after conversion (its status will
-   * still reflect whatever it was before, e.g. APPROVED — the honest
-   * backend behavior, not a bug in this mapping) plus the id of the Sales
-   * Order the backend just created, straight from its response body, so the
-   * caller can navigate to it once Sales Order screens exist without
-   * guessing or re-deriving the id client-side.
+   * VERIFIED: `PATCH /:id/revise` { taxableAmount, remarks? } (permission
+   * quotations.edit). The backend recomputes GST from the percentage the
+   * quotation already carries and sets the total; the caller never sends a
+   * total. Moves the quotation to REVISED (from DRAFT, REVISED, or an APPROVED
+   * one with no active Proforma and no live Sales Order).
    */
-  convert(id: ID): Promise<{ quotation: Quotation; salesOrderId: ID }>;
+  revise(id: ID, taxableAmount: number, remarks?: string): Promise<Quotation>;
+  /** VERIFIED: `PATCH /:id/approve` { remarks? } (permission quotations.approve): DRAFT or REVISED -> APPROVED. */
+  approve(id: ID, remarks?: string): Promise<Quotation>;
+  /** VERIFIED: `PATCH /:id/reject` { reason } (permission quotations.reject): DRAFT or REVISED -> REJECTED, final. The reason is mandatory. */
+  reject(id: ID, reason: string): Promise<Quotation>;
+  /** VERIFIED: `GET /:id/events` (permission quotations.view): the lifecycle history, newest first. */
+  listEvents(id: ID): Promise<QuotationEvent[]>;
 }
 
-// Mirrors the VERIFIED CreateProformaInvoiceDto exactly: quotationId,
-// issueDate, totalAmount, validityDate?, remarks?. totalAmount is not
-// backend-computed — the caller supplies it (the UI defaults it from the
-// source Quotation's own backend-computed total). See docs/backend-ui-contract.md §9.
+// Mirrors the VERIFIED CreateProformaInvoiceDto without its optional
+// compatibility total: quotationId, issueDate, validityDate?, remarks?. The
+// backend derives the total from the APPROVED quotation, so the caller never
+// enters (or sends) one.
 export interface CreateProformaInvoiceInput {
   quotationId: ID;
   issueDate: string; // ISO 8601
-  totalAmount: number;
   validityDate?: string;
   remarks?: string;
 }
 
+/**
+ * Proforma Invoice lifecycle (backend commit 1d0b1dc). Mutations throw
+ * ProformaConflictError (409) when the Proforma is no longer in the state the
+ * caller saw (or a rule forbids the action: expired, a live Sales Order,
+ * another active Proforma), and an ApiError with status 403 when the user lacks
+ * the permission, which must never change anything locally.
+ */
 export interface IProformaInvoiceRepository {
   list(query?: ListQuery<ProformaInvoiceSortField>): Promise<Page<ProformaInvoice>>;
   getById(id: ID): Promise<ProformaInvoice | null>;
+  /** VERIFIED: `POST /` (permission proformas.create): needs an APPROVED quotation with no active Proforma; the backend sets the total. */
   create(input: CreateProformaInvoiceInput): Promise<ProformaInvoice>;
-  /** VERIFIED: `PATCH /:id/approve`, no body — sets customerStatus to APPROVED. No other transition exists. */
-  approve(id: ID): Promise<ProformaInvoice>;
+  /** VERIFIED: `PATCH /:id/approve` { remarks? } (permission proformas.approve): PENDING -> APPROVED, refused once expired. */
+  approve(id: ID, remarks?: string): Promise<ProformaInvoice>;
+  /** VERIFIED: `PATCH /:id/cancel` { reason } (permission proformas.cancel): PENDING or APPROVED -> CANCELLED, final, refused while a live Sales Order references it. The reason is mandatory. */
+  cancel(id: ID, reason: string): Promise<ProformaInvoice>;
+  /** VERIFIED: `GET /:id/events` (permission proformas.view): the lifecycle history, newest first. */
+  listEvents(id: ID): Promise<ProformaEvent[]>;
 }
 
 // Mirrors the VERIFIED CreateSalesOrderDto: proformaInvoiceId, orderDate,

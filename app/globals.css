@@ -708,3 +708,116 @@ a.doc-trail-node:hover{border-color:var(--m);background:var(--m-soft)}
   .lifecycle-stepper{display:none}
   .lifecycle-compact{display:block}
 }
+
+/* ============================================================
+   Quotation & Proforma lifecycle UX
+   Document header, lifecycle callout, document chain, commercial
+   summary, action reasons and lifecycle history. Tokens only, so
+   light and dark themes follow automatically.
+   ============================================================ */
+
+/* Document header: identity on the left, the headline amount on the right */
+.doc-head{display:flex;gap:16px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;padding:19px;border-bottom:1px solid var(--line-2)}
+.doc-head .ident{display:flex;gap:12px;align-items:flex-start;min-width:0}
+.doc-head .ident h3{font-family:var(--display);font-size:18px;font-weight:700;color:var(--ink);overflow-wrap:anywhere}
+.doc-head .ident .co{color:var(--muted);font-size:12.5px;margin-top:2px}
+.doc-head .ident .co a{color:inherit;text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:2px}
+.doc-head .ident .co a:hover{color:var(--m)}
+.doc-head .statusrow{display:flex;gap:6px;margin-top:9px;flex-wrap:wrap}
+.doc-amount{text-align:right;min-width:150px}
+.doc-amount .k{font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);font-weight:700}
+.doc-amount .v{font-family:var(--display);font-size:26px;font-weight:700;color:var(--ink);line-height:1.15;font-variant-numeric:tabular-nums}
+.doc-amount .sub{font-size:11.5px;color:var(--muted);margin-top:2px}
+@media(max-width:640px){.doc-amount{text-align:left;width:100%}}
+
+/* Lifecycle callout: what is true now, what happens next, and why something is locked */
+.callout{display:flex;gap:12px;padding:14px 16px;border-radius:12px;border:1px solid var(--line);border-left-width:4px;background:var(--surface);margin-bottom:16px}
+.callout .ic{flex:none;width:30px;height:30px;border-radius:9px;display:grid;place-items:center;background:var(--line-2);color:var(--muted)}
+.callout .txt{min-width:0;flex:1}
+.callout h4{font-size:13.5px;font-weight:700;color:var(--ink)}
+.callout p{font-size:12.5px;color:var(--muted);margin-top:3px;overflow-wrap:anywhere}
+.callout p + p{margin-top:5px}
+.callout .quote{font-style:italic;color:var(--text)}
+.callout-actions{margin-top:11px;display:flex;gap:8px;flex-wrap:wrap}
+.callout.good{border-left-color:var(--good-strong);background:var(--good-bg)} .callout.good .ic{background:var(--surface);color:var(--good)}
+.callout.warn{border-left-color:var(--warn);background:var(--warn-bg)} .callout.warn .ic{background:var(--surface);color:var(--warn)}
+.callout.bad{border-left-color:var(--bad);background:var(--bad-bg)} .callout.bad .ic{background:var(--surface);color:var(--bad)}
+.callout.info{border-left-color:var(--info);background:var(--info-bg)} .callout.info .ic{background:var(--surface);color:var(--info)}
+.callout.neutral{border-left-color:var(--faint)}
+
+/* Action row with the reason an action is unavailable written out */
+.doc-actions{display:flex;gap:8px;flex-wrap:wrap;padding:14px 19px 0}
+.action-reasons{list-style:none;margin:0;padding:10px 19px 16px;display:grid;gap:5px;font-size:12px;color:var(--muted)}
+.action-reasons li{display:flex;gap:7px;align-items:flex-start}
+.action-reasons li::before{content:"";flex:none;width:5px;height:5px;border-radius:50%;background:var(--faint);margin-top:6px}
+.action-reasons b{color:var(--text);font-weight:600}
+.doc-actions + .action-reasons{padding-top:10px}
+.doc-actions:last-child{padding-bottom:16px}
+
+/* Quotation -> Proforma -> Sales Order */
+.doc-chain{list-style:none;margin:0;padding:0;display:flex;align-items:stretch;gap:0}
+.dc-stage{flex:1;min-width:0;position:relative;padding:13px 14px;border:1px solid var(--line);border-radius:12px;background:var(--surface);display:flex;flex-direction:column;gap:4px}
+.dc-stage + .dc-stage{margin-left:26px}
+.dc-stage + .dc-stage::before{content:"";position:absolute;left:-26px;top:50%;width:26px;height:2px;background:var(--line)}
+.dc-stage + .dc-stage::after{content:"";position:absolute;left:-9px;top:calc(50% - 4px);border:5px solid transparent;border-left:7px solid var(--line);border-right:0}
+.dc-stage .dc-label{font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);font-weight:700;display:flex;align-items:center;gap:6px}
+.dc-stage .dc-title{font-size:13.5px;font-weight:700;color:var(--ink);overflow-wrap:anywhere}
+.dc-stage a.dc-title:hover{color:var(--m)}
+.dc-stage .dc-status{display:flex;gap:5px;flex-wrap:wrap;align-items:center;min-height:22px}
+.dc-stage .dc-hint{font-size:11.5px;color:var(--muted)}
+.dc-stage .dc-cta{margin-top:6px}
+.dc-stage.dc-current{border-color:var(--m);box-shadow:0 0 0 3px var(--m-soft)}
+.dc-stage.dc-upcoming{background:transparent;border-style:dashed}
+.dc-stage.dc-upcoming .dc-title{color:var(--muted);font-weight:600}
+.dc-stage.dc-closed{background:var(--line-2)}
+.dc-stage.dc-closed .dc-title{color:var(--muted)}
+.dc-stage.dc-attention{border-color:var(--bad)}
+@media(max-width:720px){
+  .doc-chain{flex-direction:column}
+  .dc-stage + .dc-stage{margin-left:0;margin-top:22px}
+  .dc-stage + .dc-stage::before{left:50%;top:-22px;width:2px;height:22px}
+  .dc-stage + .dc-stage::after{left:calc(50% - 4px);top:-9px;border:5px solid transparent;border-top:7px solid var(--line);border-bottom:0}
+}
+
+/* Commercial summary: taxable -> GST -> total, like the bottom of an invoice */
+.summary{padding:16px 19px;border-bottom:1px solid var(--line-2)}
+.summary .row{display:flex;justify-content:space-between;gap:12px;align-items:baseline;padding:5px 0;font-size:13px}
+.summary .row .k{color:var(--muted)}
+.summary .row .v{color:var(--text);font-weight:600;font-variant-numeric:tabular-nums;text-align:right}
+.summary .row.total{border-top:1px solid var(--line);margin-top:6px;padding-top:11px}
+.summary .row.total .k{color:var(--ink);font-weight:700}
+.summary .row.total .v{font-family:var(--display);font-size:19px;font-weight:700;color:var(--ink)}
+.summary .row.unavailable .v{color:var(--warn);font-weight:600;font-size:12.5px}
+.summary .src{font-size:11.5px;color:var(--faint);margin-top:8px}
+.summary .src a{color:var(--muted);text-decoration:underline;text-underline-offset:2px}
+
+/* Key facts under the summary */
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;padding:16px 19px}
+.facts .f{font-size:12px}
+.facts .f label{display:block;color:var(--muted);font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px;font-weight:700}
+.facts .f div{color:var(--text);font-weight:500}
+.facts .f .note{font-size:11.5px;color:var(--muted);font-weight:400;margin-top:2px}
+.facts .f .note.good{color:var(--good)} .facts .f .note.warn{color:var(--warn)} .facts .f .note.bad{color:var(--bad)}
+
+/* Revision preview (current vs new) */
+.preview{width:100%;border-collapse:collapse;font-size:12.5px;margin:2px 0 4px}
+.preview th{font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);font-weight:700;text-align:right;padding:4px 8px}
+.preview th:first-child{text-align:left}
+.preview td{padding:6px 8px;text-align:right;font-variant-numeric:tabular-nums;border-top:1px solid var(--line-2)}
+.preview td:first-child{text-align:left;color:var(--muted)}
+.preview tr.total td{font-weight:700;color:var(--ink);border-top:1px solid var(--line)}
+.preview .up{color:var(--warn)} .preview .down{color:var(--good)}
+.preview-note{font-size:11.5px;color:var(--faint);margin-top:6px}
+
+/* Lifecycle history: transitions and amount changes */
+.hist-delta{display:grid;gap:2px;margin-top:4px;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.hist-delta b{color:var(--text);font-weight:600}
+.hist-foot{font-size:11.5px;color:var(--faint);padding-top:12px;margin-top:2px;border-top:1px dashed var(--line)}
+.trans{display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:4px}
+
+/* Lists: the "next step" cell */
+.nextstep{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600}
+.nextstep::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--faint);flex:none}
+.nextstep.action::before{background:var(--m)} .nextstep.good::before{background:var(--good-strong)} .nextstep.warn::before{background:var(--warn)} .nextstep.bad::before{background:var(--bad)}
+.nextstep.neutral{color:var(--muted);font-weight:500}
+.nextstep.bad{color:var(--bad)}

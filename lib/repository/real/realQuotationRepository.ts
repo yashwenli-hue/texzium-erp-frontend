@@ -1,25 +1,36 @@
 import { ID, ListQuery, Page } from "../../types/common";
-import { Opportunity, Quotation } from "../../types/domain";
+import { Opportunity, Quotation, QuotationEvent } from "../../types/domain";
 import { CreateQuotationInput, IOpportunityRepository, IQuotationRepository, QuotationSortField } from "../interfaces";
-import { apiFetch } from "../../api/httpClient";
+import { ApiError, apiFetch } from "../../api/httpClient";
 import { applyListQuery } from "../shared/listQuery";
-import { BackendQuotation, mapQuotation } from "./mappers";
+import {
+  QUOTATION_REASON_MAX_LENGTH,
+  QUOTATION_REMARKS_MAX_LENGTH,
+  QuotationConflictError,
+  cleanQuotationText,
+  parseTaxableAmount,
+} from "../shared/quotationLifecycle";
+import { BackendQuotation, BackendQuotationEvent, mapQuotation, mapQuotationEvent } from "./mappers";
 
 const SEARCHABLE: (keyof Quotation)[] = ["quoteNo", "customerName", "opportunityName", "ownerName"];
 
 /**
- * VERIFIED quotations routes: POST /, GET /, PATCH /:id/revise,
- * PATCH /:id/approve, POST /:id/convert (docs/backend-ui-contract.md §8).
- * No GET /:id exists — getById() works from the same full list, same
- * pattern as RealOpportunityRepository. GET /quotations only nests the raw
- * Opportunity (no customerName field), so this repository takes the real
+ * VERIFIED quotation routes (backend commit 1246647): POST /, GET /,
+ * GET /:id/events, PATCH /:id/revise, PATCH /:id/approve, PATCH /:id/reject.
+ * Every route needs a signed-in user and one permission (quotations.view /
+ * create / edit / approve / reject). The old POST /:id/convert route is retired
+ * (it answers 410 and writes nothing) and the old PATCH /:id/status is gone, so
+ * neither is used here. No GET /:id exists — getById() works from the same full
+ * list, same pattern as RealOpportunityRepository. GET /quotations only nests
+ * the raw Opportunity (no customerName field), so this repository takes the real
  * Opportunity repository as a dependency to resolve customerName/
  * opportunityName/ownerName the same way the Opportunities screen itself does.
  *
- * SECURITY NOTE (not fixed — backend is read-only): the quotations
- * controller has no `@UseGuards`/`@Permissions` at all — every route here
- * is reachable without a JWT. Confirmed by reading quotations.controller.ts
- * directly. Flagged in the Stage 2C report.
+ * Failure handling: a 409 means the quotation is no longer where the person saw
+ * it (someone else acted, it is locked by a Proforma or Sales Order, or its
+ * legacy tax breakdown forbids the action) and is raised as
+ * QuotationConflictError so screens reload and show the backend's message. A 403
+ * stays an ApiError(403) and changes nothing.
  */
 export class RealQuotationRepository implements IQuotationRepository {
   constructor(private opportunities: IOpportunityRepository) {}
@@ -37,6 +48,24 @@ export class RealQuotationRepository implements IQuotationRepository {
     return rows.map((raw) => mapQuotation(raw, oppById));
   }
 
+  private async reload(id: ID): Promise<Quotation> {
+    const updated = await this.getById(id);
+    if (!updated) throw new Error(`Quotation ${id} not found`);
+    return updated;
+  }
+
+  private async mutate(path: string, body: unknown, forbidden: string): Promise<void> {
+    try {
+      await apiFetch<BackendQuotation>(path, { method: "PATCH", body });
+    } catch (err) {
+      if (err instanceof ApiError) {
+        if (err.status === 409) throw new QuotationConflictError(err.message);
+        if (err.status === 403) throw new ApiError(forbidden, 403, err.details);
+      }
+      throw err;
+    }
+  }
+
   async list(query?: ListQuery<QuotationSortField>): Promise<Page<Quotation>> {
     const all = await this.fetchAll();
     return applyListQuery(all, query, SEARCHABLE);
@@ -48,53 +77,56 @@ export class RealQuotationRepository implements IQuotationRepository {
   }
 
   async create(input: CreateQuotationInput): Promise<Quotation> {
-    const raw = await apiFetch<BackendQuotation>("/quotations", {
-      method: "POST",
-      body: {
-        opportunityId: input.opportunityId,
-        quoteDate: input.quoteDate,
-        inventoryItemId: input.inventoryItemId,
-        quantity: input.quantity,
-        unitPrice: input.unitPrice,
-        sellerGstId: input.sellerGstId,
-        buyerGstId: input.buyerGstId,
-      },
-    });
+    let raw: BackendQuotation;
+    try {
+      raw = await apiFetch<BackendQuotation>("/quotations", {
+        method: "POST",
+        body: {
+          opportunityId: input.opportunityId,
+          quoteDate: input.quoteDate,
+          inventoryItemId: input.inventoryItemId,
+          quantity: input.quantity,
+          unitPrice: input.unitPrice,
+          sellerGstId: input.sellerGstId,
+          buyerGstId: input.buyerGstId,
+        },
+      });
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 403) {
+        throw new ApiError("You don't have permission to create quotations.", 403, err.details);
+      }
+      throw err;
+    }
     const created = await this.getById(raw.id);
     if (created) return created;
     // Fallback in the unlikely event the immediate re-fetch races the write.
     return mapQuotation(raw, new Map());
   }
 
-  async revise(id: ID, amount: number): Promise<Quotation> {
-    // VERIFIED body shape: { totalAmount }. `note` has no backend field — never sent.
-    await apiFetch<BackendQuotation>(`/quotations/${id}/revise`, {
-      method: "PATCH",
-      body: { totalAmount: amount },
-    });
-    const updated = await this.getById(id);
-    if (!updated) throw new Error(`Quotation ${id} not found`);
-    return updated;
+  async revise(id: ID, taxableAmount: number, remarks?: string): Promise<Quotation> {
+    // Only the taxable amount goes over the wire; GST and the total are the backend's.
+    const parsed = parseTaxableAmount(String(taxableAmount));
+    if (parsed.error !== undefined) throw new Error(parsed.error);
+    const note = cleanQuotationText(remarks, QUOTATION_REMARKS_MAX_LENGTH, false, "Remarks");
+    await this.mutate(`/quotations/${id}/revise`, { taxableAmount: parsed.value, ...(note ? { remarks: note } : {}) }, "You don't have permission to revise quotations.");
+    return this.reload(id);
   }
 
-  async approve(id: ID): Promise<Quotation> {
-    await apiFetch<BackendQuotation>(`/quotations/${id}/approve`, { method: "PATCH" });
-    const updated = await this.getById(id);
-    if (!updated) throw new Error(`Quotation ${id} not found`);
-    return updated;
+  async approve(id: ID, remarks?: string): Promise<Quotation> {
+    const note = cleanQuotationText(remarks, QUOTATION_REMARKS_MAX_LENGTH, false, "Remarks");
+    await this.mutate(`/quotations/${id}/approve`, note ? { remarks: note } : {}, "You don't have permission to approve quotations.");
+    return this.reload(id);
   }
 
-  async convert(id: ID): Promise<{ quotation: Quotation; salesOrderId: ID }> {
-    // VERIFIED: creates a real SalesOrder linked to this quotation, but never
-    // writes a status back onto the Quotation itself (confirmed by reading
-    // quotations.service.ts) — re-fetching honestly reflects that the
-    // quotation's own status is unchanged, rather than fabricating CONVERTED.
-    // The endpoint's response body is the created SalesOrder record itself
-    // (quotationsService.convertToSalesOrder returns prisma.salesOrder.create()
-    // directly) — its id is read straight from that response, never re-derived.
-    const salesOrder = await apiFetch<{ id: string }>(`/quotations/${id}/convert`, { method: "POST" });
-    const updated = await this.getById(id);
-    if (!updated) throw new Error(`Quotation ${id} not found`);
-    return { quotation: updated, salesOrderId: salesOrder.id };
+  async reject(id: ID, reason: string): Promise<Quotation> {
+    // Refused before any request: the backend requires a reason.
+    const clean = cleanQuotationText(reason, QUOTATION_REASON_MAX_LENGTH, true, "A reason");
+    await this.mutate(`/quotations/${id}/reject`, { reason: clean }, "You don't have permission to reject quotations.");
+    return this.reload(id);
+  }
+
+  async listEvents(id: ID): Promise<QuotationEvent[]> {
+    const rows = await apiFetch<BackendQuotationEvent[]>(`/quotations/${id}/events`);
+    return rows.map(mapQuotationEvent);
   }
 }

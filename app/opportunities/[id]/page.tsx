@@ -21,6 +21,7 @@ import { initials } from "../../../components/ui/Who";
 import { formatInr, formatDate } from "../../../lib/format";
 import { OPPORTUNITY_STEPS, OpportunityStage, Quotation, formatOpportunityStage } from "../../../lib/types/domain";
 import { canMoveOpportunityStage, isOpportunityStageFinal } from "../../../lib/repository/shared/opportunityStage";
+import { QUOTATION_PERMISSIONS } from "../../../lib/repository/shared/quotationLifecycle";
 
 function goBackOrTo(router: ReturnType<typeof useRouter>, fallback: string) {
   if (typeof window !== "undefined" && window.history.length > 1) {
@@ -123,7 +124,7 @@ export default function OpportunityDetailPage() {
   }
 
   const quoteColumns: Column<Quotation>[] = [
-    { key: "quoteNo", header: "No.", render: (q) => `${q.quoteNo} · V${q.version}` },
+    { key: "quoteNo", header: "No.", render: (q) => q.quoteNo },
     { key: "amount", header: "Amount", render: (q) => formatInr(q.amount) },
     { key: "status", header: "Status", render: (q) => <QuotationStatusTag status={q.status} /> },
   ];
@@ -247,9 +248,11 @@ export default function OpportunityDetailPage() {
             title="Related Quotations"
             flush
             extraHead={
-              <a className="more" href="#" onClick={(e) => { e.preventDefault(); setShowQuotationForm(true); }}>
-                <Icon name="plus" size={14} /> Create Quotation
-              </a>
+              hasPermission(QUOTATION_PERMISSIONS.create) ? (
+                <a className="more" href="#" onClick={(e) => { e.preventDefault(); setShowQuotationForm(true); }}>
+                  <Icon name="plus" size={14} /> Create Quotation
+                </a>
+              ) : undefined
             }
           >
             <DataTable

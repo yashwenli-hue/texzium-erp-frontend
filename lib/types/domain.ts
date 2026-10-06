@@ -452,32 +452,20 @@ export interface Opportunity {
   lead?: Lead;
 }
 
-// VERIFIED: Quotation.status is a plain backend String (@default("DRAFT")),
-// no Prisma enum. create() sets DRAFT, revise() sets REVISED, approve() sets
-// APPROVED — confirmed by reading quotations.service.ts directly. convert()
-// (POST /:id/convert) creates a SalesOrder record but never writes CONVERTED
-// (or any other value) back onto the Quotation itself — that status value is
-// never actually reachable through any real backend code path, even though
-// it's part of the master plan's documented workflow terminology. See
-// docs/backend-ui-contract.md §8, Stage 2C report.
-export type QuotationStatus = "DRAFT" | "REVISED" | "APPROVED" | "CONVERTED";
+// VERIFIED (backend commit 1246647, Quotation Lifecycle V1): Quotation.status is
+// a plain backend String with four values. A quotation is created DRAFT; revise
+// moves it to REVISED (from DRAFT, REVISED, or an APPROVED one that nothing has
+// been built on); approve moves a DRAFT or REVISED one to APPROVED; reject moves
+// a DRAFT or REVISED one to REJECTED, which is final. There is no EXPIRED and no
+// CONVERTED status: a quotation never converts into a Sales Order directly (the
+// old POST /:id/convert route is retired) and "has a Sales Order" is read from
+// the Sales Order itself. See lib/repository/shared/quotationLifecycle.ts.
+export type QuotationStatus = "DRAFT" | "REVISED" | "APPROVED" | "REJECTED";
 
-export const QUOTATION_STATUSES: QuotationStatus[] = ["DRAFT", "REVISED", "APPROVED", "CONVERTED"];
+export const QUOTATION_STATUSES: QuotationStatus[] = ["DRAFT", "REVISED", "APPROVED", "REJECTED"];
 
 export function formatQuotationStatus(status: string): string {
   return titleCaseFromConstant(status);
-}
-
-// MOCK/UI-ONLY: the backend confirms a `revise` operation exists, but no
-// persisted multi-version history is confirmed — this models a V1/V2/V3
-// revision trail for the UI only. A real integration may return a single
-// current amount with no history, or a differently-shaped history; treat
-// this shape as presentation-only until a real endpoint is confirmed.
-export interface QuotationRevision {
-  version: number;
-  amount: number;
-  createdAt: string;
-  note?: string;
 }
 
 export interface Quotation {
@@ -488,18 +476,12 @@ export interface Quotation {
   customerName: string;
   opportunityId?: ID;
   opportunityName: string;
-  /** Canonical headline amount — totalAmount for a real quotation, the user-entered estimate for mock. */
+  /** Canonical headline amount: the quotation's total (taxable amount + GST). */
   amount: number;
   status: QuotationStatus;
-  /** MOCK/UI-ONLY — no backend field. Always null for a real quotation. */
-  validUntil: string | null; // ISO 8601
   ownerName: string;
   createdAt: string;
-  /** MOCK/UI-ONLY current revision number — see QuotationRevision. Always 1 for a real quotation (no persisted version history). */
-  version: number;
-  /** MOCK/UI-ONLY revision trail — see QuotationRevision. Always empty for a real quotation. */
-  revisions: QuotationRevision[];
-  /** VERIFIED real fields below — backend-computed, undefined for mock quotations. See docs/backend-ui-contract.md §8. */
+  /** Amounts: backend-computed (the mock follows the same rules with a stand-in GST rate). The backend is authoritative. */
   quoteDate?: string;
   quantity?: number;
   unitPrice?: number;
@@ -511,23 +493,60 @@ export interface Quotation {
   placeOfSupply?: string;
 }
 
-// VERIFIED: ProformaInvoice.customerStatus is a plain backend String
-// (@default("PENDING")), no Prisma enum. create() leaves it at PENDING;
-// approve() (PATCH /:id/approve) is the only mutation and sets APPROVED.
-// No other status value is ever written by any backend code path — see
-// proforma-invoices.service.ts.
-export type ProformaInvoiceStatus = "PENDING" | "APPROVED";
+/**
+ * One entry of a Quotation's lifecycle history (GET /quotations/:id/events,
+ * permission quotations.view). Only lifecycle actions are recorded: creation,
+ * revision, approval and rejection. A quotation that existed before the
+ * lifecycle was introduced has no entries for what happened earlier.
+ */
+export interface QuotationEvent {
+  id: ID;
+  quotationId: ID;
+  /** QUOTATION_CREATED, QUOTATION_REVISED, QUOTATION_APPROVED or QUOTATION_REJECTED */
+  action: string;
+  fromStatus?: string;
+  toStatus?: string;
+  /** A revision's or approval's optional remarks; for a rejection, the mandatory reason. */
+  remarks?: string;
+  /** Amounts before/after. Present on a revision (both) and on creation (new only). */
+  previousTaxableAmount?: number;
+  newTaxableAmount?: number;
+  previousTotalAmount?: number;
+  newTotalAmount?: number;
+  /** Empty when the actor's account no longer exists. */
+  actorName: string;
+  actorId?: ID;
+  occurredAt: string;
+}
 
-export const PROFORMA_INVOICE_STATUSES: ProformaInvoiceStatus[] = ["PENDING", "APPROVED"];
+const QUOTATION_EVENT_LABEL: Record<string, string> = {
+  QUOTATION_CREATED: "Quotation created",
+  QUOTATION_REVISED: "Revised",
+  QUOTATION_APPROVED: "Approved",
+  QUOTATION_REJECTED: "Rejected",
+};
+
+export function formatQuotationEventAction(action: string): string {
+  return QUOTATION_EVENT_LABEL[action] ?? titleCaseFromConstant(action);
+}
+
+// VERIFIED (backend commit 1d0b1dc, Proforma Lifecycle V1): the status lives on
+// ProformaInvoice.customerStatus, a plain backend String with three values. A
+// Proforma is created PENDING from an APPROVED quotation; approve moves a
+// PENDING one to APPROVED; cancel moves a PENDING or APPROVED one to CANCELLED,
+// which is final. Expiry is not a status: a Proforma with a validity date is
+// valid through the end of that day (UTC) and expired afterwards, which the
+// backend reports as `isExpired`. See lib/repository/shared/proformaLifecycle.ts.
+export type ProformaInvoiceStatus = "PENDING" | "APPROVED" | "CANCELLED";
+
+export const PROFORMA_INVOICE_STATUSES: ProformaInvoiceStatus[] = ["PENDING", "APPROVED", "CANCELLED"];
 
 export function formatProformaInvoiceStatus(status: string): string {
   return titleCaseFromConstant(status);
 }
 
-// VERIFIED CreateProformaInvoiceDto: quotationId, issueDate, totalAmount,
-// validityDate?, remarks?. totalAmount is NOT backend-computed here (unlike
-// Quotation, which derives it from HSN/GST) — the backend stores exactly
-// whatever number is sent. See docs/backend-ui-contract.md §9.
+// The total is never entered: the backend derives it from the APPROVED
+// quotation (an optional client total is only checked against it).
 export interface ProformaInvoice {
   id: ID;
   /** proformaNumber from the backend, never set by any verified code path — falls back to a short id reference, never a fabricated sequential number. */
@@ -541,26 +560,56 @@ export interface ProformaInvoice {
   totalAmount: number;
   status: ProformaInvoiceStatus;
   validityDate: string | null;
+  /** Derived by the backend from validityDate (valid through the end of that day, UTC). Never stored. */
+  isExpired: boolean;
   remarks?: string;
   ownerName: string;
   createdAt: string;
 }
 
+/**
+ * One entry of a Proforma Invoice's lifecycle history
+ * (GET /proforma-invoices/:id/events, permission proformas.view): creation,
+ * approval and cancellation. A Proforma that existed before the lifecycle was
+ * introduced has no entries for what happened earlier.
+ */
+export interface ProformaEvent {
+  id: ID;
+  proformaInvoiceId: ID;
+  /** PROFORMA_CREATED, PROFORMA_APPROVED or PROFORMA_CANCELLED */
+  action: string;
+  fromStatus?: string;
+  toStatus?: string;
+  /** An approval's optional remarks; for a cancellation, the mandatory reason. */
+  remarks?: string;
+  actorName: string;
+  actorId?: ID;
+  occurredAt: string;
+}
+
+const PROFORMA_EVENT_LABEL: Record<string, string> = {
+  PROFORMA_CREATED: "Proforma created",
+  PROFORMA_APPROVED: "Approved",
+  PROFORMA_CANCELLED: "Cancelled",
+};
+
+export function formatProformaEventAction(action: string): string {
+  return PROFORMA_EVENT_LABEL[action] ?? titleCaseFromConstant(action);
+}
+
 // VERIFIED: SalesOrder.status is a plain backend String (@default("OPEN")),
-// no Prisma enum — same pattern as Quotation/ProformaInvoice. The RevenueOS
-// Sales Orders controller (sales-orders.controller.ts) only ever writes two
-// values: "OPEN" (via quotations.service.ts convertToSalesOrder(), and the
-// AdminOS Workflow Executor's unrelated QUOTATION_APPROVED trigger) and
-// "PENDING_STORE_APPROVAL" (via sales-orders.service.ts create(), the direct
-// POST /sales-orders path from an approved Proforma Invoice). Since backend
-// commit 85c3666 RevenueOS also moves an order through its pre-dispatch
-// lifecycle: PENDING_STORE_APPROVAL -> PENDING_ACCOUNTS_APPROVAL (an advance
-// receipt is verified) -> READY_FOR_DISPATCH_ORDER (Accounts commercial
-// approval) — see lib/repository/shared/salesOrderLifecycle.ts. Other values
+// no Prisma enum — same pattern as Quotation/ProformaInvoice. Since backend
+// commit 1d0b1dc a Sales Order is created in exactly one way, POST /sales-orders
+// from an approved Proforma Invoice, which starts it at PENDING_STORE_APPROVAL.
+// "OPEN" survives only on orders created earlier by the retired quotation
+// conversion and workflow trigger (legacy rows; they are never repaired).
+// RevenueOS moves an order through its pre-dispatch lifecycle:
+// PENDING_STORE_APPROVAL -> PENDING_ACCOUNTS_APPROVAL (an advance receipt is
+// verified) -> READY_FOR_DISPATCH_ORDER (Accounts commercial approval), and can
+// cancel it — see lib/repository/shared/salesOrderLifecycle.ts. Other values
 // observed in real data (e.g. "READY_FOR_INVOICING", "DISPATCH_ORDER_CREATED")
-// are written exclusively by unrelated OperationsOS (Dispatch Orders) and
-// AdminOS (Workflow Executor) modules, so this stays a plain string rather
-// than a closed union, and no frontend action is offered for those values.
+// are written by OperationsOS, so this stays a plain string rather than a
+// closed union, and no frontend action is offered for those values.
 export function formatSalesOrderStatus(status: string): string {
   return titleCaseFromConstant(status);
 }
@@ -568,14 +617,12 @@ export function formatSalesOrderStatus(status: string): string {
 // VERIFIED CreateSalesOrderDto: proformaInvoiceId, orderDate,
 // inventoryItemId, orderQty, sellerGstId, buyerGstId — see
 // CreateSalesOrderInput. The order's total is NOT sent: the backend takes it
-// from the approved Proforma Invoice's totalAmount. A Sales Order can also be created without any of
-// those fields via POST /quotations/:id/convert (quotationId only) — the
-// two backend creation paths are independent and never cross-reference each
-// other, so a given Sales Order carries either quotationId or
-// proformaInvoiceId (rarely both meaningfully linked at once). customerName/
-// opportunityName/ownerName/quoteNo/proformaNumber are always denormalized
-// from whichever linked Quotation/Proforma Invoice is resolvable. See the
-// Stage 2E report.
+// from the approved Proforma Invoice's totalAmount. An order created through
+// that route carries proformaInvoiceId (and, resolved through the Proforma, its
+// quotation); a legacy order created by the retired conversion carries
+// quotationId only. customerName/opportunityName/ownerName/quoteNo/
+// proformaNumber are always denormalized from whichever linked Quotation/
+// Proforma Invoice is resolvable.
 export interface SalesOrder {
   id: ID;
   /** salesOrderCode from the backend — null for both verified RevenueOS creation paths; falls back to a short id reference, never a fabricated sequence number. */

@@ -135,13 +135,13 @@ export default function DashboardPage() {
     }
 
     for (const q of quotations) {
-      if (q.status !== "DRAFT") continue;
+      if (q.status !== "DRAFT" && q.status !== "REVISED") continue;
       items.push({
         id: `quote-${q.id}`,
         icon: "file",
         tone: "n",
         urgencyLabel: "Needs action",
-        title: `${q.quoteNo} still in Draft`,
+        title: q.status === "DRAFT" ? `${q.quoteNo} still in Draft` : `${q.quoteNo} revised — needs approval`,
         company: q.customerName,
         time: formatRelative(q.createdAt),
         href: `/quotations/${q.id}`,

@@ -1,32 +1,46 @@
 import { ID, ListQuery, Page } from "../../types/common";
-import { ProformaInvoice, Quotation } from "../../types/domain";
+import { ProformaEvent, ProformaInvoice, Quotation } from "../../types/domain";
 import { CreateProformaInvoiceInput, IProformaInvoiceRepository, IQuotationRepository, ProformaInvoiceSortField } from "../interfaces";
-import { apiFetch } from "../../api/httpClient";
+import { ApiError, apiFetch } from "../../api/httpClient";
 import { applyListQuery } from "../shared/listQuery";
-import { BackendProformaInvoice, mapProformaInvoice } from "./mappers";
+import {
+  PROFORMA_REASON_MAX_LENGTH,
+  PROFORMA_REMARKS_MAX_LENGTH,
+  ProformaConflictError,
+} from "../shared/proformaLifecycle";
+import { cleanQuotationText } from "../shared/quotationLifecycle";
+import { BackendProformaEvent, BackendProformaInvoice, mapProformaEvent, mapProformaInvoice } from "./mappers";
 
 const SEARCHABLE: (keyof ProformaInvoice)[] = ["proformaNumber", "quoteNo", "customerName", "opportunityName", "ownerName"];
 
 /**
- * VERIFIED proforma-invoices routes: POST /, GET /, PATCH /:id/approve
- * (docs/backend-ui-contract.md §9). No GET /:id exists — getById() works
- * from the same full list, same pattern as Opportunities/Quotations. GET
- * /proforma-invoices only nests the raw Quotation (no customerName field),
- * so this repository takes the real Quotation repository as a dependency
- * to resolve customerName/opportunityName/ownerName the same way the
- * Quotations screen itself does.
+ * VERIFIED proforma-invoices routes (backend commit 1d0b1dc): POST /, GET /,
+ * GET /:id/events, PATCH /:id/approve, PATCH /:id/cancel. Every route needs a
+ * signed-in user and one permission (proformas.view / create / approve /
+ * cancel). No GET /:id exists — getById() works from the same full list, same
+ * pattern as Opportunities/Quotations. GET /proforma-invoices nests the raw
+ * Quotation (no customerName field), so this repository takes the real
+ * Quotation repository as a dependency to resolve customerName/opportunityName/
+ * ownerName. Someone with proformas.view but not quotations.view still gets
+ * their Proformas: the quotation lookup then simply comes back empty and those
+ * denormalized fields show "—".
  *
- * SECURITY NOTE (not fixed — backend is read-only): the proforma-invoices
- * controller has no `@UseGuards`/`@Permissions` at all — every route here
- * is reachable without a JWT, same as Quotations. Confirmed by reading
- * proforma-invoices.controller.ts directly.
+ * The create body never carries a total: the backend derives it from the
+ * APPROVED quotation. A 409 (not approved, already an active Proforma, expired,
+ * a live Sales Order) is raised as ProformaConflictError so screens reload and
+ * show the backend's message; a 403 stays an ApiError(403) and changes nothing.
  */
 export class RealProformaInvoiceRepository implements IProformaInvoiceRepository {
   constructor(private quotations: IQuotationRepository) {}
 
   private async quotationMap(): Promise<Map<string, Quotation>> {
-    const page = await this.quotations.list();
-    return new Map(page.items.map((q) => [q.id, q]));
+    try {
+      const page = await this.quotations.list();
+      return new Map(page.items.map((q) => [q.id, q]));
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 403) return new Map();
+      throw err;
+    }
   }
 
   private async fetchAll(): Promise<ProformaInvoice[]> {
@@ -35,6 +49,24 @@ export class RealProformaInvoiceRepository implements IProformaInvoiceRepository
       this.quotationMap(),
     ]);
     return rows.map((raw) => mapProformaInvoice(raw, qById));
+  }
+
+  private async reload(id: ID): Promise<ProformaInvoice> {
+    const updated = await this.getById(id);
+    if (!updated) throw new Error(`Proforma invoice ${id} not found`);
+    return updated;
+  }
+
+  private async call<T>(path: string, method: "POST" | "PATCH", body: unknown, forbidden: string): Promise<T> {
+    try {
+      return await apiFetch<T>(path, { method, body });
+    } catch (err) {
+      if (err instanceof ApiError) {
+        if (err.status === 409) throw new ProformaConflictError(err.message);
+        if (err.status === 403) throw new ApiError(forbidden, 403, err.details);
+      }
+      throw err;
+    }
   }
 
   async list(query?: ListQuery<ProformaInvoiceSortField>): Promise<Page<ProformaInvoice>> {
@@ -48,26 +80,39 @@ export class RealProformaInvoiceRepository implements IProformaInvoiceRepository
   }
 
   async create(input: CreateProformaInvoiceInput): Promise<ProformaInvoice> {
-    const raw = await apiFetch<BackendProformaInvoice>("/proforma-invoices", {
-      method: "POST",
-      body: {
+    const remarks = cleanQuotationText(input.remarks, PROFORMA_REMARKS_MAX_LENGTH, false, "Remarks");
+    const raw = await this.call<BackendProformaInvoice>(
+      "/proforma-invoices",
+      "POST",
+      {
         quotationId: input.quotationId,
         issueDate: input.issueDate,
-        totalAmount: input.totalAmount,
         validityDate: input.validityDate,
-        remarks: input.remarks,
+        ...(remarks ? { remarks } : {}),
       },
-    });
+      "You don't have permission to create Proforma Invoices."
+    );
     const created = await this.getById(raw.id);
     if (created) return created;
     // Fallback in the unlikely event the immediate re-fetch races the write.
     return mapProformaInvoice(raw, new Map());
   }
 
-  async approve(id: ID): Promise<ProformaInvoice> {
-    await apiFetch<BackendProformaInvoice>(`/proforma-invoices/${id}/approve`, { method: "PATCH" });
-    const updated = await this.getById(id);
-    if (!updated) throw new Error(`Proforma invoice ${id} not found`);
-    return updated;
+  async approve(id: ID, remarks?: string): Promise<ProformaInvoice> {
+    const note = cleanQuotationText(remarks, PROFORMA_REMARKS_MAX_LENGTH, false, "Remarks");
+    await this.call(`/proforma-invoices/${id}/approve`, "PATCH", note ? { remarks: note } : {}, "You don't have permission to approve Proforma Invoices.");
+    return this.reload(id);
+  }
+
+  async cancel(id: ID, reason: string): Promise<ProformaInvoice> {
+    // Refused before any request: the backend requires a reason.
+    const clean = cleanQuotationText(reason, PROFORMA_REASON_MAX_LENGTH, true, "A reason");
+    await this.call(`/proforma-invoices/${id}/cancel`, "PATCH", { reason: clean }, "You don't have permission to cancel Proforma Invoices.");
+    return this.reload(id);
+  }
+
+  async listEvents(id: ID): Promise<ProformaEvent[]> {
+    const rows = await apiFetch<BackendProformaEvent[]>(`/proforma-invoices/${id}/events`);
+    return rows.map(mapProformaEvent);
   }
 }

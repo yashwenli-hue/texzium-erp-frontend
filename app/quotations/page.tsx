@@ -2,34 +2,39 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { PageHeader, DesignNote } from "../../components/ui/PageHeader";
+import { PageHeader } from "../../components/ui/PageHeader";
 import { StatCard, StatRow, Panel } from "../../components/ui/Card";
 import { Button, EmptyState } from "../../components/ui/Button";
-import { QuotationStatusTag, ChipGroup, Chip } from "../../components/ui/Tag";
+import { QuotationStatusTag, ChipGroup, Chip, Tag } from "../../components/ui/Tag";
 import { DataTable, Column } from "../../components/ui/DataTable";
 import { Pagination, paginate } from "../../components/ui/Button";
+import { NextStepCell } from "../../components/ui/NextStepCell";
 import { QuotationForm } from "../../components/forms/QuotationForm";
-import { useQuotations } from "../../lib/hooks/useQuotations";
+import { useQuotationPipeline } from "../../lib/hooks/useQuotations";
+import { useAuth } from "../../lib/auth/AuthContext";
+import { buildCommercialChain, quotationNextStep } from "../../lib/repository/shared/commercialChain";
+import { QUOTATION_PERMISSIONS, isLegacyTaxBreakdown } from "../../lib/repository/shared/quotationLifecycle";
 import { Quotation, QUOTATION_STATUSES, formatQuotationStatus } from "../../lib/types/domain";
-import { formatInr, formatDate } from "../../lib/format";
+import { formatInr, formatInrExact } from "../../lib/format";
 
 const PAGE_SIZE = 8;
 
 export default function QuotationsPage() {
   const router = useRouter();
-  const { quotations, loading, error, createQuotation, refetch } = useQuotations();
+  const { hasPermission } = useAuth();
+  const { quotations, proformas, orders, downstreamKnown, loading, error, createQuotation, refetch } = useQuotationPipeline();
   const [showForm, setShowForm] = useState(false);
   const [statusChip, setStatusChip] = useState<string>("All");
   const [page, setPage] = useState(1);
+  const mayCreate = hasPermission(QUOTATION_PERMISSIONS.create);
 
-  const totalValue = quotations.reduce((s, q) => s + q.amount, 0);
-  const approved = quotations.filter((q) => q.status === "APPROVED" || q.status === "CONVERTED").length;
-  const needsAction = quotations.filter((q) => q.status === "DRAFT" || q.status === "REVISED").length;
-  const expiringSoon = quotations.filter((q) => {
-    if (!q.validUntil) return false;
-    const days = (new Date(q.validUntil).getTime() - Date.now()) / 86_400_000;
-    return days > 0 && days <= 7;
-  }).length;
+  const chains = useMemo(() => new Map(quotations.map((q) => [q.id, buildCommercialChain(q.id, proformas, orders)])), [quotations, proformas, orders]);
+  const open = quotations.filter((q) => q.status !== "REJECTED");
+  const openValue = open.reduce((s, q) => s + q.amount, 0);
+  const needsApproval = quotations.filter((q) => q.status === "DRAFT" || q.status === "REVISED").length;
+  const approved = quotations.filter((q) => q.status === "APPROVED");
+  const awaitingProforma = approved.filter((q) => { const c = chains.get(q.id); return c && !c.activeProforma && c.liveOrders.length === 0; }).length;
+  const inProgress = approved.filter((q) => { const c = chains.get(q.id); return c && (c.activeProforma || c.liveOrders.length > 0); }).length;
 
   const statusCounts = useMemo(() => {
     const map: Record<string, number> = {};
@@ -42,16 +47,16 @@ export default function QuotationsPage() {
 
   const columns: Column<Quotation>[] = [
     { key: "quoteNo", header: "Quote No.", render: (q) => (
-      <span style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}>
         {q.quoteNo}
-        <span className="version-badge">V{q.version}</span>
+        {isLegacyTaxBreakdown(q) && <span title="Its taxable amount and GST were never recorded"><Tag color="w">Legacy</Tag></span>}
       </span>
     ) },
     { key: "customerName", header: "Customer", render: (q) => q.customerName },
     { key: "opportunityName", header: "Opportunity", render: (q) => q.opportunityName },
-    { key: "amount", header: "Amount", render: (q) => formatInr(q.amount) },
+    { key: "amount", header: "Total", render: (q) => formatInrExact(q.amount) },
     { key: "status", header: "Status", render: (q) => <QuotationStatusTag status={q.status} /> },
-    { key: "validUntil", header: "Valid Until", render: (q) => formatDate(q.validUntil) },
+    { key: "next", header: "Next step", render: (q) => <NextStepCell step={quotationNextStep(q, chains.get(q.id) ?? buildCommercialChain(q.id, [], []))} /> },
     { key: "ownerName", header: "Owner", render: (q) => q.ownerName },
   ];
 
@@ -67,18 +72,19 @@ export default function QuotationsPage() {
   // A failed fetch must not read as "zero quotations" — that's the
   // DataTable's own empty state below, reserved for a genuine zero-result response.
   if (error && quotations.length === 0) {
+    const forbidden = (error as { status?: number }).status === 403;
     return (
       <div className="page">
         <PageHeader
           eyebrow="RevenueOS · Quote to Cash · Quotations"
           title="Quotations"
-          subtitle="Every quote raised, its version, and how close it is to becoming revenue."
+          subtitle="Every quote raised, where it stands, and what happens next."
         />
         <Panel title="All Quotations">
           <EmptyState
             icon="alert"
-            title="Couldn't load quotations"
-            body={error.message || "Something went wrong reaching the RevenueOS backend. Please try again."}
+            title={forbidden ? "You don't have access to quotations" : "Couldn't load quotations"}
+            body={forbidden ? "Viewing quotations needs the quotations.view permission. Ask an administrator to grant it, then sign in again." : error.message || "Something went wrong reaching the RevenueOS backend. Please try again."}
             action={
               <Button variant="ghost" onClick={refetch}>
                 Retry
@@ -95,19 +101,25 @@ export default function QuotationsPage() {
       <PageHeader
         eyebrow="RevenueOS · Quote to Cash · Quotations"
         title="Quotations"
-        subtitle="Every quote raised, its version, and how close it is to becoming revenue."
+        subtitle="Every quote raised, where it stands, and what happens next."
         cta={
-          <Button variant="primary" icon="plus" onClick={() => setShowForm(true)}>
+          <Button
+            variant="primary"
+            icon="plus"
+            onClick={() => setShowForm(true)}
+            disabled={!mayCreate}
+            title={mayCreate ? undefined : "You don't have permission to create quotations."}
+          >
             New Quotation
           </Button>
         }
       />
 
       <StatRow>
-        <StatCard label="Quotations" value={String(quotations.length)} note={`${formatInr(totalValue)} total value`} />
-        <StatCard label="Approved" value={String(approved)} note="approved or converted" />
-        <StatCard label="Needs Action" value={String(needsAction)} note="draft or revised" />
-        <StatCard label="Expiring Soon" value={String(expiringSoon)} note="within 7 days" />
+        <StatCard label="Open pipeline" value={formatInr(openValue)} note={`${open.length} quotation${open.length === 1 ? "" : "s"}, rejected excluded`} />
+        <StatCard label="Needs approval" value={String(needsApproval)} note="draft or revised" />
+        <StatCard label="Awaiting Proforma" value={downstreamKnown ? String(awaitingProforma) : "—"} note={downstreamKnown ? "approved, nothing built yet" : "needs Proforma and Sales Order access"} />
+        <StatCard label="In progress" value={downstreamKnown ? String(inProgress) : "—"} note={downstreamKnown ? "Proforma or Sales Order under way" : "needs Proforma and Sales Order access"} />
       </StatRow>
 
       <ChipGroup>
@@ -123,20 +135,12 @@ export default function QuotationsPage() {
             columns={columns}
             rows={rows}
             onRowClick={(q) => router.push(`/quotations/${q.id}`)}
-            emptyTitle="No quotations match this filter"
+            emptyTitle={quotations.length === 0 ? "No quotations yet" : "No quotations match this filter"}
+            emptyBody={quotations.length === 0 ? (mayCreate ? "Create one from an opportunity to start the quote-to-cash flow." : undefined) : undefined}
           />
           <Pagination page={page} pageSize={PAGE_SIZE} total={filtered.length} onPageChange={setPage} />
         </Panel>
       </div>
-
-      <DesignNote>
-        <b>Design note.</b> Status uses only the verified backend lifecycle — Draft, Revised and
-        Approved are set by the corresponding backend action; Converted is part of the documented
-        workflow terminology but no backend code path ever writes it onto a quotation (converting
-        creates a Sales Order instead — see the quotation&apos;s own detail page). The V-number badge is a
-        mock/UI-only revision trail (see QuotationRevision in lib/types/domain.ts); click any row to
-        open its full detail.
-      </DesignNote>
 
       {showForm && <QuotationForm onClose={() => setShowForm(false)} onSubmit={createQuotation} />}
     </div>

@@ -1,25 +1,29 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { Icon } from "../../../components/ui/Icon";
 import { Panel } from "../../../components/ui/Card";
-import { QuotationStatusTag, ProformaInvoiceStatusTag, SalesOrderStatusTag, Tag } from "../../../components/ui/Tag";
+import { ProformaInvoiceStatusTag, QuotationStatusTag, SalesOrderStatusTag, Tag } from "../../../components/ui/Tag";
 import { Button, EmptyState } from "../../../components/ui/Button";
 import { DataTable, Column } from "../../../components/ui/DataTable";
-import { DesignNote } from "../../../components/ui/PageHeader";
-import { DocumentTrail } from "../../../components/ui/DocumentTrail";
 import { ConfirmDialog } from "../../../components/ui/ConfirmDialog";
+import { CommercialSummary } from "../../../components/ui/CommercialSummary";
+import { DocumentActions, DocumentAction } from "../../../components/ui/DocumentActions";
+import { ChainStage, DocumentChain } from "../../../components/ui/DocumentChain";
+import { QuotationCallout } from "../../../components/ui/QuotationCallout";
+import { QuotationHistory } from "../../../components/ui/DocumentLifecycleHistory";
 import { QuotationReviseDialog } from "../../../components/forms/QuotationReviseDialog";
+import { QuotationApproveDialog } from "../../../components/forms/QuotationApproveDialog";
 import { ProformaInvoiceForm } from "../../../components/forms/ProformaInvoiceForm";
 import { useQuotationDetail } from "../../../lib/hooks/useQuotations";
-import { useProformaInvoices } from "../../../lib/hooks/useProformaInvoices";
-import { useSalesOrders } from "../../../lib/hooks/useSalesOrders";
-import { useRepository } from "../../../lib/repository/RepositoryProvider";
+import { useAuth } from "../../../lib/auth/AuthContext";
 import { useToast } from "../../../components/ui/Toast";
-import { initials } from "../../../components/ui/Who";
-import { formatInr, formatDate, formatDateTime } from "../../../lib/format";
-import { ProformaInvoice, SalesOrder } from "../../../lib/types/domain";
+import { buildCommercialChain } from "../../../lib/repository/shared/commercialChain";
+import { QUOTATION_PERMISSIONS, isLegacyTaxBreakdown, quotationActions, quotationAmounts } from "../../../lib/repository/shared/quotationLifecycle";
+import { PROFORMA_PERMISSIONS, validityLabel } from "../../../lib/repository/shared/proformaLifecycle";
+import { formatDate, formatInrExact } from "../../../lib/format";
 
 function goBackOrTo(router: ReturnType<typeof useRouter>, fallback: string) {
   if (typeof window !== "undefined" && window.history.length > 1) {
@@ -33,28 +37,42 @@ export default function QuotationDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const toast = useToast();
+  const { hasPermission } = useAuth();
   const id = params?.id;
-  const { quotation, opportunity, loading, error, refetch, reviseQuotation, approveQuotation } = useQuotationDetail(id);
-  const { proformaInvoices, createProformaInvoice, refetch: refetchProformas } = useProformaInvoices();
-  const { salesOrders } = useSalesOrders();
-  const repo = useRepository();
-  const isReal = repo.kind === "real";
-  const [showRevise, setShowRevise] = useState(false);
-  const [showApprove, setShowApprove] = useState(false);
-  const [showProformaForm, setShowProformaForm] = useState(false);
+  const {
+    quotation,
+    opportunity,
+    loading,
+    error,
+    refetch,
+    events,
+    eventsLoading,
+    eventsError,
+    proformas,
+    orders,
+    downstreamKnown,
+    reviseQuotation,
+    approveQuotation,
+    rejectQuotation,
+    createProformaInvoice,
+    refreshAll,
+  } = useQuotationDetail(id);
+  const [dialog, setDialog] = useState<null | "revise" | "approve" | "reject" | "proforma">(null);
 
   if (loading && !quotation) {
     return (
       <div className="page">
-        <div className="skeleton" style={{ height: 220, marginBottom: 16 }} />
+        <div className="skeleton" style={{ height: 140, marginBottom: 16 }} />
+        <div className="skeleton" style={{ height: 90, marginBottom: 16 }} />
         <div className="skeleton" style={{ height: 260 }} />
       </div>
     );
   }
 
-  // A fetch failure (network/5xx) is not the same as a genuine not-found —
+  // A fetch failure (network/5xx/403) is not the same as a genuine not-found —
   // only getById() resolving to null means the quotation truly doesn't exist.
   if (error) {
+    const forbidden = (error as { status?: number }).status === 403;
     return (
       <div className="page">
         <a className="back-link" onClick={() => goBackOrTo(router, "/quotations")}>
@@ -63,8 +81,8 @@ export default function QuotationDetailPage() {
         <Panel title="Couldn't load this quotation">
           <EmptyState
             icon="alert"
-            title="Something went wrong"
-            body={error.message || "Something went wrong reaching the RevenueOS backend. Please try again."}
+            title={forbidden ? "You don't have access to quotations" : "Something went wrong"}
+            body={forbidden ? "Viewing quotations needs the quotations.view permission. Ask an administrator to grant it, then sign in again." : error.message || "Something went wrong reaching the RevenueOS backend. Please try again."}
             action={
               <Button variant="ghost" onClick={refetch}>
                 Retry
@@ -91,32 +109,77 @@ export default function QuotationDetailPage() {
     );
   }
 
-  // Which amounts panel to show is decided by the repository mode, not by
-  // which optional fields happen to be set on the object — mock quotations
-  // never carry real GST/tax figures to render, by design (repo.kind is the
-  // same distinction already used for Lead notes/activity — see
-  // app/leads/[id]/page.tsx).
-  const canRevise = quotation.status !== "CONVERTED";
-  const canApprove = quotation.status === "DRAFT" || quotation.status === "REVISED";
-  const revisions = [...quotation.revisions].sort((a, b) => b.version - a.version);
-  const relatedProformas = proformaInvoices.filter((p) => p.quotationId === quotation.id);
-  const relatedSalesOrders = salesOrders.filter((o) => o.quotationId === quotation.id);
-  // No backend precondition exists on proforma creation (it doesn't even
-  // check the quotation's status) — this mirrors the same documented
-  // Quote-to-Cash sequence assumption as Convert's own gate, not a claimed
-  // backend rule. See docs/revenueos-stage2-plan.md §4.
-  const canCreateProforma = quotation.status === "APPROVED";
+  const amounts = quotationAmounts(quotation);
+  const legacy = isLegacyTaxBreakdown(quotation);
+  const chain = buildCommercialChain(quotation.id, proformas, orders);
+  const activeProforma = chain.activeProforma;
+  const liveOrders = chain.liveOrders;
 
-  const proformaColumns: Column<ProformaInvoice>[] = [
-    { key: "proformaNumber", header: "No.", render: (p) => p.proformaNumber },
-    { key: "totalAmount", header: "Amount", render: (p) => formatInr(p.totalAmount) },
-    { key: "status", header: "Status", render: (p) => <ProformaInvoiceStatusTag status={p.status} /> },
+  const actions = quotationActions({
+    status: quotation.status,
+    legacyBreakdown: legacy,
+    may: {
+      approve: hasPermission(QUOTATION_PERMISSIONS.approve),
+      edit: hasPermission(QUOTATION_PERMISSIONS.edit),
+      reject: hasPermission(QUOTATION_PERMISSIONS.reject),
+      createProforma: hasPermission(PROFORMA_PERMISSIONS.create),
+    },
+    activeProformaLabels: activeProforma ? [activeProforma.proformaNumber] : [],
+    liveOrderLabels: liveOrders.map((o) => o.salesOrderCode),
+  });
+
+  const actionList: DocumentAction[] = [
+    { key: "approve", label: "Approve", icon: "check", variant: "primary", state: actions.approve, onClick: () => setDialog("approve") },
+    { key: "createProforma", label: "Create Proforma Invoice", icon: "receipt", variant: quotation.status === "APPROVED" && actions.createProforma.enabled ? "primary" : "ghost", state: actions.createProforma, onClick: () => setDialog("proforma") },
+    { key: "revise", label: "Revise", icon: "layers", state: actions.revise, onClick: () => setDialog("revise") },
+    { key: "reject", label: "Reject", icon: "close", className: "danger-ghost", state: actions.reject, onClick: () => setDialog("reject") },
   ];
 
-  const salesOrderColumns: Column<SalesOrder>[] = [
-    { key: "salesOrderCode", header: "Order No.", render: (o) => o.salesOrderCode },
-    { key: "totalAmount", header: "Amount", render: (o) => formatInr(o.totalAmount) },
-    { key: "status", header: "Status", render: (o) => <SalesOrderStatusTag status={o.status} /> },
+  const olderProformas = chain.proformas.filter((p) => p !== activeProforma);
+  const proformaStage: ChainStage = activeProforma
+    ? {
+        key: "proforma",
+        label: "Proforma Invoice",
+        title: activeProforma.proformaNumber,
+        href: `/proforma-invoices/${activeProforma.id}`,
+        status: <ProformaInvoiceStatusTag status={activeProforma.status} expired={activeProforma.isExpired} />,
+        hint: validityLabel(activeProforma.validityDate).text + (olderProformas.length ? ` · ${olderProformas.length} cancelled earlier` : ""),
+        state: activeProforma.isExpired ? "attention" : "normal",
+      }
+    : {
+        key: "proforma",
+        label: "Proforma Invoice",
+        title: "Not created yet",
+        hint: actions.createProforma.enabled ? `Ready to create from this quotation.${olderProformas.length ? ` ${olderProformas.length} cancelled earlier.` : ""}` : olderProformas.length ? `${olderProformas.length} cancelled earlier. ${quotation.status === "APPROVED" ? "" : "Needs an approved quotation."}`.trim() : "Needs an approved quotation.",
+        state: quotation.status === "REJECTED" ? "closed" : "upcoming",
+      };
+  const orderStage: ChainStage = liveOrders.length
+    ? {
+        key: "order",
+        label: "Sales Order",
+        title: liveOrders[0].salesOrderCode,
+        href: `/sales-orders/${liveOrders[0].id}`,
+        status: <SalesOrderStatusTag status={liveOrders[0].status} />,
+        hint: liveOrders[0].proformaInvoiceId ? (liveOrders.length > 1 ? `+${liveOrders.length - 1} more` : undefined) : "Legacy order, created straight from this quotation.",
+        state: "normal",
+      }
+    : {
+        key: "order",
+        label: "Sales Order",
+        title: "Not created yet",
+        hint: chain.orders.length ? `${chain.orders.length} cancelled. A new one is created from an approved Proforma.` : "Created from an approved Proforma Invoice.",
+        state: quotation.status === "REJECTED" ? "closed" : "upcoming",
+      };
+
+  const documentRows: Array<{ id: string; kind: "Proforma" | "Sales Order"; number: string; href: string; amount: number; status: JSX.Element }> = [
+    ...chain.proformas.map((p) => ({ id: p.id, kind: "Proforma" as const, number: p.proformaNumber, href: `/proforma-invoices/${p.id}`, amount: p.totalAmount, status: <ProformaInvoiceStatusTag status={p.status} expired={p.isExpired} /> })),
+    ...chain.orders.map((o) => ({ id: o.id, kind: "Sales Order" as const, number: o.salesOrderCode, href: `/sales-orders/${o.id}`, amount: o.totalAmount, status: <SalesOrderStatusTag status={o.status} /> })),
+  ];
+  const documentColumns: Column<(typeof documentRows)[number]>[] = [
+    { key: "kind", header: "Document", render: (r) => r.kind },
+    { key: "number", header: "No.", render: (r) => r.number },
+    { key: "amount", header: "Amount", render: (r) => formatInrExact(r.amount) },
+    { key: "status", header: "Status", render: (r) => r.status },
   ];
 
   return (
@@ -124,171 +187,120 @@ export default function QuotationDetailPage() {
       <a className="back-link" onClick={() => goBackOrTo(router, "/quotations")}>
         <Icon name="back" size={14} /> Back to Quotations
       </a>
-      <div className="crm-grid">
-        <div className="card panel">
-          <div className="profile-head">
-            <div className="top">
-              <div className="av-lg">{initials(quotation.customerName)}</div>
-              <div>
-                <h3>{quotation.quoteNo} <span className="version-badge" style={{ marginLeft: 6 }}>V{quotation.version}</span></h3>
-                <div className="co">{quotation.customerName} · Owner: {quotation.ownerName}</div>
+
+      <div className="card panel" style={{ marginBottom: 16 }}>
+        <div className="doc-head" style={{ borderBottom: 0, paddingBottom: 10 }}>
+          <div className="ident">
+            <div className="dot" style={{ width: 44, height: 44, borderRadius: 12, background: "var(--m-soft)", color: "var(--m)", display: "grid", placeItems: "center", flex: "none" }}>
+              <Icon name="notepad" size={20} />
+            </div>
+            <div>
+              <h3>{quotation.quoteNo}</h3>
+              <div className="co">
+                {opportunity ? <Link href={`/leads/${opportunity.leadId}`}>{quotation.customerName}</Link> : quotation.customerName}
+                {" · "}
+                {opportunity ? <Link href={`/opportunities/${opportunity.id}`}>{quotation.opportunityName}</Link> : quotation.opportunityName}
+                {" · Owner: "}
+                {quotation.ownerName}
+              </div>
+              <div className="statusrow">
+                <QuotationStatusTag status={quotation.status} />
+                {legacy && <Tag color="w">Legacy tax breakdown</Tag>}
               </div>
             </div>
-            <div className="tagrow">
-              <QuotationStatusTag status={quotation.status} />
-              <Tag color="n">{formatInr(quotation.amount)}</Tag>
-              {quotation.validUntil && <Tag color="n">Valid until {formatDate(quotation.validUntil)}</Tag>}
-            </div>
-            <div className="lead-action-row">
-              <Button variant="ghost" icon="layers" onClick={() => setShowRevise(true)} disabled={!canRevise}>
-                Revise
-              </Button>
-              <Button variant="primary" icon="check" onClick={() => setShowApprove(true)} disabled={!canApprove}>
-                Approve
-              </Button>
-            </div>
           </div>
-
-          <div style={{ padding: "16px 19px", borderBottom: "1px solid var(--line-2)" }}>
-            <DocumentTrail
-              nodes={[
-                { key: "lead", label: quotation.customerName, sublabel: "Lead", href: opportunity ? `/leads/${opportunity.leadId}` : undefined },
-                ...(opportunity ? [{ key: "opp", label: opportunity.title, sublabel: "Opportunity", href: `/opportunities/${opportunity.id}` }] : []),
-                { key: "quote", label: quotation.quoteNo, sublabel: "Quotation", current: true },
-              ]}
-            />
-          </div>
-
-          {isReal ? (
-            <div className="info-grid">
-              <div className="f"><label>Taxable Amount</label><div>{formatInr(quotation.taxableAmount ?? 0)}</div></div>
-              <div className="f"><label>GST ({quotation.gstPercent ?? 0}%{quotation.taxType ? ` · ${quotation.taxType}` : ""})</label><div>{formatInr(quotation.gstAmount ?? 0)}</div></div>
-              <div className="f"><label>Total Amount</label><div><b>{formatInr(quotation.totalAmount ?? quotation.amount)}</b></div></div>
-              <div className="f"><label>Quote Date</label><div>{quotation.quoteDate ? formatDate(quotation.quoteDate) : "—"}</div></div>
-            </div>
-          ) : (
-            <div className="info-grid">
-              <div className="f"><label>Taxable Amount (estimate)</label><div>{formatInr(quotation.amount)}</div></div>
-              <div className="f"><label>Tax / Total</label><div style={{ color: "var(--faint)" }}>Computed by backend once connected</div></div>
-            </div>
-          )}
-
-          <div style={{ padding: "0 19px 19px" }}>
-            <p style={{ fontSize: 11.5, color: "var(--faint)" }}>
-              {isReal
-                ? "GST, HSN and total calculation are backend-owned — the figures above are exactly what the connected backend returned."
-                : "The amount shown is a frontend presentation estimate. GST, HSN and total calculation are backend-owned per the verified quotation contract — do not treat figures here as final until a real quotation response is connected."}
-            </p>
+          <div className="doc-amount">
+            <div className="k">Total amount</div>
+            <div className="v" data-testid="header-total">{formatInrExact(amounts.totalAmount)}</div>
+            <div className="sub">{legacy ? "Tax breakdown not recorded" : `Taxable ${formatInrExact(amounts.taxableAmount)} + GST ${amounts.gstPercent}%`}</div>
           </div>
         </div>
+        <DocumentActions actions={actionList} testId="quotation-actions" />
+      </div>
 
+      <QuotationCallout quotation={quotation} legacy={legacy} activeProforma={activeProforma} liveOrders={liveOrders} downstreamKnown={downstreamKnown} events={events} />
+
+      <div style={{ marginBottom: 16 }}>
+        <Panel title="From quotation to Sales Order">
+          <DocumentChain stages={[{ key: "quotation", label: "Quotation", title: quotation.quoteNo, status: <QuotationStatusTag status={quotation.status} />, hint: quotation.status === "APPROVED" ? "Commercially approved" : quotation.status === "REJECTED" ? "Closed" : "Not approved yet", state: "current" }, proformaStage, orderStage]} />
+        </Panel>
+      </div>
+
+      <div className="crm-grid">
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <Panel title="Revision History" flush>
-            <div className="tl" style={{ padding: "14px 19px" }}>
-              {revisions.length === 0 && (
-                <p style={{ color: "var(--muted)", fontSize: 13 }}>
-                  {isReal
-                    ? "No persisted version history — the backend's revise operation updates the amount in place rather than keeping prior versions."
-                    : "No revisions yet."}
-                </p>
-              )}
-              {revisions.map((r, i) => (
-                <div className="tl-item" key={r.version}>
-                  <div className="dot"><Icon name="layers" size={14} /></div>
-                  <div className="body">
-                    <div className="r1">
-                      <b>V{r.version} — {formatInr(r.amount)}</b>
-                      <span className="when">{formatDateTime(r.createdAt)}</span>
-                    </div>
-                    {r.note && <p>{r.note}</p>}
-                    {i === 0 && <p style={{ color: "var(--m)", fontWeight: 600 }}>Current</p>}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Panel>
-          <Panel
-            title="Related Proforma Invoices"
-            flush
-            extraHead={
-              canCreateProforma ? (
-                <a className="more" href="#" onClick={(e) => { e.preventDefault(); setShowProformaForm(true); }}>
-                  <Icon name="plus" size={14} /> Create Proforma
-                </a>
-              ) : undefined
-            }
-          >
-            <DataTable
-              columns={proformaColumns}
-              rows={relatedProformas}
-              onRowClick={(p) => router.push(`/proforma-invoices/${p.id}`)}
-              emptyTitle="No proforma invoices yet"
-              emptyBody={canCreateProforma ? "Create one to move toward a Sales Order." : "Approve this quotation first."}
+          <div className="card panel">
+            <div className="panel-head"><h3>Commercial summary</h3></div>
+            <CommercialSummary
+              taxableAmount={amounts.taxableAmount}
+              gstPercent={amounts.gstPercent}
+              gstAmount={amounts.gstAmount}
+              totalAmount={amounts.totalAmount}
+              taxType={quotation.taxType}
+              breakdownAvailable={!legacy}
             />
-          </Panel>
-          {relatedSalesOrders.length > 0 && (
-            <Panel title="Related Sales Orders" flush>
+            <div className="facts">
+              <div className="f"><label>Quote date</label><div>{quotation.quoteDate ? formatDate(quotation.quoteDate) : "—"}</div></div>
+              <div className="f"><label>Place of supply</label><div>{quotation.placeOfSupply ?? "—"}</div></div>
+              <div className="f"><label>Created</label><div>{formatDate(quotation.createdAt)}</div></div>
+            </div>
+          </div>
+          {documentRows.length > 0 && (
+            <Panel title="Documents built on this quotation" flush>
               <DataTable
-                columns={salesOrderColumns}
-                rows={relatedSalesOrders}
-                onRowClick={(o) => router.push(`/sales-orders/${o.id}`)}
-                emptyTitle="No sales orders yet"
-                emptyBody=""
+                columns={documentColumns}
+                rows={documentRows}
+                onRowClick={(r) => router.push(r.href)}
+                emptyTitle="Nothing built on this quotation yet"
               />
             </Panel>
           )}
-          <Panel title="Downstream">
-            <p style={{ fontSize: 12.5, color: "var(--muted)" }}>
-              {quotation.status === "APPROVED"
-                ? "This quotation is approved. Create a Proforma Invoice above to continue — that's the next step in the standard Quote-to-Cash workflow toward a Sales Order."
-                : "Approve this quotation to create a Proforma Invoice, the next step toward a Sales Order."}
-            </p>
-          </Panel>
         </div>
+        <Panel title="Lifecycle history" flush>
+          <QuotationHistory events={events} loading={eventsLoading} error={eventsError} onRetry={refreshAll} />
+        </Panel>
       </div>
 
-      <DesignNote>
-        <b>Design note.</b> Revise and Approve mirror VERIFIED backend operations. The standard Version A
-        workflow continues through Create Proforma Invoice above, then a Sales Order from the Proforma&apos;s
-        own detail page — Proforma is the intended next step after an approved quotation, not a Sales Order
-        directly. The backend also technically exposes a direct `POST /quotations/:id/convert` route that
-        creates a Sales Order straight from a Quotation, bypassing Proforma entirely, but that isn&apos;t the
-        intended commercial workflow, so no action for it is offered here. Any Sales Order already linked to
-        this quotation (e.g. created before this change, or directly against the API) still appears below.
-      </DesignNote>
-
-      {showRevise && (
+      {dialog === "revise" && (
         <QuotationReviseDialog
           quoteNo={quotation.quoteNo}
-          currentVersion={quotation.version}
-          currentAmount={quotation.amount}
-          onClose={() => setShowRevise(false)}
-          onSubmit={(amount, note) => reviseQuotation(amount, note)}
+          status={quotation.status}
+          current={amounts}
+          taxType={quotation.taxType}
+          onClose={() => setDialog(null)}
+          onSubmit={(taxable, remarks) => reviseQuotation(taxable, remarks)}
         />
       )}
-      {showApprove && (
-        <ConfirmDialog
-          title="Approve Quotation"
-          body={`Approve ${quotation.quoteNo}? This confirms the current amount and version as final for this stage.`}
-          confirmLabel="Approve"
-          onClose={() => setShowApprove(false)}
-          onConfirm={async () => {
-            await approveQuotation();
-            toast.show(`${quotation.quoteNo} approved`, "check");
-          }}
-        />
-      )}
-      {showProformaForm && (
-        <ProformaInvoiceForm
-          quotationId={quotation.id}
+      {dialog === "approve" && (
+        <QuotationApproveDialog
           quoteNo={quotation.quoteNo}
-          defaultTotalAmount={quotation.totalAmount ?? quotation.amount}
-          onClose={() => setShowProformaForm(false)}
-          onSubmit={async (input) => {
-            const p = await createProformaInvoice(input);
-            refetchProformas();
-            return p;
+          wasRevised={quotation.status === "REVISED"}
+          amounts={amounts}
+          onClose={() => setDialog(null)}
+          onSubmit={(remarks) => approveQuotation(remarks)}
+        />
+      )}
+      {dialog === "reject" && (
+        <ConfirmDialog
+          title={`Reject ${quotation.quoteNo}`}
+          body="Rejecting closes this quotation for good: it can't be revised, approved or turned into a Proforma Invoice. Say why, for the record."
+          confirmLabel="Reject quotation"
+          destructive
+          noteLabel="Reason"
+          noteRequired
+          onClose={() => setDialog(null)}
+          onConfirm={async (reason) => {
+            await rejectQuotation(reason ?? "");
+            toast.show(`${quotation.quoteNo} rejected`, "check");
           }}
+        />
+      )}
+      {dialog === "proforma" && (
+        <ProformaInvoiceForm
+          quoteNo={quotation.quoteNo}
+          amounts={amounts}
+          breakdownAvailable={!legacy}
+          onClose={() => setDialog(null)}
+          onSubmit={(input) => createProformaInvoice(input)}
         />
       )}
     </div>

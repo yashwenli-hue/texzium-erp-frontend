@@ -1,5 +1,5 @@
 import { ID, ListQuery, Page } from "../../types/common";
-import { Quotation, SalesOrder } from "../../types/domain";
+import { Quotation, QuotationEvent } from "../../types/domain";
 import {
   IQuotationRepository,
   CreateQuotationInput,
@@ -8,13 +8,44 @@ import {
 import { db } from "./db";
 import { delay, applyListQuery } from "./queryUtils";
 import { mockId } from "./entityStore";
-
-let mockOrderCounter = 5090;
+import {
+  QUOTATION_REASON_MAX_LENGTH,
+  QUOTATION_REMARKS_MAX_LENGTH,
+  QuotationConflictError,
+  cleanQuotationText,
+  computeQuotationAmounts,
+  hasConsistentTaxBreakdown,
+  isQuotationTransitionAllowed,
+  parseTaxableAmount,
+  quotationAmounts,
+  quotationCannotApproveMessage,
+  quotationCannotRejectMessage,
+  quotationCannotReviseMessage,
+  quotationInconsistentBreakdownMessage,
+  quotationLockedByDownstreamMessage,
+  QUOTATION_NOT_FOUND_MESSAGE,
+} from "../shared/quotationLifecycle";
+import { isActiveProforma } from "../shared/proformaLifecycle";
+import { isLiveSalesOrder } from "../shared/salesOrderLifecycle";
 
 const SEARCHABLE: (keyof Quotation)[] = ["quoteNo", "customerName", "opportunityName", "ownerName"];
 
 let quoteCounter = 3420;
 
+/** The mock has no HSN master, so a created quotation carries this stand-in GST rate. The real backend takes the rate from the item's HSN. */
+export const MOCK_GST_PERCENT = 18;
+
+/** The mock's stand-in for the signed-in user. The real backend takes the actor from the token. */
+const MOCK_ACTOR = { id: "mock-user", name: "You" };
+
+/**
+ * Mirrors the backend's Quotation lifecycle (commit 1246647): the same
+ * statuses, transitions, taxable-amount revision (GST recomputed from the stored
+ * percentage), the lock on an approved quotation that has an active Proforma or
+ * a live Sales Order, the refusal to revise/approve a legacy quotation whose tax
+ * breakdown does not add up, mandatory rejection reason, and an attributed
+ * history. The old convert action does not exist any more, here or in the backend.
+ */
 export class MockQuotationRepository implements IQuotationRepository {
   async list(query?: ListQuery<QuotationSortField>): Promise<Page<Quotation>> {
     return delay(applyListQuery(db.quotations.getAll(), query, SEARCHABLE));
@@ -24,88 +55,140 @@ export class MockQuotationRepository implements IQuotationRepository {
     return delay(db.quotations.getById(id) ?? null);
   }
 
+  private record(e: Omit<QuotationEvent, "id" | "actorName" | "actorId" | "occurredAt">) {
+    db.quotationEvents.add({
+      id: mockId("QE"),
+      actorName: MOCK_ACTOR.name,
+      actorId: MOCK_ACTOR.id,
+      occurredAt: new Date().toISOString(),
+      ...e,
+    });
+  }
+
+  private require(id: ID): Quotation {
+    const q = db.quotations.getById(id);
+    if (!q) throw new Error(QUOTATION_NOT_FOUND_MESSAGE);
+    return q;
+  }
+
   async create(input: CreateQuotationInput): Promise<Quotation> {
     const opportunity = db.opportunities.getById(input.opportunityId);
     if (!opportunity) throw new Error(`Opportunity ${input.opportunityId} not found`);
     quoteCounter += 1;
     const now = new Date().toISOString();
-    // Mock has no HSN/GST-rate master data, so it never computes or sets
-    // taxableAmount/gstPercent/gstAmount/totalAmount — those are backend-
-    // computed real fields only (see Quotation in lib/types/domain.ts).
-    // `amount` here is a plain quantity × unit price presentation estimate,
-    // not a tax calculation. Whether to treat that as authoritative is
-    // decided by repo.kind in the UI, never by which optional fields happen
-    // to be set on the object.
-    const amount = input.quantity * input.unitPrice;
+    const amounts = computeQuotationAmounts(input.quantity * input.unitPrice, MOCK_GST_PERCENT);
     const quotation: Quotation = {
       id: mockId("Q"),
       quoteNo: `QT-${quoteCounter}`,
       customerName: opportunity.customerName,
       opportunityId: opportunity.id,
       opportunityName: opportunity.title,
-      amount,
+      amount: amounts.totalAmount,
+      taxableAmount: amounts.taxableAmount,
+      gstPercent: MOCK_GST_PERCENT,
+      gstAmount: amounts.gstAmount,
+      totalAmount: amounts.totalAmount,
       status: "DRAFT",
-      validUntil: null,
       ownerName: opportunity.ownerName,
       createdAt: now,
-      version: 1,
-      revisions: [{ version: 1, amount, createdAt: now }],
       quoteDate: input.quoteDate,
       quantity: input.quantity,
       unitPrice: input.unitPrice,
     };
     db.quotations.add(quotation);
+    this.record({
+      quotationId: quotation.id,
+      action: "QUOTATION_CREATED",
+      toStatus: "DRAFT",
+      newTaxableAmount: amounts.taxableAmount,
+      newTotalAmount: amounts.totalAmount,
+    });
     return delay(quotation);
   }
 
-  async revise(id: ID, amount: number, note?: string): Promise<Quotation> {
-    const existing = db.quotations.getById(id);
-    if (!existing) throw new Error(`Quotation ${id} not found`);
-    const now = new Date().toISOString();
-    const nextVersion = existing.version + 1;
+  async revise(id: ID, taxableAmount: number, remarks?: string): Promise<Quotation> {
+    const parsed = parseTaxableAmount(String(taxableAmount));
+    if (parsed.error !== undefined) throw new Error(parsed.error);
+    const note = cleanQuotationText(remarks, QUOTATION_REMARKS_MAX_LENGTH, false, "Remarks");
+    const existing = this.require(id);
+    if (!isQuotationTransitionAllowed(existing.status, "REVISED")) {
+      throw new QuotationConflictError(quotationCannotReviseMessage(existing.status));
+    }
+    const current = quotationAmounts(existing);
+    if (!hasConsistentTaxBreakdown(current)) {
+      throw new QuotationConflictError(quotationInconsistentBreakdownMessage("revised"));
+    }
+    if (existing.status === "APPROVED") {
+      // Locked once something has been built on it: an active (not cancelled) Proforma, or a Sales Order that is not cancelled.
+      const proformas = db.proformaInvoices.getAll().filter((p) => p.quotationId === id);
+      const proformaIds = new Set(proformas.map((p) => p.id));
+      const blockers: string[] = [];
+      if (proformas.some(isActiveProforma)) blockers.push("an active Proforma Invoice");
+      if (db.salesOrders.getAll().some((o) => isLiveSalesOrder(o.status) && (o.quotationId === id || (o.proformaInvoiceId && proformaIds.has(o.proformaInvoiceId))))) {
+        blockers.push("a Sales Order");
+      }
+      if (blockers.length > 0) throw new QuotationConflictError(quotationLockedByDownstreamMessage(blockers));
+    }
+    const next = computeQuotationAmounts(parsed.value, current.gstPercent);
     const updated = db.quotations.update(id, {
-      amount,
       status: "REVISED",
-      version: nextVersion,
-      revisions: [...existing.revisions, { version: nextVersion, amount, createdAt: now, note }],
+      amount: next.totalAmount,
+      taxableAmount: next.taxableAmount,
+      gstAmount: next.gstAmount,
+      totalAmount: next.totalAmount,
     });
-    if (!updated) throw new Error(`Quotation ${id} not found`);
+    if (!updated) throw new Error(QUOTATION_NOT_FOUND_MESSAGE);
+    this.record({
+      quotationId: id,
+      action: "QUOTATION_REVISED",
+      fromStatus: existing.status,
+      toStatus: "REVISED",
+      remarks: note,
+      previousTaxableAmount: current.taxableAmount,
+      newTaxableAmount: next.taxableAmount,
+      previousTotalAmount: current.totalAmount,
+      newTotalAmount: next.totalAmount,
+    });
     return delay(updated);
   }
 
-  async approve(id: ID): Promise<Quotation> {
+  async approve(id: ID, remarks?: string): Promise<Quotation> {
+    const note = cleanQuotationText(remarks, QUOTATION_REMARKS_MAX_LENGTH, false, "Remarks");
+    const existing = this.require(id);
+    if (!isQuotationTransitionAllowed(existing.status, "APPROVED")) {
+      throw new QuotationConflictError(quotationCannotApproveMessage(existing.status));
+    }
+    if (!hasConsistentTaxBreakdown(quotationAmounts(existing))) {
+      throw new QuotationConflictError(quotationInconsistentBreakdownMessage("approved"));
+    }
     const updated = db.quotations.update(id, { status: "APPROVED" });
-    if (!updated) throw new Error(`Quotation ${id} not found`);
+    if (!updated) throw new Error(QUOTATION_NOT_FOUND_MESSAGE);
+    this.record({ quotationId: id, action: "QUOTATION_APPROVED", fromStatus: existing.status, toStatus: "APPROVED", remarks: note });
     return delay(updated);
   }
 
-  async convert(id: ID): Promise<{ quotation: Quotation; salesOrderId: ID }> {
-    const existing = db.quotations.getById(id);
-    if (!existing) throw new Error(`Quotation ${id} not found`);
-    const now = new Date().toISOString();
-    mockOrderCounter += 1;
-    // Mirrors the real quotationsService.convertToSalesOrder(): a Sales
-    // Order linked by quotationId, status OPEN, no proforma involved. Unlike
-    // the real backend (which leaves Quotation.status untouched), the mock
-    // is free to show the master plan's documented terminal state for demo
-    // purposes — that divergence is mock-only, same as before this change.
-    const salesOrder: SalesOrder = {
-      id: mockId("SO"),
-      salesOrderCode: `SO-${mockOrderCounter}`,
-      orderDate: now,
-      totalAmount: existing.amount,
-      status: "OPEN",
-      quotationId: existing.id,
-      quoteNo: existing.quoteNo,
-      opportunityId: existing.opportunityId,
-      opportunityName: existing.opportunityName,
-      customerName: existing.customerName,
-      ownerName: existing.ownerName,
-      createdAt: now,
-    };
-    db.salesOrders.add(salesOrder);
-    const updated = db.quotations.update(id, { status: "CONVERTED" });
-    if (!updated) throw new Error(`Quotation ${id} not found`);
-    return delay({ quotation: updated, salesOrderId: salesOrder.id });
+  async reject(id: ID, reason: string): Promise<Quotation> {
+    const clean = cleanQuotationText(reason, QUOTATION_REASON_MAX_LENGTH, true, "A reason");
+    const existing = this.require(id);
+    if (!isQuotationTransitionAllowed(existing.status, "REJECTED")) {
+      throw new QuotationConflictError(quotationCannotRejectMessage(existing.status));
+    }
+    const updated = db.quotations.update(id, { status: "REJECTED" });
+    if (!updated) throw new Error(QUOTATION_NOT_FOUND_MESSAGE);
+    this.record({ quotationId: id, action: "QUOTATION_REJECTED", fromStatus: existing.status, toStatus: "REJECTED", remarks: clean });
+    return delay(updated);
+  }
+
+  async listEvents(id: ID): Promise<QuotationEvent[]> {
+    this.require(id);
+    // Newest first; events recorded in the same millisecond keep their real order (the later one first).
+    const events = db.quotationEvents
+      .getAll()
+      .map((e, index) => ({ e, index }))
+      .filter(({ e }) => e.quotationId === id)
+      .sort((a, b) => +new Date(b.e.occurredAt) - +new Date(a.e.occurredAt) || b.index - a.index)
+      .map(({ e }) => e);
+    return delay(events);
   }
 }
+

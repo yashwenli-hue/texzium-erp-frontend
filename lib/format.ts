@@ -11,6 +11,15 @@ export function formatInr(amount: number): string {
   return `₹${amount.toLocaleString("en-IN")}`;
 }
 
+/**
+ * An exact rupee amount for commercial documents (taxable amount, GST, total),
+ * where the compact "₹1.1 Cr" of formatInr would hide the figures that matter:
+ * "₹2,95,000.00". Always two decimals, Indian digit grouping.
+ */
+export function formatInrExact(amount: number): string {
+  return `₹${amount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
 /** Compact "2 hrs ago" / "Yesterday" / "5 days ago" style relative time. */
 export function formatRelative(iso: string): string {
   const then = new Date(iso).getTime();

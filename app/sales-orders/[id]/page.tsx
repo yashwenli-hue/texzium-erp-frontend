@@ -323,8 +323,8 @@ export default function SalesOrderDetailPage() {
           {!hasGstDetails && (
             <div style={{ padding: "0 19px 19px" }}>
               <p style={{ fontSize: 11.5, color: "var(--faint)" }}>
-                No seller/buyer GST or tax type on this order — it was created by converting a Quotation, which
-                doesn&apos;t collect or copy that information (confirmed by reading quotations.service.ts directly).
+                No seller/buyer GST or tax type on this order — it is a legacy order, created before the lifecycle by
+                converting a Quotation directly, which didn&apos;t collect that information.
               </p>
             </div>
           )}
@@ -558,14 +558,13 @@ export default function SalesOrderDetailPage() {
       </div>
 
       <DesignNote>
-        <b>Design note.</b> This order was created either by converting an approved Quotation (
-        <code>POST /quotations/:id/convert</code>, linked by quotationId, status <code>OPEN</code>) or
-        directly from an approved Proforma Invoice (<code>POST /sales-orders</code>, linked by
-        proformaInvoiceId, status <code>PENDING_STORE_APPROVAL</code>, total taken from that Proforma) — never
-        both. Only orders from a Proforma enter the commercial workflow: verifying an advance receipt moves the
-        order to Pending Accounts Approval, and Accounts approval makes it Ready For Dispatch Order. The backend
-        decides who did what (the signed-in user) and keeps it in the lifecycle history; a rejected advance leaves
-        the status unchanged. &quot;Ready For Invoicing&quot; is written by the OperationsOS Dispatch Orders service
+        <b>Design note.</b> A Sales Order is created from an approved, unexpired Proforma Invoice
+        (<code>POST /sales-orders</code>, linked by proformaInvoiceId, status <code>PENDING_STORE_APPROVAL</code>,
+        total taken from that Proforma). An order with status <code>OPEN</code> is a legacy order created before
+        that, straight from a quotation; it does not enter the commercial workflow. Verifying an advance receipt
+        moves an order to Pending Accounts Approval, and Accounts approval makes it Ready For Dispatch Order. The
+        backend decides who did what (the signed-in user) and keeps it in the lifecycle history; a rejected advance
+        leaves the status unchanged. &quot;Ready For Invoicing&quot; is written by the OperationsOS Dispatch Orders service
         when a linked Dispatch Order is marked DISPATCHED, so Create Sales Invoice only appears once that real
         status is reached and a matching dispatched order is found. Each step can be retracted (most recent
         first) and an order can be cancelled, both with a mandatory reason that is kept in the history; once a

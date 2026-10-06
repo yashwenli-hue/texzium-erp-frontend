@@ -55,28 +55,37 @@ export function OpportunityStageTag({ stage }: { stage: string }) {
   return <Tag color={OPPORTUNITY_STAGE_STYLE[stage] ?? "n"}>{formatOpportunityStage(stage)}</Tag>;
 }
 
-// Quotation status is a raw backend value (DRAFT/REVISED/APPROVED/CONVERTED)
+// Quotation status is a raw backend value (DRAFT/REVISED/APPROVED/REJECTED)
 // rather than the Title-Case strings the shared STAGE_COLOR/StatusTag above
 // assume — same "raw value in, formatted label out" pattern as LeadStatusTag.
 export const QUOTATION_STATUS_STYLE: Record<string, TagColor> = {
   DRAFT: "n",
   REVISED: "w",
   APPROVED: "g",
-  CONVERTED: "i",
+  REJECTED: "b",
 };
 
 export function QuotationStatusTag({ status }: { status: string }) {
   return <Tag color={QUOTATION_STATUS_STYLE[status] ?? "n"}>{formatQuotationStatus(status)}</Tag>;
 }
 
-// Proforma Invoice status — only two reachable backend values (PENDING/APPROVED).
+// Proforma Invoice status: PENDING, APPROVED, CANCELLED. Expiry is not a status
+// (the backend derives it from the validity date), so it is shown as its own tag
+// beside the status of a Proforma that has run out and is not cancelled.
 export const PROFORMA_INVOICE_STATUS_STYLE: Record<string, TagColor> = {
   PENDING: "w",
   APPROVED: "g",
+  CANCELLED: "b",
 };
 
-export function ProformaInvoiceStatusTag({ status }: { status: string }) {
-  return <Tag color={PROFORMA_INVOICE_STATUS_STYLE[status] ?? "n"}>{formatProformaInvoiceStatus(status)}</Tag>;
+export function ProformaInvoiceStatusTag({ status, expired }: { status: string; expired?: boolean }) {
+  const showExpired = !!expired && status !== "CANCELLED";
+  return (
+    <span style={{ display: "inline-flex", gap: 5, alignItems: "center", flexWrap: "wrap" }}>
+      <Tag color={PROFORMA_INVOICE_STATUS_STYLE[status] ?? "n"}>{formatProformaInvoiceStatus(status)}</Tag>
+      {showExpired && <Tag color="b">Expired</Tag>}
+    </span>
+  );
 }
 
 // Sales Order status is an open-ended backend string, not a closed enum —

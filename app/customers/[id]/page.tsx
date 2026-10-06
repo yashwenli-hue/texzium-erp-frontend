@@ -79,7 +79,7 @@ export default function CustomerDetailPage() {
     { key: "opportunityName", header: "Opportunity", render: (q) => q.opportunityName },
     { key: "amount", header: "Amount", render: (q) => formatInr(q.amount) },
     { key: "status", header: "Status", render: (q) => <QuotationStatusTag status={q.status} /> },
-    { key: "validUntil", header: "Valid Until", render: (q) => formatDate(q.validUntil) },
+    { key: "quoteDate", header: "Quote Date", render: (q) => formatDate(q.quoteDate ?? q.createdAt) },
   ];
 
   const contactColumns: Column<Contact>[] = [
@@ -113,7 +113,7 @@ export default function CustomerDetailPage() {
         id: q.id,
         icon: "file",
         title: `Quotation ${q.quoteNo} — ${q.status}`,
-        detail: `${formatInr(q.amount)} · V${q.version}`,
+        detail: formatInr(q.amount),
         at: q.createdAt,
       })),
     isReal

@@ -11,7 +11,9 @@ import {
   Note,
   Opportunity,
   Quotation,
+  QuotationEvent,
   ProformaInvoice,
+  ProformaEvent,
   SalesOrder,
   SalesOrderEvent,
   SalesOrderPaymentTerm,
@@ -35,7 +37,9 @@ import {
   SEED_NOTES,
   SEED_OPPORTUNITIES,
   SEED_QUOTATIONS,
+  SEED_QUOTATION_EVENTS,
   SEED_PROFORMA_INVOICES,
+  SEED_PROFORMA_EVENTS,
   SEED_SALES_ORDERS,
   SEED_SALES_INVOICES,
   SEED_DISPATCH_ORDERS,
@@ -71,7 +75,11 @@ export const db = {
   // lib/repository/shared/opportunityStage.ts for the rules the mock follows).
   opportunities: new EntityStore<Opportunity>(SEED_OPPORTUNITIES),
   quotations: new EntityStore<Quotation>(SEED_QUOTATIONS),
+  // Quotation and Proforma lifecycle history (in memory only, like every other
+  // mock table: the real backend owns it).
+  quotationEvents: new EntityStore<QuotationEvent>(SEED_QUOTATION_EVENTS),
   proformaInvoices: new EntityStore<ProformaInvoice>(SEED_PROFORMA_INVOICES),
+  proformaEvents: new EntityStore<ProformaEvent>(SEED_PROFORMA_EVENTS),
   salesOrders: new EntityStore<SalesOrder>(SEED_SALES_ORDERS),
   // The Sales Order commercial workflow (payment terms, advance receipts,
   // accounts approvals) and its lifecycle history. In memory only, like every

@@ -71,7 +71,7 @@ export default function SalesOrdersPage() {
         <PageHeader
           eyebrow="RevenueOS · Quote to Cash · Sales Orders"
           title="Sales Orders"
-          subtitle="Created from an approved Quotation or Proforma Invoice."
+          subtitle="Created from an approved Proforma Invoice."
         />
         <Panel title="Sales Orders">
           <EmptyState
@@ -103,7 +103,7 @@ export default function SalesOrdersPage() {
           value={String(liveOrders.length)}
           note={`${formatInr(totalValue)} total value${cancelledCount > 0 ? ` · ${cancelledCount} cancelled not counted` : ""}`}
         />
-        <StatCard label="Open" value={String(openCount)} note="from Quotation conversion" />
+        <StatCard label="Open" value={String(openCount)} note="legacy orders, created before the lifecycle" />
         <StatCard label="Pending Store Approval" value={String(pendingStoreCount)} note="from a Proforma Invoice" />
       </StatRow>
 
@@ -121,22 +121,21 @@ export default function SalesOrdersPage() {
             rows={rows}
             onRowClick={(o) => router.push(`/sales-orders/${o.id}`)}
             emptyTitle="No sales orders match this filter"
-            emptyBody="Convert an approved Quotation, or create one from an approved Proforma Invoice."
+            emptyBody="Create one from an approved Proforma Invoice."
           />
           <Pagination page={page} pageSize={PAGE_SIZE} total={filtered.length} onPageChange={setPage} />
         </Panel>
       </div>
 
       <DesignNote>
-        <b>Design note.</b> A Sales Order is created one of two independent, verified ways: converting an
-        approved Quotation (<code>POST /quotations/:id/convert</code>), or directly from an approved Proforma
-        Invoice (<code>POST /sales-orders</code>) — the backend never links these two paths together. Orders
-        created from a Proforma enter the commercial workflow on their detail page: verifying an advance receipt
-        moves them to Pending Accounts Approval, and Accounts approval makes them Ready For Dispatch Order, with
-        who did each step recorded in the order&apos;s lifecycle history. Orders created by converting a Quotation
-        (status Open) do not enter that workflow. Order No.
-        falls back to a short reference when the backend hasn&apos;t assigned a real code (no verified code path
-        in this controller sets one).
+        <b>Design note.</b> A Sales Order is created in exactly one way: from an approved, unexpired Proforma
+        Invoice (<code>POST /sales-orders</code>) whose quotation is still approved. Each one then enters the
+        commercial workflow on its detail page: verifying an advance receipt moves it to Pending Accounts
+        Approval, and Accounts approval makes it Ready For Dispatch Order, with who did each step recorded in the
+        order&apos;s lifecycle history. Orders with status Open are legacy orders created before this existed, by
+        converting a quotation directly; they do not enter that workflow and are left as they are. Order No. falls
+        back to a short reference when the backend hasn&apos;t assigned a real code (no verified code path in this
+        controller sets one).
       </DesignNote>
     </div>
   );

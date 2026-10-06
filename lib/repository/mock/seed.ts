@@ -9,6 +9,8 @@ import {
   Note,
   Opportunity,
   Quotation,
+  QuotationEvent,
+  ProformaEvent,
   ProformaInvoice,
   SalesOrder,
   SalesInvoice,
@@ -183,56 +185,89 @@ export const SEED_OPPORTUNITIES: Opportunity[] = [
 // ---------------------------------------------------------------------------
 // QUOTATIONS
 // ---------------------------------------------------------------------------
-// Status uses only the VERIFIED lifecycle (Draft/Revised/Approved/Converted
-// — see QuotationStatus). `version`/`revisions` are MOCK/UI-ONLY — see
-// QuotationRevision. One quotation per opportunity, so every quotation has
-// a real, consistent Lead → Opportunity → Quotation chain.
+// QUOTATIONS
+// Statuses follow the backend lifecycle (DRAFT, REVISED, APPROVED, REJECTED).
+// Amounts follow the backend's rules with a stand-in 18% GST rate (the mock has
+// no HSN master): GST = taxable x 18%, total = taxable + GST. Q8 is a LEGACY
+// quotation, approved before the lifecycle existed with no stored tax breakdown
+// (taxable and GST are 0 while the total is not); the backend will not revise or
+// approve such a row, and it has no lifecycle history. Q9 is approved with only
+// a cancelled Proforma behind it, so a new Proforma can be created. Q10 is
+// approved with an old Proforma that has since expired.
+// ---------------------------------------------------------------------------
+const gst18 = (taxable: number) => ({ taxableAmount: taxable, gstPercent: 18, gstAmount: Math.round(taxable * 18) / 100, totalAmount: taxable + Math.round(taxable * 18) / 100 });
 export const SEED_QUOTATIONS: Quotation[] = [
-  { id: "Q1", quoteNo: "QT-3398", customerName: "GreenVolt Energy", opportunityId: "O1", opportunityName: "5MW Rooftop EPC — GreenVolt", amount: 6_400_000, status: "DRAFT", validUntil: daysFromNow(20), ownerName: "Anita S.", createdAt: daysAgo(4), version: 1, revisions: [{ version: 1, amount: 6_400_000, createdAt: daysAgo(4) }] },
-  { id: "Q2", quoteNo: "QT-3402", customerName: "Sterling Pumps", opportunityId: "O2", opportunityName: "Hydraulic Systems Upgrade", amount: 1_840_000, status: "REVISED", validUntil: daysFromNow(15), ownerName: "Rohit M.", createdAt: daysAgo(6), version: 2, revisions: [
-    { version: 1, amount: 2_000_000, createdAt: daysAgo(6) },
-    { version: 2, amount: 1_840_000, createdAt: daysAgo(3), note: "8% discount approved to close the deal faster" },
-  ] },
-  { id: "Q3", quoteNo: "QT-3390", customerName: "JSW Steel", opportunityId: "O3", opportunityName: "Factory Automation Retrofit", amount: 8_500_000, status: "APPROVED", validUntil: daysFromNow(12), ownerName: "Rohit M.", createdAt: daysAgo(5), version: 1, revisions: [{ version: 1, amount: 8_500_000, createdAt: daysAgo(5) }] },
-  { id: "Q4", quoteNo: "QT-3379", customerName: "L&T Infra", opportunityId: "O4", opportunityName: "Control Room Equipment", amount: 3_600_000, status: "DRAFT", validUntil: daysFromNow(18), ownerName: "Anita S.", createdAt: daysAgo(1), version: 1, revisions: [{ version: 1, amount: 3_600_000, createdAt: daysAgo(1) }] },
-  { id: "Q5", quoteNo: "QT-3406", customerName: "Adani Green", opportunityId: "O5", opportunityName: "Rooftop Solar — Phase 1", amount: 11_000_000, status: "REVISED", validUntil: daysFromNow(25), ownerName: "Vikram J.", createdAt: daysAgo(7), version: 2, revisions: [
-    { version: 1, amount: 11_500_000, createdAt: daysAgo(7) },
-    { version: 2, amount: 11_000_000, createdAt: daysAgo(2), note: "Scope trimmed to Phase 1 only" },
-  ] },
-  { id: "Q6", quoteNo: "QT-3371", customerName: "Reliance Industries", opportunityId: "O6", opportunityName: "Bulk Procurement Contract", amount: 4_200_000, status: "DRAFT", validUntil: daysFromNow(30), ownerName: "Anita S.", createdAt: daysAgo(2), version: 1, revisions: [{ version: 1, amount: 4_200_000, createdAt: daysAgo(2) }] },
-  { id: "Q7", quoteNo: "QT-3415", customerName: "Tata Projects", opportunityId: "O7", opportunityName: "Warehouse Automation", amount: 2_850_000, status: "APPROVED", validUntil: daysFromNow(22), ownerName: "Rohit M.", createdAt: daysAgo(1), version: 1, revisions: [{ version: 1, amount: 2_850_000, createdAt: daysAgo(1) }] },
-  { id: "Q8", quoteNo: "QT-3385", customerName: "Havells India", opportunityId: "O8", opportunityName: "Switchgear Replacement Order", amount: 5_200_000, status: "APPROVED", validUntil: daysAgo(1), ownerName: "Priya N.", createdAt: daysAgo(8), version: 1, revisions: [{ version: 1, amount: 5_200_000, createdAt: daysAgo(8) }] },
+  { id: "Q1", quoteNo: "QT-3398", customerName: "GreenVolt Energy", opportunityId: "O1", opportunityName: "5MW Rooftop EPC — GreenVolt", amount: 5_900_000, ...gst18(5_000_000), taxType: "IGST", status: "DRAFT", ownerName: "Anita S.", createdAt: daysAgo(4), quoteDate: daysAgo(4) },
+  { id: "Q2", quoteNo: "QT-3402", customerName: "Sterling Pumps", opportunityId: "O2", opportunityName: "Hydraulic Systems Upgrade", amount: 1_770_000, ...gst18(1_500_000), taxType: "CGST_SGST", status: "REVISED", ownerName: "Rohit M.", createdAt: daysAgo(6), quoteDate: daysAgo(6) },
+  { id: "Q3", quoteNo: "QT-3390", customerName: "JSW Steel", opportunityId: "O3", opportunityName: "Factory Automation Retrofit", amount: 8_496_000, ...gst18(7_200_000), taxType: "IGST", status: "APPROVED", ownerName: "Rohit M.", createdAt: daysAgo(5), quoteDate: daysAgo(5) },
+  { id: "Q4", quoteNo: "QT-3379", customerName: "L&T Infra", opportunityId: "O4", opportunityName: "Control Room Equipment", amount: 3_540_000, ...gst18(3_000_000), taxType: "IGST", status: "DRAFT", ownerName: "Anita S.", createdAt: daysAgo(1), quoteDate: daysAgo(1) },
+  { id: "Q5", quoteNo: "QT-3406", customerName: "Adani Green", opportunityId: "O5", opportunityName: "Rooftop Solar — Phase 1", amount: 10_620_000, ...gst18(9_000_000), taxType: "IGST", status: "REVISED", ownerName: "Vikram J.", createdAt: daysAgo(7), quoteDate: daysAgo(7) },
+  { id: "Q6", quoteNo: "QT-3371", customerName: "Reliance Industries", opportunityId: "O6", opportunityName: "Bulk Procurement Contract", amount: 4_248_000, ...gst18(3_600_000), taxType: "IGST", status: "REJECTED", ownerName: "Anita S.", createdAt: daysAgo(9), quoteDate: daysAgo(9) },
+  { id: "Q7", quoteNo: "QT-3415", customerName: "Tata Projects", opportunityId: "O7", opportunityName: "Warehouse Automation", amount: 2_832_000, ...gst18(2_400_000), taxType: "CGST_SGST", status: "APPROVED", ownerName: "Rohit M.", createdAt: daysAgo(1), quoteDate: daysAgo(1) },
+  { id: "Q8", quoteNo: "QT-3385", customerName: "Havells India", opportunityId: "O8", opportunityName: "Switchgear Replacement Order", amount: 5_200_000, taxableAmount: 0, gstPercent: 0, gstAmount: 0, totalAmount: 5_200_000, status: "APPROVED", ownerName: "Priya N.", createdAt: daysAgo(8), quoteDate: daysAgo(8) },
+  { id: "Q9", quoteNo: "QT-3410", customerName: "Sterling Pumps", opportunityId: "O2", opportunityName: "Hydraulic Systems Upgrade", amount: 1_180_000, ...gst18(1_000_000), taxType: "CGST_SGST", status: "APPROVED", ownerName: "Rohit M.", createdAt: daysAgo(12), quoteDate: daysAgo(12) },
+  { id: "Q10", quoteNo: "QT-3377", customerName: "Reliance Industries", opportunityId: "O6", opportunityName: "Bulk Procurement Contract", amount: 2_360_000, ...gst18(2_000_000), taxType: "IGST", status: "APPROVED", ownerName: "Anita S.", createdAt: daysAgo(20), quoteDate: daysAgo(20) },
+];
+
+// Lifecycle history, as the backend would hold it for quotations created after
+// the lifecycle existed. Q8 (a legacy row) deliberately has none.
+export const SEED_QUOTATION_EVENTS: QuotationEvent[] = [
+  { id: "QE1", quotationId: "Q1", action: "QUOTATION_CREATED", toStatus: "DRAFT", newTaxableAmount: 5_000_000, newTotalAmount: 5_900_000, actorName: "Anita S.", occurredAt: daysAgo(4) },
+  { id: "QE2", quotationId: "Q2", action: "QUOTATION_CREATED", toStatus: "DRAFT", newTaxableAmount: 1_600_000, newTotalAmount: 1_888_000, actorName: "Rohit M.", occurredAt: daysAgo(6) },
+  { id: "QE3", quotationId: "Q2", action: "QUOTATION_REVISED", fromStatus: "DRAFT", toStatus: "REVISED", remarks: "8% discount approved to close the deal faster", previousTaxableAmount: 1_600_000, newTaxableAmount: 1_500_000, previousTotalAmount: 1_888_000, newTotalAmount: 1_770_000, actorName: "Rohit M.", occurredAt: daysAgo(3) },
+  { id: "QE4", quotationId: "Q3", action: "QUOTATION_CREATED", toStatus: "DRAFT", newTaxableAmount: 7_200_000, newTotalAmount: 8_496_000, actorName: "Rohit M.", occurredAt: daysAgo(5) },
+  { id: "QE5", quotationId: "Q3", action: "QUOTATION_APPROVED", fromStatus: "DRAFT", toStatus: "APPROVED", remarks: "Commercials agreed with the customer", actorName: "Meera K.", occurredAt: daysAgo(4) },
+  { id: "QE6", quotationId: "Q4", action: "QUOTATION_CREATED", toStatus: "DRAFT", newTaxableAmount: 3_000_000, newTotalAmount: 3_540_000, actorName: "Anita S.", occurredAt: daysAgo(1) },
+  { id: "QE7", quotationId: "Q5", action: "QUOTATION_CREATED", toStatus: "DRAFT", newTaxableAmount: 9_500_000, newTotalAmount: 11_210_000, actorName: "Vikram J.", occurredAt: daysAgo(7) },
+  { id: "QE8", quotationId: "Q5", action: "QUOTATION_REVISED", fromStatus: "DRAFT", toStatus: "REVISED", remarks: "Scope trimmed to Phase 1 only", previousTaxableAmount: 9_500_000, newTaxableAmount: 9_000_000, previousTotalAmount: 11_210_000, newTotalAmount: 10_620_000, actorName: "Vikram J.", occurredAt: daysAgo(2) },
+  { id: "QE9", quotationId: "Q6", action: "QUOTATION_CREATED", toStatus: "DRAFT", newTaxableAmount: 3_600_000, newTotalAmount: 4_248_000, actorName: "Anita S.", occurredAt: daysAgo(9) },
+  { id: "QE10", quotationId: "Q6", action: "QUOTATION_REJECTED", fromStatus: "DRAFT", toStatus: "REJECTED", remarks: "Customer went with another vendor", actorName: "Meera K.", occurredAt: daysAgo(6) },
+  { id: "QE11", quotationId: "Q7", action: "QUOTATION_CREATED", toStatus: "DRAFT", newTaxableAmount: 2_400_000, newTotalAmount: 2_832_000, actorName: "Rohit M.", occurredAt: daysAgo(1) },
+  { id: "QE12", quotationId: "Q7", action: "QUOTATION_APPROVED", fromStatus: "DRAFT", toStatus: "APPROVED", actorName: "Meera K.", occurredAt: daysAgo(1) },
+  { id: "QE13", quotationId: "Q9", action: "QUOTATION_CREATED", toStatus: "DRAFT", newTaxableAmount: 1_000_000, newTotalAmount: 1_180_000, actorName: "Rohit M.", occurredAt: daysAgo(12) },
+  { id: "QE14", quotationId: "Q9", action: "QUOTATION_APPROVED", fromStatus: "DRAFT", toStatus: "APPROVED", actorName: "Meera K.", occurredAt: daysAgo(11) },
+  { id: "QE15", quotationId: "Q10", action: "QUOTATION_CREATED", toStatus: "DRAFT", newTaxableAmount: 2_000_000, newTotalAmount: 2_360_000, actorName: "Anita S.", occurredAt: daysAgo(20) },
+  { id: "QE16", quotationId: "Q10", action: "QUOTATION_APPROVED", fromStatus: "DRAFT", toStatus: "APPROVED", actorName: "Meera K.", occurredAt: daysAgo(19) },
 ];
 
 // ---------------------------------------------------------------------------
 // PROFORMA INVOICES
-// Only sourced from already-Approved mock quotations (Q3, Q7, Q8), mirroring
-// the verified backend rule that proforma invoices originate from quotations
-// (docs/backend-ui-contract.md §9). One PENDING and one APPROVED for demo
-// variety; Q8 intentionally has none yet, so "Create Proforma" has a real
-// empty case to exercise from Quotation Detail.
+// One active (not cancelled) Proforma per quotation, always at the quotation's
+// total. PF1 approved (with a Sales Order behind it), PF2 pending, PF3 cancelled
+// (so Q9 can get a new one), PF4 an old approved Proforma that has expired and
+// has no history or order (a legacy row; it can still be cancelled). Q8, a
+// legacy quotation, has no Proforma at all: its only downstream document is the
+// legacy order SO2.
+// ---------------------------------------------------------------------------
 export const SEED_PROFORMA_INVOICES: ProformaInvoice[] = [
-  { id: "PF1", proformaNumber: "PI-1042", quotationId: "Q3", quoteNo: "QT-3390", customerName: "JSW Steel", opportunityId: "O3", opportunityName: "Factory Automation Retrofit", issueDate: daysAgo(4), totalAmount: 8_500_000, status: "APPROVED", validityDate: daysFromNow(10), remarks: "Final commercial confirmation before Sales Order.", ownerName: "Rohit M.", createdAt: daysAgo(4) },
-  { id: "PF2", proformaNumber: "PI-1058", quotationId: "Q7", quoteNo: "QT-3415", customerName: "Tata Projects", opportunityId: "O7", opportunityName: "Warehouse Automation", issueDate: daysAgo(1), totalAmount: 2_850_000, status: "PENDING", validityDate: daysFromNow(20), ownerName: "Rohit M.", createdAt: daysAgo(1) },
+  { id: "PF1", proformaNumber: "PI-1042", quotationId: "Q3", quoteNo: "QT-3390", customerName: "JSW Steel", opportunityId: "O3", opportunityName: "Factory Automation Retrofit", issueDate: daysAgo(4), totalAmount: 8_496_000, status: "APPROVED", validityDate: daysFromNow(10), isExpired: false, remarks: "Final commercial confirmation before Sales Order.", ownerName: "Rohit M.", createdAt: daysAgo(4) },
+  { id: "PF2", proformaNumber: "PI-1058", quotationId: "Q7", quoteNo: "QT-3415", customerName: "Tata Projects", opportunityId: "O7", opportunityName: "Warehouse Automation", issueDate: daysAgo(1), totalAmount: 2_832_000, status: "PENDING", validityDate: daysFromNow(20), isExpired: false, ownerName: "Rohit M.", createdAt: daysAgo(1) },
+  { id: "PF3", proformaNumber: "PI-1031", quotationId: "Q9", quoteNo: "QT-3410", customerName: "Sterling Pumps", opportunityId: "O2", opportunityName: "Hydraulic Systems Upgrade", issueDate: daysAgo(10), totalAmount: 1_180_000, status: "CANCELLED", validityDate: daysFromNow(5), isExpired: false, remarks: "Issued with the wrong delivery terms.", ownerName: "Rohit M.", createdAt: daysAgo(10) },
+  { id: "PF4", proformaNumber: "PI-1019", quotationId: "Q10", quoteNo: "QT-3377", customerName: "Reliance Industries", opportunityId: "O6", opportunityName: "Bulk Procurement Contract", issueDate: daysAgo(19), totalAmount: 2_360_000, status: "APPROVED", validityDate: daysAgo(5), isExpired: true, ownerName: "Anita S.", createdAt: daysAgo(19) },
+];
+
+// PF4 predates the lifecycle, so it has no history.
+export const SEED_PROFORMA_EVENTS: ProformaEvent[] = [
+  { id: "PE1", proformaInvoiceId: "PF1", action: "PROFORMA_CREATED", toStatus: "PENDING", actorName: "Rohit M.", occurredAt: daysAgo(4) },
+  { id: "PE2", proformaInvoiceId: "PF1", action: "PROFORMA_APPROVED", fromStatus: "PENDING", toStatus: "APPROVED", remarks: "Customer signed the Proforma", actorName: "Meera K.", occurredAt: daysAgo(3) },
+  { id: "PE3", proformaInvoiceId: "PF2", action: "PROFORMA_CREATED", toStatus: "PENDING", actorName: "Rohit M.", occurredAt: daysAgo(1) },
+  { id: "PE4", proformaInvoiceId: "PF3", action: "PROFORMA_CREATED", toStatus: "PENDING", actorName: "Rohit M.", occurredAt: daysAgo(10) },
+  { id: "PE5", proformaInvoiceId: "PF3", action: "PROFORMA_CANCELLED", fromStatus: "PENDING", toStatus: "CANCELLED", remarks: "Wrong delivery terms; re-issuing", actorName: "Meera K.", occurredAt: daysAgo(9) },
 ];
 
 // ---------------------------------------------------------------------------
 // SALES ORDERS
-// Demonstrates both verified, independent real creation paths: SO1 comes
-// from the already-APPROVED PF1 (the direct POST /sales-orders path, tied
-// to a Proforma Invoice), SO2 comes directly from the already-APPROVED Q8
-// (the POST /quotations/:id/convert path, tied to a Quotation, with no
-// Proforma involved at all) — Q8 intentionally has no Proforma Invoice of
-// its own (see SEED_PROFORMA_INVOICES above), so this is its only downstream
-// document. Mirrors the two status values the RevenueOS Sales Orders
-// controller actually writes: PENDING_STORE_APPROVAL and OPEN.
+// SO1 comes from the approved PF1 (POST /sales-orders, the only way an order is
+// created today). SO2 is a LEGACY order: it was created straight from the
+// approved quotation Q8 by the retired conversion (status OPEN, quotationId only,
+// no Proforma). It is left as it is; it still counts as a live order against Q8.
 // ---------------------------------------------------------------------------
 export const SEED_SALES_ORDERS: SalesOrder[] = [
   {
     id: "SO1",
     salesOrderCode: "SO-5201",
     orderDate: daysAgo(3),
-    totalAmount: 8_500_000,
+    totalAmount: 8_496_000,
     status: "PENDING_STORE_APPROVAL",
     proformaInvoiceId: "PF1",
     proformaNumber: "PI-1042",

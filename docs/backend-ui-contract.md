@@ -51,8 +51,8 @@ FRONTEND RULE: Use the existing auth contract. Do not invent a second authentica
 - Lead status: `POST /`
 - Leads: `POST /`, `GET /`, `GET /:id`, `PATCH /:id`
 - Opportunities: `POST /`, `GET /`, `GET /:id`, `PATCH /:id/stage`
-- Quotations: `POST /`, `PATCH /:id/status`, `PATCH /:id/revise`, `PATCH /:id/approve`, `POST /:id/convert`, `GET /`
-- Proforma invoices: `POST /`, `GET /`, `PATCH /:id/approve`
+- Quotations: `POST /`, `GET /`, `GET /:id/events`, `PATCH /:id/revise`, `PATCH /:id/approve`, `PATCH /:id/reject` (`PATCH /:id/status` is removed; `POST /:id/convert` is retired and answers 410 without reading or writing anything)
+- Proforma invoices: `POST /`, `GET /`, `GET /:id/events`, `PATCH /:id/approve`, `PATCH /:id/cancel`
 - Sales orders: `POST /`, `GET /`, `GET /:id/events`, `POST /:id/cancel`
 - Sales order payment terms: `POST /create`, `GET /`
 - Sales order advance receipts: `POST /create`, `PATCH /:id/verify`, `PATCH /:id/retract-verification`, `GET /`
@@ -218,27 +218,34 @@ VERIFIED backend validates opportunity, inventory item, seller GST, buyer GST an
 
 VERIFIED backend calculates taxable amount, GST and total. New quotations start as `DRAFT`.
 
-VERIFIED operations:
-- update status
-- revise
-- approve
-- convert
+VERIFIED (backend commit `1246647`, Quotation Lifecycle V1): `status` has four values. A quotation is created `DRAFT`.
+- `PATCH /:id/revise` `{ taxableAmount, remarks? }` (`quotations.edit`): the backend recomputes GST from the percentage the quotation already carries and sets the total (taxable amount + GST, rounded to paise). The frontend never sends a total. Moves the quotation to `REVISED` from `DRAFT`, `REVISED`, or an `APPROVED` quotation that has no active Proforma (not cancelled) and no Sales Order that is not cancelled (reached directly or through one of its Proformas); otherwise 409.
+- `PATCH /:id/approve` `{ remarks? }` (`quotations.approve`): `DRAFT` or `REVISED` to `APPROVED`. Not repeatable (409).
+- `PATCH /:id/reject` `{ reason }` (`quotations.reject`): `DRAFT` or `REVISED` to `REJECTED`, final. The reason is mandatory. An approved quotation cannot be rejected (revise it first).
+- A quotation whose stored tax breakdown does not add up (taxable amount + GST is not the total, or GST is not the stated percentage of the taxable amount, or the taxable amount is 0) is a legacy row: it can be neither revised nor approved (409) and is never repaired. Real data has such rows (approved before the lifecycle, with taxable amount and GST stored as 0).
+- `GET /:id/events` (`quotations.view`) returns the lifecycle history, newest first, actor as `{ id, fullName }`: `QUOTATION_CREATED`, `QUOTATION_REVISED` (with `previousTaxableAmount`, `newTaxableAmount`, `previousTotalAmount`, `newTotalAmount`), `QUOTATION_APPROVED`, `QUOTATION_REJECTED` (reason in `remarks`). No history is back-filled: a quotation that predates the lifecycle has none.
+- Every route needs a signed-in user and one permission: `quotations.view` (list, events), `.create`, `.edit`, `.approve`, `.reject`. Users must sign in again after the permissions are granted.
+- There is no EXPIRED and no CONVERTED status, and no version history. A quotation never converts into a Sales Order directly: `POST /:id/convert` is retired.
 
-VERIFIED: revise sets `REVISED`; approve sets `APPROVED`; convert creates a SalesOrder.
-
-FRONTEND RULE: Do not invent persistent quotation numbers or tax calculations. Use backend-generated quotation code/value when available.
+FRONTEND RULE: Do not invent persistent quotation numbers or tax calculations. The live preview in the revise dialog only previews what the backend then recomputes; the backend's figures are the ones shown afterwards.
 
 ## 9. Proforma invoices
 
-VERIFIED CreateProformaInvoiceDto:
+VERIFIED CreateProformaInvoiceDto (backend commit `1d0b1dc`, Proforma Lifecycle V1):
 - `quotationId`
 - `issueDate`
-- `totalAmount`
 - `validityDate?`
 - `remarks?`
+- `totalAmount?` (compatibility only: it must equal the quotation's total within a paisa or the request is refused with 400; the frontend does not send it)
 
-VERIFIED: proforma invoices originate from quotations.
-VERIFIED: approval sets customer status to `APPROVED`.
+VERIFIED: a Proforma is created `PENDING` from an `APPROVED` quotation, and its total is the quotation's (derived by the backend; never typed). A quotation can have only one active (not cancelled) Proforma (409).
+VERIFIED: the status lives on `customerStatus`: `PENDING`, `APPROVED`, `CANCELLED`.
+- `PATCH /:id/approve` `{ remarks? }` (`proformas.approve`): `PENDING` to `APPROVED`; refused once expired (409); not repeatable.
+- `PATCH /:id/cancel` `{ reason }` (`proformas.cancel`): `PENDING` or `APPROVED` to `CANCELLED`, final. The reason is mandatory. Refused (409) while a Sales Order that is not cancelled references the Proforma.
+- Expiry is not a status: `validityDate` is valid through the end of that calendar day (UTC); `GET /` reports `isExpired`. An expired Proforma can be neither approved nor turned into a Sales Order, but can still be cancelled.
+- `GET /:id/events` (`proformas.view`): `PROFORMA_CREATED`, `PROFORMA_APPROVED`, `PROFORMA_CANCELLED` (reason in `remarks`), newest first. No history is back-filled.
+- Every route needs a signed-in user and one permission: `proformas.view` (list, events), `.create`, `.approve`, `.cancel`.
+- Existing Proformas are not repaired (some are already past their validity date).
 
 ## 10. Sales orders
 
@@ -250,7 +257,7 @@ VERIFIED CreateSalesOrderDto (backend commit `85c3666`):
 - `sellerGstId`
 - `buyerGstId`
 
-VERIFIED: creation validates approved proforma, inventory item, seller/buyer GST and inventory availability.
+VERIFIED: creation validates approved proforma, inventory item, seller/buyer GST and inventory availability. Since backend commit `1d0b1dc` it also requires the Proforma not to be expired, its quotation to still be `APPROVED`, and the two totals to agree within a paisa (409 otherwise), and it is the ONLY way a Sales Order is created: the old quotation conversion route and the AdminOS workflow trigger no longer create orders. Orders with status `OPEN` are legacy rows created by those routes; they are left as they are.
 
 VERIFIED: inventory shortage can create a PurchaseRequisition.
 VERIFIED: creation starts at `PENDING_STORE_APPROVAL`.
