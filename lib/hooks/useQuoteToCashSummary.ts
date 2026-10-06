@@ -5,6 +5,7 @@ import { useProformaInvoices } from "./useProformaInvoices";
 import { useSalesOrders } from "./useSalesOrders";
 import { useDispatchOrders } from "./useDispatchOrders";
 import { useSalesInvoices } from "./useSalesInvoices";
+import { isLiveSalesOrder } from "../repository/shared/salesOrderLifecycle";
 
 /**
  * Composes the existing Stage 2C–2F entity hooks into one small
@@ -26,7 +27,8 @@ export function useQuoteToCashSummary() {
   return {
     quotations: { count: quotations.quotations.length, loading: quotations.loading, error: quotations.error },
     proformaInvoices: { count: proformaInvoices.proformaInvoices.length, loading: proformaInvoices.loading, error: proformaInvoices.error },
-    salesOrders: { count: salesOrders.salesOrders.length, loading: salesOrders.loading, error: salesOrders.error },
+    // A cancelled Sales Order is no longer part of the pipeline, so it is left out of the count.
+    salesOrders: { count: salesOrders.salesOrders.filter((o) => isLiveSalesOrder(o.status)).length, loading: salesOrders.loading, error: salesOrders.error },
     dispatchOrders: { count: dispatchOrders.dispatchOrders.length, loading: dispatchOrders.loading, error: dispatchOrders.error },
     salesInvoices: { count: salesInvoices.salesInvoices.length, loading: salesInvoices.loading, error: salesInvoices.error },
   };

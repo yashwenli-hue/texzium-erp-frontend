@@ -13,6 +13,7 @@ import {
   SALES_ORDER_LIFECYCLE_STATUS,
   SALES_ORDER_PROFORMA_NOT_APPROVED_MESSAGE,
   SalesOrderConflictError,
+  isLiveSalesOrder,
 } from "../shared/salesOrderLifecycle";
 
 const SEARCHABLE: (keyof SalesOrder)[] = ["salesOrderCode", "customerName", "opportunityName", "ownerName", "quoteNo"];
@@ -27,7 +28,7 @@ let orderCounter = 5210;
  *
  * Follows the backend's rules (commit 85c3666): the order's total is the
  * approved Proforma's total (the input carries none), the Proforma must be
- * APPROVED, and only one Sales Order can be created per Proforma. The
+ * APPROVED, and only one non-cancelled Sales Order can exist per Proforma. The
  * lifecycle that follows lives in MockSalesOrderCommercialRepository.
  */
 export class MockSalesOrderRepository implements ISalesOrderRepository {
@@ -43,7 +44,8 @@ export class MockSalesOrderRepository implements ISalesOrderRepository {
     const proforma = db.proformaInvoices.getById(input.proformaInvoiceId);
     if (!proforma) throw new Error("Proforma Invoice not found.");
     if (proforma.status !== "APPROVED") throw new SalesOrderConflictError(SALES_ORDER_PROFORMA_NOT_APPROVED_MESSAGE);
-    if (db.salesOrders.getAll().some((o) => o.proformaInvoiceId === proforma.id)) {
+    // One NON-cancelled order per Proforma: a cancelled order stays in history but no longer blocks a replacement.
+    if (db.salesOrders.getAll().some((o) => o.proformaInvoiceId === proforma.id && isLiveSalesOrder(o.status))) {
       throw new SalesOrderConflictError(SALES_ORDER_ALREADY_EXISTS_MESSAGE);
     }
     orderCounter += 1;
@@ -72,10 +74,13 @@ export class MockSalesOrderRepository implements ISalesOrderRepository {
 
   async listEvents(id: ID): Promise<SalesOrderEvent[]> {
     if (!db.salesOrders.getById(id)) throw new Error("Sales Order not found.");
+    // Newest first; events recorded in the same millisecond keep their real order (the later one first).
     const events = db.salesOrderEvents
       .getAll()
-      .filter((e) => e.salesOrderId === id)
-      .sort((a, b) => +new Date(b.occurredAt) - +new Date(a.occurredAt));
+      .map((e, index) => ({ e, index }))
+      .filter(({ e }) => e.salesOrderId === id)
+      .sort((a, b) => +new Date(b.e.occurredAt) - +new Date(a.e.occurredAt) || b.index - a.index)
+      .map(({ e }) => e);
     return delay(events);
   }
 }

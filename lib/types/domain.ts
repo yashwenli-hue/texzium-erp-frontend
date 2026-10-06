@@ -656,6 +656,8 @@ export interface SalesOrderCommercialApproval {
   /** Legacy display name the backend fills from the signed-in user. Not the actor of record. */
   approvedBy: string;
   remarks?: string;
+  /** APPROVED while in force; RETRACTED once it was undone (the row is kept, a later approval is a new row). */
+  status: string;
   createdAt: string;
 }
 
@@ -668,12 +670,18 @@ export interface SalesOrderCommercialApproval {
 export interface SalesOrderEvent {
   id: ID;
   salesOrderId: ID;
-  /** e.g. ADVANCE_RECEIPT_VERIFIED, ADVANCE_RECEIPT_REJECTED, ACCOUNTS_APPROVED */
+  /**
+   * ADVANCE_RECEIPT_VERIFIED, ADVANCE_RECEIPT_REJECTED, ACCOUNTS_APPROVED,
+   * ADVANCE_RECEIPT_VERIFICATION_RETRACTED, ACCOUNTS_APPROVAL_RETRACTED or SALES_ORDER_CANCELLED
+   */
   action: string;
-  /** VERIFIED, REJECTED or APPROVED */
+  /** VERIFIED, REJECTED, APPROVED, RETRACTED or CANCELLED */
   result?: string;
   fromStatus?: string;
   toStatus?: string;
+  /** The receipt or approval the event is about; none for a cancellation. */
+  referenceId?: ID;
+  /** For a retraction or cancellation this is the mandatory reason. */
   remarks?: string;
   /** From the event's actor { id, fullName }; empty when the account no longer exists. */
   actorName: string;
@@ -685,6 +693,9 @@ const SALES_ORDER_EVENT_LABEL: Record<string, string> = {
   ADVANCE_RECEIPT_VERIFIED: "Advance receipt verified",
   ADVANCE_RECEIPT_REJECTED: "Advance receipt rejected",
   ACCOUNTS_APPROVED: "Accounts commercial approval given",
+  ADVANCE_RECEIPT_VERIFICATION_RETRACTED: "Advance verification retracted",
+  ACCOUNTS_APPROVAL_RETRACTED: "Accounts approval retracted",
+  SALES_ORDER_CANCELLED: "Sales Order cancelled",
 };
 
 export function formatSalesOrderEventAction(action: string): string {

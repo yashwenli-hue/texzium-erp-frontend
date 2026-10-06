@@ -11,6 +11,7 @@ import { DataTable, Column } from "../../components/ui/DataTable";
 import { useSalesOrders } from "../../lib/hooks/useSalesOrders";
 import { SalesOrder, formatSalesOrderStatus } from "../../lib/types/domain";
 import { formatInr, formatDate } from "../../lib/format";
+import { isLiveSalesOrder } from "../../lib/repository/shared/salesOrderLifecycle";
 
 const PAGE_SIZE = 8;
 
@@ -20,7 +21,11 @@ export default function SalesOrdersPage() {
   const [statusChip, setStatusChip] = useState<string>("All");
   const [page, setPage] = useState(1);
 
-  const totalValue = salesOrders.reduce((s, o) => s + o.totalAmount, 0);
+  // A cancelled order is no longer part of the pipeline: it is left out of the count and the value, and
+  // shown on its own (it still has its own chip and row below, with its history).
+  const liveOrders = salesOrders.filter((o) => isLiveSalesOrder(o.status));
+  const cancelledCount = salesOrders.length - liveOrders.length;
+  const totalValue = liveOrders.reduce((s, o) => s + o.totalAmount, 0);
   const openCount = salesOrders.filter((o) => o.status === "OPEN").length;
   const pendingStoreCount = salesOrders.filter((o) => o.status === "PENDING_STORE_APPROVAL").length;
 
@@ -93,7 +98,11 @@ export default function SalesOrdersPage() {
       />
 
       <StatRow>
-        <StatCard label="Sales Orders" value={String(salesOrders.length)} note={`${formatInr(totalValue)} total value`} />
+        <StatCard
+          label="Sales Orders"
+          value={String(liveOrders.length)}
+          note={`${formatInr(totalValue)} total value${cancelledCount > 0 ? ` · ${cancelledCount} cancelled not counted` : ""}`}
+        />
         <StatCard label="Open" value={String(openCount)} note="from Quotation conversion" />
         <StatCard label="Pending Store Approval" value={String(pendingStoreCount)} note="from a Proforma Invoice" />
       </StatRow>

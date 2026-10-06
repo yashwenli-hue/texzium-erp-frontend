@@ -53,9 +53,9 @@ FRONTEND RULE: Use the existing auth contract. Do not invent a second authentica
 - Opportunities: `POST /`, `GET /`, `GET /:id`, `PATCH /:id/stage`
 - Quotations: `POST /`, `PATCH /:id/status`, `PATCH /:id/revise`, `PATCH /:id/approve`, `POST /:id/convert`, `GET /`
 - Proforma invoices: `POST /`, `GET /`, `PATCH /:id/approve`
-- Sales orders: `POST /`, `GET /`, `GET /:id/events`
+- Sales orders: `POST /`, `GET /`, `GET /:id/events`, `POST /:id/cancel`
 - Sales order payment terms: `POST /create`, `GET /`
-- Sales order advance receipts: `POST /create`, `PATCH /:id/verify`, `GET /`
+- Sales order advance receipts: `POST /create`, `PATCH /:id/verify`, `PATCH /:id/retract-verification`, `GET /`
 - Sales invoices: `POST /`, `GET /`
 - Sales invoice items: `POST /`
 - Payment collections: `POST /`
@@ -255,9 +255,9 @@ VERIFIED: creation validates approved proforma, inventory item, seller/buyer GST
 VERIFIED: inventory shortage can create a PurchaseRequisition.
 VERIFIED: creation starts at `PENDING_STORE_APPROVAL`.
 VERIFIED: the order's total is the approved Proforma's `totalAmount`. The frontend sends no total (a differing client total is refused with 400), shows the Proforma total read-only, and calculates no tax.
-VERIFIED: only one Sales Order can be created per Proforma (a second is a 409). Existing duplicates are untouched.
-VERIFIED: every Sales Order route (and payment terms, advance receipts, accounts approval) needs a signed-in user and a `salesorders.*` permission: `salesorders.view`, `.create`, `.paymentterms.view|create`, `.advancereceipts.view|create|verify`, `.commercialapproval.view|approve`. Users must sign in again after the permissions are granted.
-VERIFIED: `GET /sales-orders/:id/events` (`salesorders.view`) returns the lifecycle history, newest first, with the actor as `{ id, fullName }`. Events exist only for advance verified, advance rejected and accounts approved.
+VERIFIED: only one non-cancelled Sales Order can exist per Proforma (a second live one is a 409). A cancelled order stays in history and no longer blocks a replacement. Existing duplicates are untouched.
+VERIFIED: every Sales Order route (and payment terms, advance receipts, accounts approval) needs a signed-in user and a `salesorders.*` permission: `salesorders.view`, `.create`, `.cancel`, `.paymentterms.view|create`, `.advancereceipts.view|create|verify|retract`, `.commercialapproval.view|approve|retract`. Users must sign in again after the permissions are granted.
+VERIFIED: `GET /sales-orders/:id/events` (`salesorders.view`) returns the lifecycle history, newest first, with the actor as `{ id, fullName }`. Events exist only for advance verified, advance rejected, accounts approved, advance verification retracted, accounts approval retracted and Sales Order cancelled (`ADVANCE_RECEIPT_VERIFIED`, `ADVANCE_RECEIPT_REJECTED`, `ACCOUNTS_APPROVED`, `ADVANCE_RECEIPT_VERIFICATION_RETRACTED`, `ACCOUNTS_APPROVAL_RETRACTED`, `SALES_ORDER_CANCELLED`). Each carries `result`, `fromStatus`, `toStatus`, `referenceId` (the receipt or approval; none for a cancellation) and, for a retraction or cancellation, the reason as `remarks`. Events are never edited.
 
 FRONTEND RULE: Do not bypass store approval, GST validation or inventory validation.
 
@@ -293,6 +293,23 @@ VERIFIED CreateAccountsCommercialApprovalDto:
 - `remarks?`
 
 VERIFIED: commercial approval only works when the order is `PENDING_ACCOUNTS_APPROVAL` (otherwise 409) and moves it to `READY_FOR_DISPATCH_ORDER`.
+
+### Retract and cancel (backend commits `e5536a8`, `483e546`, `075fba5`)
+
+VERIFIED routes, each with the body `{ reason }` only: `PATCH /sales-order-advance-receipt/:id/retract-verification` (`salesorders.advancereceipts.retract`), `POST /accounts-commercial-approval/:id/retract` (`salesorders.commercialapproval.retract`) and `POST /sales-orders/:id/cancel` (`salesorders.cancel`). `reason` is mandatory, trimmed, 1-500 characters (otherwise 400); the request cannot name an actor or a status. The actor is the signed-in user.
+
+VERIFIED responses: `{ message, receipt, salesOrder: { id, status } }`, `{ message, approval, salesOrder }` and `{ message, salesOrder }`.
+
+VERIFIED rules:
+- Retract verification: `PENDING_ACCOUNTS_APPROVAL` -> `PENDING_STORE_APPROVAL`. The receipt goes back to `PENDING` with `verifiedBy`/`verifiedAt` cleared. Not possible while the order is `READY_FOR_DISPATCH_ORDER` (retract the approval first).
+- Retract approval: `READY_FOR_DISPATCH_ORDER` -> `PENDING_ACCOUNTS_APPROVAL`. The approval row is kept with `status` `RETRACTED`; a later approval is a new row.
+- Cancel: from `PENDING_STORE_APPROVAL`, `PENDING_ACCOUNTS_APPROVAL` or `READY_FOR_DISPATCH_ORDER` to `CANCELLED`. `CANCELLED` is terminal: no reopen, no delete. Receipts (a `VERIFIED` advance included), payment terms and approvals are left exactly as they are; nothing is refunded or reversed.
+- All three are refused with 409 for legacy `OPEN` and the OperationsOS statuses, for a step the workflow did not record, and once the order has a Dispatch Order, Dispatch or Sales Invoice. Cancel is also refused once an approved Purchase Requisition, a Purchase Order or reserved stock exists.
+- A `CANCELLED` order refuses verify, reject, approve, retract, cancel, and creating payment terms or advance receipts (409). Payment terms and advance receipts can only be recorded while the order is `PENDING_STORE_APPROVAL` or `PENDING_ACCOUNTS_APPROVAL`.
+- A Sales Invoice cannot be created for a `CANCELLED` Sales Order (409, "A cancelled Sales Order cannot be invoiced.").
+- `GET /sales-reports/funnel` and `/quotation-conversion` leave cancelled orders out of `salesOrders`/`convertedToSalesOrders` and report `cancelledSalesOrders`; the frontend does not call them.
+
+FRONTEND RULE: the UI offers each action only for the order status it fits, with its permission (disabled, with the reason, without it), and always asks for a reason. It never changes the order locally: after a success, or a 409, it reloads the order, records and history from the backend and shows the backend's message. A cancelled order shows a banner and no workflow action.
 
 VERIFIED: the actor of every verification and approval is the signed-in user, recorded on the lifecycle event. `verifiedBy` / `approvedBy` are legacy columns the backend fills from the user's name; the frontend never sends them (nor `actorId`, a status or a total), and the backend rejects them.
 

@@ -13,6 +13,7 @@ import { SalesInvoiceForm } from "../../../components/forms/SalesInvoiceForm";
 import { SalesOrderPaymentTermForm } from "../../../components/forms/SalesOrderPaymentTermForm";
 import { SalesOrderAdvanceReceiptForm } from "../../../components/forms/SalesOrderAdvanceReceiptForm";
 import { SalesOrderLifecycleHistory } from "../../../components/ui/SalesOrderLifecycleHistory";
+import { SalesOrderCancelledBanner } from "../../../components/ui/SalesOrderCancelledBanner";
 import { LifecycleStepper } from "../../../components/ui/LifecycleStepper";
 import { ConfirmDialog } from "../../../components/ui/ConfirmDialog";
 import { useToast } from "../../../components/ui/Toast";
@@ -25,6 +26,7 @@ import { formatInr, formatDate } from "../../../lib/format";
 import {
   SalesInvoice,
   SalesOrderAdvanceReceipt,
+  SalesOrderCommercialApproval,
   SalesOrderPaymentTerm,
   formatPaymentMode,
   formatPaymentType,
@@ -33,10 +35,14 @@ import {
 import {
   SALES_ORDER_LIFECYCLE_STATUS,
   SALES_ORDER_PERMISSIONS,
+  canCancelSalesOrder,
   canGiveAccountsApproval,
   canRecordCommercialDocuments,
+  canRetractAccountsApproval,
+  canRetractAdvanceVerification,
   canVerifyAdvanceReceipt,
   isInSalesOrderLifecycle,
+  isSalesOrderCancelled,
 } from "../../../lib/repository/shared/salesOrderLifecycle";
 
 function goBackOrTo(router: ReturnType<typeof useRouter>, fallback: string) {
@@ -75,6 +81,9 @@ export default function SalesOrderDetailPage() {
     createAdvanceReceipt,
     verifyAdvanceReceipt,
     approveCommercially,
+    retractVerification,
+    retractApproval,
+    cancelSalesOrder,
   } = useSalesOrderDetail(id);
   const { salesInvoices, createSalesInvoice, refetch: refetchInvoices } = useSalesInvoices();
   const { dispatchOrders } = useDispatchOrders();
@@ -83,6 +92,9 @@ export default function SalesOrderDetailPage() {
   const [showReceiptForm, setShowReceiptForm] = useState(false);
   const [receiptAction, setReceiptAction] = useState<{ kind: "verify" | "reject"; receipt: SalesOrderAdvanceReceipt } | null>(null);
   const [showApprove, setShowApprove] = useState(false);
+  const [retractReceipt, setRetractReceipt] = useState<SalesOrderAdvanceReceipt | null>(null);
+  const [retractApprovalTarget, setRetractApprovalTarget] = useState<SalesOrderCommercialApproval | null>(null);
+  const [showCancel, setShowCancel] = useState(false);
 
   if (loading && !salesOrder) {
     return (
@@ -163,6 +175,24 @@ export default function SalesOrderDetailPage() {
   const documentsOpen = canRecordCommercialDocuments(status);
   const noPermission = (what: string) => `You don't have permission to ${what}`;
 
+  // ---- Retract and cancel. Same rule: offered for the right status, disabled with
+  // the reason without the permission. CANCELLED is terminal, so a cancelled
+  // order is offered no workflow action at all. Once Operations has a Dispatch
+  // Order or Finance an invoice for the order the backend refuses to retract or
+  // cancel; the page already holds both lists, so it says so up front.
+  const cancelled = isSalesOrderCancelled(status);
+  const mayRetractVerification = hasPermission(SALES_ORDER_PERMISSIONS.advanceReceiptsRetract);
+  const mayRetractApproval = hasPermission(SALES_ORDER_PERMISSIONS.commercialApprovalRetract);
+  const mayCancel = hasPermission(SALES_ORDER_PERMISSIONS.cancel);
+  const downstreamStarted = linkedDispatchOrders.length > 0 || relatedInvoices.length > 0;
+  const downstreamTitle = "A Dispatch Order or Sales Invoice already exists for this order, so it can no longer be retracted or cancelled here.";
+  const reversalTitle = (permitted: boolean, what: string) =>
+    !permitted ? noPermission(what) : downstreamStarted ? downstreamTitle : undefined;
+  // What a cancellation leaves behind: verified advances stay verified and are not refunded.
+  const verifiedAdvanceTotal = advanceReceipts.filter((r) => r.verificationStatus === "VERIFIED").reduce((sum, r) => sum + r.amountReceived, 0);
+  // Events come newest first, so the first cancellation event is the one that happened.
+  const cancelEvent = events.find((e) => e.action === "SALES_ORDER_CANCELLED");
+
   const termColumns: Column<SalesOrderPaymentTerm>[] = [
     { key: "type", header: "Type", render: (t) => formatPaymentType(t.paymentType) },
     { key: "advance", header: "Advance", render: (t) => formatInr(t.advanceAmount) },
@@ -189,30 +219,49 @@ export default function SalesOrderDetailPage() {
     {
       key: "actions",
       header: "",
-      render: (r) =>
-        r.verificationStatus === "PENDING" ? (
-          <div style={{ display: "flex", gap: 6 }}>
-            {canVerifyAdvanceReceipt(status) && (
+      render: (r) => {
+        if (r.verificationStatus === "PENDING") {
+          // A cancelled order takes no more decisions: its pending receipts stay pending.
+          if (cancelled) return null;
+          return (
+            <div style={{ display: "flex", gap: 6 }}>
+              {canVerifyAdvanceReceipt(status) && (
+                <Button
+                  variant="primary"
+                  disabled={!mayVerify}
+                  title={mayVerify ? undefined : noPermission("verify advance receipts")}
+                  onClick={() => setReceiptAction({ kind: "verify", receipt: r })}
+                >
+                  Verify
+                </Button>
+              )}
               <Button
-                variant="primary"
+                variant="ghost"
+                className="danger-ghost"
                 disabled={!mayVerify}
-                title={mayVerify ? undefined : noPermission("verify advance receipts")}
-                onClick={() => setReceiptAction({ kind: "verify", receipt: r })}
+                title={mayVerify ? undefined : noPermission("reject advance receipts")}
+                onClick={() => setReceiptAction({ kind: "reject", receipt: r })}
               >
-                Verify
+                Reject
               </Button>
-            )}
+            </div>
+          );
+        }
+        // The verification can be retracted only while the order waits for Accounts approval.
+        if (r.verificationStatus === "VERIFIED" && canRetractAdvanceVerification(status)) {
+          return (
             <Button
               variant="ghost"
-              className="danger-ghost"
-              disabled={!mayVerify}
-              title={mayVerify ? undefined : noPermission("reject advance receipts")}
-              onClick={() => setReceiptAction({ kind: "reject", receipt: r })}
+              disabled={!mayRetractVerification || downstreamStarted}
+              title={reversalTitle(mayRetractVerification, "retract advance receipt verifications")}
+              onClick={() => setRetractReceipt(r)}
             >
-              Reject
+              Retract verification
             </Button>
-          </div>
-        ) : null,
+          );
+        }
+        return null;
+      },
     },
   ];
 
@@ -227,6 +276,15 @@ export default function SalesOrderDetailPage() {
       <a className="back-link" onClick={() => goBackOrTo(router, "/sales-orders")}>
         <Icon name="back" size={14} /> Back to Sales Orders
       </a>
+      {cancelled && (
+        <SalesOrderCancelledBanner
+          salesOrderCode={salesOrder.salesOrderCode}
+          cancelledAt={cancelEvent?.occurredAt}
+          cancelledByName={cancelEvent?.actorName || undefined}
+          reason={cancelEvent?.remarks}
+          verifiedAdvanceTotal={verifiedAdvanceTotal}
+        />
+      )}
       <div className="crm-grid">
         <div className="card panel">
           <div className="profile-head">
@@ -292,6 +350,8 @@ export default function SalesOrderDetailPage() {
               emptyBody={
                 canCreateInvoice
                   ? "Create one now that a dispatched shipment exists for this order."
+                  : cancelled
+                  ? "This order is cancelled and cannot be invoiced."
                   : salesOrder.status === "READY_FOR_INVOICING"
                   ? "This order is ready to invoice, but no matching dispatched order was found for it."
                   : "This order needs a dispatched shipment before it can be invoiced."
@@ -328,7 +388,11 @@ export default function SalesOrderDetailPage() {
       <div className="crm-grid" style={{ marginTop: 16 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <Panel title="Commercial workflow">
-            {inWorkflow ? (
+            {cancelled ? (
+              <p style={{ fontSize: 12.5, color: "var(--muted)" }}>
+                This order is cancelled and is no longer part of the commercial workflow. Its history is kept below.
+              </p>
+            ) : inWorkflow ? (
               <LifecycleStepper
                 steps={[
                   { key: SALES_ORDER_LIFECYCLE_STATUS.PENDING_STORE_APPROVAL, label: "Store approval" },
@@ -344,27 +408,60 @@ export default function SalesOrderDetailPage() {
                 a Proforma Invoice.
               </p>
             )}
-            {canGiveAccountsApproval(status) && (
-              <div style={{ marginTop: 14 }}>
-                <Button
-                  variant="primary"
-                  icon="check"
-                  disabled={!mayApprove}
-                  title={mayApprove ? undefined : noPermission("give accounts commercial approval")}
-                  onClick={() => setShowApprove(true)}
-                >
-                  Give Accounts Approval
-                </Button>
+            {(canGiveAccountsApproval(status) || canCancelSalesOrder(status)) && (
+              <div style={{ marginTop: 14, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                {canGiveAccountsApproval(status) && (
+                  <Button
+                    variant="primary"
+                    icon="check"
+                    disabled={!mayApprove}
+                    title={mayApprove ? undefined : noPermission("give accounts commercial approval")}
+                    onClick={() => setShowApprove(true)}
+                  >
+                    Give Accounts Approval
+                  </Button>
+                )}
+                {canCancelSalesOrder(status) && (
+                  <Button
+                    variant="ghost"
+                    className="danger-ghost"
+                    icon="close"
+                    disabled={!mayCancel || downstreamStarted}
+                    title={reversalTitle(mayCancel, "cancel Sales Orders")}
+                    onClick={() => setShowCancel(true)}
+                  >
+                    Cancel Sales Order
+                  </Button>
+                )}
               </div>
             )}
             {approvals.length > 0 && (
               <div style={{ marginTop: 14 }}>
-                {approvals.map((a) => (
-                  <p key={a.id} style={{ fontSize: 12.5, color: "var(--muted)" }}>
-                    Accounts approval given by <b style={{ color: "var(--text)" }}>{a.approvedBy}</b> on {formatDate(a.createdAt)}
-                    {a.remarks ? ` — “${a.remarks}”` : ""}
-                  </p>
-                ))}
+                {approvals.map((a) =>
+                  a.status === "RETRACTED" ? (
+                    // Kept for the record, but no longer in force.
+                    <p key={a.id} style={{ fontSize: 12.5, color: "var(--faint)" }}>
+                      Accounts approval by {a.approvedBy} on {formatDate(a.createdAt)} was retracted.
+                    </p>
+                  ) : (
+                    <div key={a.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+                      <p style={{ fontSize: 12.5, color: "var(--muted)" }}>
+                        Accounts approval given by <b style={{ color: "var(--text)" }}>{a.approvedBy}</b> on {formatDate(a.createdAt)}
+                        {a.remarks ? ` — “${a.remarks}”` : ""}
+                      </p>
+                      {canRetractAccountsApproval(status) && (
+                        <Button
+                          variant="ghost"
+                          disabled={!mayRetractApproval || downstreamStarted}
+                          title={reversalTitle(mayRetractApproval, "retract accounts commercial approvals")}
+                          onClick={() => setRetractApprovalTarget(a)}
+                        >
+                          Retract approval
+                        </Button>
+                      )}
+                    </div>
+                  )
+                )}
               </div>
             )}
             {!access.viewApprovals && (
@@ -431,14 +528,21 @@ export default function SalesOrderDetailPage() {
                 }
               />
             )}
+            {cancelled && advanceReceipts.length > 0 && (
+              <p style={{ fontSize: 12, color: "var(--faint)", padding: "10px 19px 14px" }}>
+                This order is cancelled. Its receipts are left exactly as they were: a verified advance stays verified
+                (it is not refunded here) and a pending receipt stays pending.
+              </p>
+            )}
           </Panel>
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <Panel title="Lifecycle history">
             <p style={{ fontSize: 12, color: "var(--faint)", marginBottom: 10 }}>
-              Audit trail of advance verifications, rejections and accounts approvals for this order. It is not a
-              place for general notes.
+              Audit trail of advance verifications, rejections, accounts approvals, their retractions and any
+              cancellation for this order, with the reason for each retraction or cancellation. It is not a place for
+              general notes.
             </p>
             {!access.viewHistory ? (
               <p style={{ fontSize: 12.5, color: "var(--muted)" }}>You don&apos;t have permission to view this order&apos;s history.</p>
@@ -463,7 +567,10 @@ export default function SalesOrderDetailPage() {
         decides who did what (the signed-in user) and keeps it in the lifecycle history; a rejected advance leaves
         the status unchanged. &quot;Ready For Invoicing&quot; is written by the OperationsOS Dispatch Orders service
         when a linked Dispatch Order is marked DISPATCHED, so Create Sales Invoice only appears once that real
-        status is reached and a matching dispatched order is found.
+        status is reached and a matching dispatched order is found. Each step can be retracted (most recent
+        first) and an order can be cancelled, both with a mandatory reason that is kept in the history; once a
+        Dispatch Order or Sales Invoice exists the backend refuses both. Cancelled is final, and cancelling does not
+        refund an advance or change any downstream record.
       </DesignNote>
 
       {showTermForm && (
@@ -512,6 +619,54 @@ export default function SalesOrderDetailPage() {
           onConfirm={async (note) => {
             await approveCommercially(note);
             toast.show("Accounts commercial approval given", "check");
+          }}
+        />
+      )}
+
+      {retractReceipt && (
+        <ConfirmDialog
+          title="Retract Advance Verification"
+          body={`Retract the verification of the advance receipt of ${formatInr(retractReceipt.amountReceived)} (${formatPaymentMode(retractReceipt.paymentMode)})? The receipt goes back to Pending and ${salesOrder.salesOrderCode} returns to Pending Store Approval. The original verification stays in the history.`}
+          confirmLabel="Retract verification"
+          noteLabel="Reason"
+          noteRequired
+          onClose={() => setRetractReceipt(null)}
+          onConfirm={async (note) => {
+            await retractVerification(retractReceipt.id, note ?? "");
+            toast.show("Advance verification retracted", "check");
+          }}
+        />
+      )}
+
+      {retractApprovalTarget && (
+        <ConfirmDialog
+          title="Retract Accounts Approval"
+          body={`Retract the accounts approval of ${salesOrder.salesOrderCode}? It returns to Pending Accounts Approval and needs approving again. The original approval stays in the history.`}
+          confirmLabel="Retract approval"
+          noteLabel="Reason"
+          noteRequired
+          onClose={() => setRetractApprovalTarget(null)}
+          onConfirm={async (note) => {
+            await retractApproval(retractApprovalTarget.id, note ?? "");
+            toast.show("Accounts approval retracted", "check");
+          }}
+        />
+      )}
+
+      {showCancel && (
+        <ConfirmDialog
+          title="Cancel Sales Order"
+          body={`Cancel ${salesOrder.salesOrderCode}? This is final: a cancelled Sales Order can't be reopened or changed. Cancelling does not reverse or refund anything outside this order's own approval steps: any verified advance${
+            verifiedAdvanceTotal > 0 ? ` (${formatInr(verifiedAdvanceTotal)} verified so far)` : ""
+          } stays verified and is not refunded, and nothing is changed for payments, dispatches or invoices.`}
+          confirmLabel="Cancel order permanently"
+          destructive
+          noteLabel="Reason"
+          noteRequired
+          onClose={() => setShowCancel(false)}
+          onConfirm={async (note) => {
+            await cancelSalesOrder(note ?? "");
+            toast.show("Sales Order cancelled", "close");
           }}
         />
       )}

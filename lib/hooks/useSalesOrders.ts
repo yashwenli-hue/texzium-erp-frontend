@@ -139,6 +139,29 @@ export function useSalesOrderDetail(id: string | undefined) {
     [repo, run]
   );
 
+  // Retractions and the cancellation each need a reason (the repository refuses
+  // an empty one before any request). Nothing changes locally: on success the
+  // backend's order, records and history are reloaded, and a conflict reloads
+  // them too, exactly like the actions above.
+  const retractVerification = useCallback(
+    (receiptId: string, reason: string) => run(() => repo.salesOrderCommercial.retractVerification(receiptId, reason)),
+    [repo, run]
+  );
+
+  const retractApproval = useCallback(
+    (approvalId: string, reason: string) => run(() => repo.salesOrderCommercial.retractApproval(approvalId, reason)),
+    [repo, run]
+  );
+
+  const cancelSalesOrder = useCallback(
+    (reason: string) =>
+      run(() => {
+        if (!id) throw new Error("This sales order isn't loaded any more. Reload and try again.");
+        return repo.salesOrderCommercial.cancelSalesOrder(id, reason);
+      }),
+    [repo, id, run]
+  );
+
   const approveCommercially = useCallback(
     (remarks?: string) =>
       run(() => {
@@ -171,5 +194,8 @@ export function useSalesOrderDetail(id: string | undefined) {
     createAdvanceReceipt,
     verifyAdvanceReceipt,
     approveCommercially,
+    retractVerification,
+    retractApproval,
+    cancelSalesOrder,
   };
 }

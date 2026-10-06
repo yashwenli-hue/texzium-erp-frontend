@@ -15,7 +15,7 @@ import { useProformaInvoiceDetail } from "../../../lib/hooks/useProformaInvoices
 import { useSalesOrders } from "../../../lib/hooks/useSalesOrders";
 import { useToast } from "../../../components/ui/Toast";
 import { useAuth } from "../../../lib/auth/AuthContext";
-import { SALES_ORDER_PERMISSIONS } from "../../../lib/repository/shared/salesOrderLifecycle";
+import { SALES_ORDER_PERMISSIONS, isLiveSalesOrder } from "../../../lib/repository/shared/salesOrderLifecycle";
 import { initials } from "../../../components/ui/Who";
 import { formatInr, formatDate } from "../../../lib/format";
 import { SalesOrder } from "../../../lib/types/domain";
@@ -94,10 +94,13 @@ export default function ProformaInvoiceDetailPage() {
   // backend precondition, not just a UX safeguard, unlike the equivalent
   // gates on the Quotation detail page.
   const relatedSalesOrders = salesOrders.filter((o) => o.proformaInvoiceId === proforma.id);
-  // One Sales Order per Proforma: the backend refuses a second (409), so the
-  // action is only offered while none exists. It also needs salesorders.create.
+  // One NON-cancelled Sales Order per Proforma: the backend refuses a second
+  // live one (409), so the action is only offered while none exists. A cancelled
+  // order stays in the list below as history but no longer blocks a replacement.
+  // It also needs salesorders.create.
+  const liveSalesOrders = relatedSalesOrders.filter((o) => isLiveSalesOrder(o.status));
   const mayCreateSalesOrders = hasPermission(SALES_ORDER_PERMISSIONS.create);
-  const canCreateSalesOrder = proforma.status === "APPROVED" && relatedSalesOrders.length === 0 && mayCreateSalesOrders;
+  const canCreateSalesOrder = proforma.status === "APPROVED" && liveSalesOrders.length === 0 && mayCreateSalesOrders;
   const salesOrderColumns: Column<SalesOrder>[] = [
     { key: "salesOrderCode", header: "Order No.", render: (o) => o.salesOrderCode },
     { key: "totalAmount", header: "Amount", render: (o) => formatInr(o.totalAmount) },
@@ -187,10 +190,12 @@ export default function ProformaInvoiceDetailPage() {
             <p style={{ fontSize: 12.5, color: "var(--muted)" }}>
               {proforma.status !== "APPROVED"
                 ? "Approve this proforma invoice to create a Sales Order from it."
-                : relatedSalesOrders.length > 0
-                ? "A Sales Order already exists for this proforma invoice. Only one can be created from each."
+                : liveSalesOrders.length > 0
+                ? "A Sales Order already exists for this proforma invoice. Only one active order can exist for each."
                 : mayCreateSalesOrders
-                ? "This proforma invoice is approved. Create a Sales Order above — its total is this proforma's total, and only one order can be created from it."
+                ? relatedSalesOrders.length > 0
+                  ? "The earlier Sales Order was cancelled. Create a replacement above — its total is this proforma's total, and only one active order can exist for it."
+                  : "This proforma invoice is approved. Create a Sales Order above — its total is this proforma's total, and only one active order can exist for it."
                 : "This proforma invoice is approved. You don't have permission to create sales orders from it."}
             </p>
           </Panel>

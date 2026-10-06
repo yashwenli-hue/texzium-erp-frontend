@@ -12,6 +12,7 @@ import {
   toAdvanceReceiptBody,
   toApprovalBody,
   toPaymentTermBody,
+  toReasonBody,
   toVerificationBody,
 } from "../shared/salesOrderLifecycle";
 import {
@@ -35,11 +36,17 @@ import {
  *   GET  /accounts-commercial-approval        (salesorders.commercialapproval.view)
  *   POST /accounts-commercial-approval/create { salesOrderId, remarks? }
  *                                             (salesorders.commercialapproval.approve)
+ *   PATCH /sales-order-advance-receipt/:id/retract-verification { reason }
+ *                                             (salesorders.advancereceipts.retract)
+ *   POST /accounts-commercial-approval/:id/retract { reason }
+ *                                             (salesorders.commercialapproval.retract)
+ *   POST /sales-orders/:id/cancel { reason }  (salesorders.cancel)
  *
  * The list routes return every row, so they are filtered to one order here. The
  * request bodies are built by the shared toXBody() helpers, which only ever
  * include the fields the backend accepts: never an actor, a verifier, an
- * approver, a status or a total. The backend records the signed-in user as the
+ * approver, a status or a total (a retraction or cancellation carries only its
+ * mandatory reason). The backend records the signed-in user as the
  * actor of every lifecycle action and its status is authoritative; this class
  * keeps no lifecycle state of its own.
  */
@@ -119,6 +126,51 @@ export class RealSalesOrderCommercialRepository implements ISalesOrderCommercial
       return { approval: mapSalesOrderCommercialApproval(res.approval), salesOrderStatus: res.salesOrder.status };
     } catch (err) {
       throw lifecycleError(err, "You don't have permission to give accounts commercial approval.");
+    }
+  }
+
+  async retractVerification(
+    receiptId: ID,
+    reason: string
+  ): Promise<{ receipt: SalesOrderAdvanceReceipt; salesOrderStatus: string }> {
+    const body = toReasonBody(reason);
+    try {
+      const res = await apiFetch<{ receipt: BackendSalesOrderAdvanceReceipt; salesOrder: { id: string; status: string } }>(
+        `/sales-order-advance-receipt/${receiptId}/retract-verification`,
+        { method: "PATCH", body }
+      );
+      return { receipt: mapSalesOrderAdvanceReceipt(res.receipt), salesOrderStatus: res.salesOrder.status };
+    } catch (err) {
+      throw lifecycleError(err, "You don't have permission to retract advance receipt verifications.");
+    }
+  }
+
+  async retractApproval(
+    approvalId: ID,
+    reason: string
+  ): Promise<{ approval: SalesOrderCommercialApproval; salesOrderStatus: string }> {
+    const body = toReasonBody(reason);
+    try {
+      const res = await apiFetch<{ approval: BackendAccountsCommercialApproval; salesOrder: { id: string; status: string } }>(
+        `/accounts-commercial-approval/${approvalId}/retract`,
+        { method: "POST", body }
+      );
+      return { approval: mapSalesOrderCommercialApproval(res.approval), salesOrderStatus: res.salesOrder.status };
+    } catch (err) {
+      throw lifecycleError(err, "You don't have permission to retract accounts commercial approvals.");
+    }
+  }
+
+  async cancelSalesOrder(salesOrderId: ID, reason: string): Promise<{ salesOrderStatus: string }> {
+    const body = toReasonBody(reason);
+    try {
+      const res = await apiFetch<{ salesOrder: { id: string; status: string } }>(`/sales-orders/${salesOrderId}/cancel`, {
+        method: "POST",
+        body,
+      });
+      return { salesOrderStatus: res.salesOrder.status };
+    } catch (err) {
+      throw lifecycleError(err, "You don't have permission to cancel Sales Orders.");
     }
   }
 }

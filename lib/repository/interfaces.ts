@@ -362,8 +362,9 @@ export interface ISalesOrderRepository {
   create(input: CreateSalesOrderInput): Promise<SalesOrder>;
   /**
    * VERIFIED: `GET /sales-orders/:id/events` (permission salesorders.view) — the
-   * order's lifecycle history, newest first: advance verified / rejected and
-   * accounts approval, each with its actor. Not general notes.
+   * order's lifecycle history, newest first: advance verified / rejected,
+   * accounts approval, their retractions and cancellation, each with its actor
+   * (and, for a retraction or cancellation, the reason). Not general notes.
    */
   listEvents(id: ID): Promise<SalesOrderEvent[]>;
 }
@@ -423,6 +424,32 @@ export interface ISalesOrderCommercialRepository {
     salesOrderId: ID,
     remarks?: string
   ): Promise<{ approval: SalesOrderCommercialApproval; salesOrderStatus: string }>;
+  /**
+   * `PATCH /sales-order-advance-receipt/:id/retract-verification` { reason }
+   * (salesorders.advancereceipts.retract): PENDING_ACCOUNTS_APPROVAL ->
+   * PENDING_STORE_APPROVAL. The receipt goes back to PENDING. The reason is
+   * mandatory (1-500 characters); a missing one throws before any request.
+   */
+  retractVerification(
+    receiptId: ID,
+    reason: string
+  ): Promise<{ receipt: SalesOrderAdvanceReceipt; salesOrderStatus: string }>;
+  /**
+   * `POST /accounts-commercial-approval/:id/retract` { reason }
+   * (salesorders.commercialapproval.retract): READY_FOR_DISPATCH_ORDER ->
+   * PENDING_ACCOUNTS_APPROVAL. The approval row is kept and marked RETRACTED.
+   */
+  retractApproval(
+    approvalId: ID,
+    reason: string
+  ): Promise<{ approval: SalesOrderCommercialApproval; salesOrderStatus: string }>;
+  /**
+   * `POST /sales-orders/:id/cancel` { reason } (salesorders.cancel): from
+   * PENDING_STORE_APPROVAL, PENDING_ACCOUNTS_APPROVAL or READY_FOR_DISPATCH_ORDER
+   * to CANCELLED, which is terminal. Receipts (a VERIFIED advance included) are
+   * left exactly as they are; nothing is refunded or reversed downstream.
+   */
+  cancelSalesOrder(salesOrderId: ID, reason: string): Promise<{ salesOrderStatus: string }>;
 }
 
 // Mirrors the VERIFIED CreateSalesInvoiceDto exactly: salesOrderId,

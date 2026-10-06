@@ -91,6 +91,7 @@ export const SALES_ORDER_STATUS_STYLE: Record<string, TagColor> = {
   PENDING_STORE_APPROVAL: "w",
   PENDING_ACCOUNTS_APPROVAL: "w",
   READY_FOR_DISPATCH_ORDER: "g",
+  CANCELLED: "b",
 };
 
 export function SalesOrderStatusTag({ status }: { status: string }) {

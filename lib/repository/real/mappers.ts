@@ -534,6 +534,8 @@ export function mapSalesOrderCommercialApproval(raw: BackendAccountsCommercialAp
     salesOrderId: raw.salesOrderId,
     approvedBy: raw.approvedBy,
     remarks: raw.remarks ?? undefined,
+    // A row written before approvals had a status (or by hand) counts as in force, as the backend's own default does.
+    status: raw.status ?? "APPROVED",
     createdAt: raw.createdAt,
   };
 }
@@ -562,6 +564,7 @@ export function mapSalesOrderEvent(raw: BackendSalesOrderEvent): SalesOrderEvent
     result: raw.result ?? undefined,
     fromStatus: raw.fromStatus ?? undefined,
     toStatus: raw.toStatus ?? undefined,
+    referenceId: raw.referenceId ?? undefined,
     remarks: raw.remarks ?? undefined,
     actorName: raw.actor?.fullName ?? "",
     actorId: raw.actor?.id ?? raw.actorId ?? undefined,
