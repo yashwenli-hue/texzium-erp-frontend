@@ -62,10 +62,10 @@ export const db = {
   activities: new EntityStore<Activity>(SEED_ACTIVITIES),
   tasks: new EntityStore<Task>(SEED_TASKS),
   notes: new EntityStore<Note>(SEED_NOTES),
-  // storageKey enabled here only: the design review specifically calls out
-  // Opportunity pipeline stage needing to survive a refresh. Other stores
-  // intentionally keep the original "resets on refresh" mock behavior.
-  opportunities: new EntityStore<Opportunity>(SEED_OPPORTUNITIES, "revenueos.mock.opportunities"),
+  // Like every other mock table, opportunities reset on refresh. Stage is no
+  // longer kept in the browser: the real backend owns it (see
+  // lib/repository/shared/opportunityStage.ts for the rules the mock follows).
+  opportunities: new EntityStore<Opportunity>(SEED_OPPORTUNITIES),
   quotations: new EntityStore<Quotation>(SEED_QUOTATIONS),
   proformaInvoices: new EntityStore<ProformaInvoice>(SEED_PROFORMA_INVOICES),
   salesOrders: new EntityStore<SalesOrder>(SEED_SALES_ORDERS),

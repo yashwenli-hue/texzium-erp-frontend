@@ -4,8 +4,11 @@ import { useCallback, useMemo, useState } from "react";
 import { useRepository } from "../repository/RepositoryProvider";
 import { useAsyncList } from "./useAsyncList";
 import { CreateOpportunityInput, OpportunitySortField } from "../repository/interfaces";
-import { OpportunityStage } from "../types/domain";
+import { Opportunity, OpportunityStage } from "../types/domain";
+import { OpportunityStageConflictError } from "../repository/shared/opportunityStage";
 import { SortState } from "../types/common";
+
+const NOT_LOADED_MESSAGE = "This opportunity isn't loaded any more. Reload and try again.";
 
 export function useOpportunities() {
   const repo = useRepository();
@@ -27,12 +30,24 @@ export function useOpportunities() {
     [repo, refetch]
   );
 
+  // The move names the stage on screen as `fromStage`, so the backend only
+  // applies it while the opportunity is still there. If someone else moved it
+  // first (conflict), reload so the board shows the truth, then let the caller
+  // show the message. Nothing is changed optimistically.
+  const items = data?.items;
   const updateStage = useCallback(
-    async (id: string, stage: OpportunityStage) => {
-      await repo.opportunities.updateStage(id, stage);
-      refetch();
+    async (id: string, toStage: OpportunityStage) => {
+      const current = items?.find((o: Opportunity) => o.id === id);
+      if (!current) throw new Error(NOT_LOADED_MESSAGE);
+      try {
+        await repo.opportunities.updateStage(id, current.stage, toStage);
+        refetch();
+      } catch (err) {
+        if (err instanceof OpportunityStageConflictError) refetch();
+        throw err;
+      }
     },
-    [repo, refetch]
+    [repo, refetch, items]
   );
 
   return {
@@ -73,12 +88,18 @@ export function useOpportunityDetail(id: string | undefined) {
   const timeline = lead?.timelines ?? fetchedTimeline ?? [];
 
   const updateStage = useCallback(
-    async (stage: OpportunityStage) => {
+    async (toStage: OpportunityStage) => {
       if (!id) return;
-      await repo.opportunities.updateStage(id, stage);
-      refetch();
+      if (!opportunity) throw new Error(NOT_LOADED_MESSAGE);
+      try {
+        await repo.opportunities.updateStage(id, opportunity.stage, toStage);
+        refetch();
+      } catch (err) {
+        if (err instanceof OpportunityStageConflictError) refetch();
+        throw err;
+      }
     },
-    [id, repo, refetch]
+    [id, repo, refetch, opportunity]
   );
 
   return {

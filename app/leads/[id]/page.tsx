@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Icon } from "../../../components/ui/Icon";
 import { Panel } from "../../../components/ui/Card";
-import { StatusTag, QuotationStatusTag, LeadStatusTag, LeadDeactivatedTag, LeadScoreTag, Tag } from "../../../components/ui/Tag";
+import { OpportunityStageTag, QuotationStatusTag, LeadStatusTag, LeadDeactivatedTag, LeadScoreTag, Tag } from "../../../components/ui/Tag";
 import { SourceBadge } from "../../../components/ui/SourceBadge";
 import { FollowupTag } from "../../../components/ui/FollowupTag";
 import { QuickActions } from "../../../components/ui/QuickActions";
@@ -172,7 +172,7 @@ export default function LeadDetailPage() {
 
   const oppColumns: Column<Opportunity>[] = [
     { key: "title", header: "Opportunity", render: (o) => o.title },
-    { key: "stage", header: "Stage", render: (o) => <StatusTag status={o.stage} /> },
+    { key: "stage", header: "Stage", render: (o) => <OpportunityStageTag stage={o.stage} /> },
     { key: "expectedValue", header: "Value", render: (o) => formatInr(o.expectedValue) },
   ];
 

@@ -50,7 +50,7 @@ FRONTEND RULE: Use the existing auth contract. Do not invent a second authentica
 - Lead sources: `POST /`, `GET /`
 - Lead status: `POST /`
 - Leads: `POST /`, `GET /`, `GET /:id`, `PATCH /:id`
-- Opportunities: `POST /`, `GET /`
+- Opportunities: `POST /`, `GET /`, `GET /:id`, `PATCH /:id/stage`
 - Quotations: `POST /`, `PATCH /:id/status`, `PATCH /:id/revise`, `PATCH /:id/approve`, `POST /:id/convert`, `GET /`
 - Proforma invoices: `POST /`, `GET /`, `PATCH /:id/approve`
 - Sales orders: `POST /`, `GET /`
@@ -192,6 +192,14 @@ VERIFIED CreateOpportunityDto:
 VERIFIED: opportunity is linked to a lead and creation creates `OPPORTUNITY_CREATED` on the lead timeline.
 
 FRONTEND RULE: select a real lead during API integration.
+
+VERIFIED (backend commit `933231a`): `Opportunity.status` holds the stage, one of `QUALIFIED`, `PROPOSAL`, `NEGOTIATION`, `WON`, `LOST`. New opportunities start at `QUALIFIED`. `PATCH /opportunities/:id/stage` (permission `opportunities.edit`) takes `{ fromStage, toStage }` and is the only way to change it:
+- `QUALIFIED` -> `PROPOSAL` or `LOST`; `PROPOSAL` -> `QUALIFIED`, `NEGOTIATION` or `LOST`; `NEGOTIATION` -> `PROPOSAL`, `WON` or `LOST`; `WON` and `LOST` are final (no reopen).
+- 400 for a move the rules refuse, 404 for an unknown opportunity, 409 when the stored stage is no longer `fromStage` (someone else moved it first) or the lead is deactivated, 403 without `opportunities.edit`.
+- Each move writes an attributed `OPPORTUNITY_STAGE_CHANGED` system event to the lead timeline (actor from the signed-in user).
+- A manual migration (`20261006_crm_opportunity_stage.sql`) turns existing `OPEN` rows into `QUALIFIED`. It must be applied before the frontend that reads these values is used against a database; an unrecognised value such as `OPEN` is reported as an error, not shown as a stage.
+
+FRONTEND RULE: the backend is the only source of stage. Do not keep stage in the browser. Send the stage the person was looking at as `fromStage` and reload on a 409.
 
 UI ASSUMPTION: weighted forecast can be displayed as expected value × probability / 100 for presentation. It is not authoritative unless the backend supplies an authoritative forecast.
 
@@ -380,6 +388,7 @@ Explicitly confirmed permissions:
 - `leads.followups.view`
 - `leads.status.update`
 - `opportunities.create`
+- `opportunities.edit`
 - `opportunities.view`
 
 FRONTEND RULE: do not infer permissions from labels. Respect authenticated user permissions and handle 401/403 responses.
@@ -435,7 +444,7 @@ FRONTEND RULE: these may remain presentation concepts, but map them to real back
 1. Exact deployed API base URL and reverse-proxy prefix.
 2. Exact response envelopes.
 3. Exact deployed LeadStatus values.
-4. Exact Opportunity status values.
+4. ~~Exact Opportunity status values.~~ Settled: the five stage values above (once the stage migration is applied to the deployed database).
 5. Exact Quotation status values accepted by deployed API.
 6. Exact SalesOrder status values used throughout UI.
 7. Exact verification/payment-mode enumerations where DTOs accept strings.

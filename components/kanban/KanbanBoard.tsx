@@ -21,6 +21,8 @@ export function KanbanBoard<T extends { id: string }, S extends string>({
   getStage,
   renderCard,
   onMove,
+  canMove,
+  onBlockedMove,
   onCardClick,
   gridColumns,
   colorMap,
@@ -30,6 +32,15 @@ export function KanbanBoard<T extends { id: string }, S extends string>({
   getStage: (item: T) => S;
   renderCard: (item: T) => ReactNode;
   onMove?: (id: string, stage: S) => void;
+  /**
+   * Optional rule check for a move. When given, a card can only be dropped on a
+   * column it may move to, the per-card dropdown disables the other columns,
+   * and dropping a card on its own column does nothing. Without it every move
+   * is allowed (the Lead pipeline's behaviour).
+   */
+  canMove?: (item: T, toStage: S) => boolean;
+  /** Called when a move that `canMove` refuses is attempted anyway. */
+  onBlockedMove?: (item: T, toStage: S) => void;
   onCardClick?: (id: string) => void;
   gridColumns?: number;
   /** Overrides the shared STAGE_COLOR/TINT lookup for this board's columns with direct
@@ -39,6 +50,23 @@ export function KanbanBoard<T extends { id: string }, S extends string>({
 }) {
   const [dragOverStage, setDragOverStage] = useState<S | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
+
+  function requestMove(item: T, stage: S) {
+    if (canMove) {
+      if (getStage(item) === stage) return;
+      if (!canMove(item, stage)) {
+        onBlockedMove?.(item, stage);
+        return;
+      }
+    }
+    onMove?.(item.id, stage);
+  }
+
+  function isRefusedTarget(stage: S): boolean {
+    if (!canMove || !draggingId) return false;
+    const dragged = items.find((item) => item.id === draggingId);
+    return !!dragged && getStage(dragged) !== stage && !canMove(dragged, stage);
+  }
 
   return (
     <div
@@ -56,7 +84,7 @@ export function KanbanBoard<T extends { id: string }, S extends string>({
             className={`kcol ${isDropTarget ? "drop-target" : ""}`}
             style={{ background: isDropTarget ? undefined : tint.bg }}
             onDragOver={(e) => {
-              if (!onMove) return;
+              if (!onMove || isRefusedTarget(col.key)) return;
               e.preventDefault();
               setDragOverStage(col.key);
             }}
@@ -65,7 +93,9 @@ export function KanbanBoard<T extends { id: string }, S extends string>({
               if (!onMove) return;
               e.preventDefault();
               const id = e.dataTransfer.getData("text/kanban-id");
-              if (id) onMove(id, col.key);
+              const dropped = items.find((item) => item.id === id);
+              if (dropped) requestMove(dropped, col.key);
+              else if (id) onMove(id, col.key);
               setDragOverStage(null);
               setDraggingId(null);
             }}
@@ -96,11 +126,15 @@ export function KanbanBoard<T extends { id: string }, S extends string>({
                   <div className="kcard-move" onClick={(e) => e.stopPropagation()}>
                     <select
                       value={getStage(item)}
-                      onChange={(e) => onMove(item.id, e.target.value as S)}
+                      onChange={(e) => requestMove(item, e.target.value as S)}
                       aria-label="Move to a different column"
                     >
                       {columns.map((c) => (
-                        <option key={c.key} value={c.key}>
+                        <option
+                          key={c.key}
+                          value={c.key}
+                          disabled={!!canMove && c.key !== getStage(item) && !canMove(item, c.key)}
+                        >
                           Move to: {c.label}
                         </option>
                       ))}

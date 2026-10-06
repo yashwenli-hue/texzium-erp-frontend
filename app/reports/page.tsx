@@ -46,9 +46,9 @@ export default function ReportsPage() {
         CustomerLedger balance column into a mathematically inflated total;{" "}
         <code>salesperson-performance</code> is byte-for-byte identical to{" "}
         <code>customer-revenue</code> — it groups by customer name, not salesperson, despite the
-        name; <code>lost-opportunities</code> can never reflect real lost deals because Opportunity
-        stage is local-only (see the Dashboard&apos;s own design note) and the backend Opportunity
-        status never actually changes. The remaining endpoints (<code>top-products</code>,{" "}
+        name; <code>lost-opportunities</code> lists opportunities whose saved stage is Lost, so it only
+        reflects deals moved to Lost since opportunity stages became persistent (it was always empty
+        before that). The remaining endpoints (<code>top-products</code>,{" "}
         <code>product-revenue</code>, <code>product-quantity</code>, <code>hsn-revenue</code>,{" "}
         <code>category-revenue</code>) were each investigated and found to be a naive ratio, an
         always-empty list, or a mislabeled/duplicate metric. This isn&apos;t a coverage gap waiting on

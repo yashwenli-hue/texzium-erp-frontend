@@ -10,6 +10,7 @@ import {
   LeadActivityType,
   AssignableUser,
   Opportunity,
+  OpportunityStage,
   Quotation,
   QuotationStatus,
   ProformaInvoice,
@@ -33,6 +34,7 @@ import {
   AppNotification,
   titleCaseFromConstant,
   leadActivityMeta,
+  isOpportunityStage,
 } from "../../types/domain";
 
 /**
@@ -130,6 +132,19 @@ export interface BackendOpportunity {
   lead?: BackendLead | null;
 }
 
+/**
+ * Opportunity.status is the stage, one of exactly five values. Anything else
+ * (for example a row that still reads OPEN because the stage migration has not
+ * been applied) is a contract problem, so it surfaces as a clear error and is
+ * never shown as if it were a real stage.
+ */
+export function mapOpportunityStage(status: string): OpportunityStage {
+  if (isOpportunityStage(status)) return status;
+  throw new Error(
+    `An opportunity has an unrecognised stage ("${status}"). Ask an administrator to check that the opportunity stage update has been applied.`
+  );
+}
+
 export function mapLeadSource(raw: BackendLeadSource): LeadSourceRecord {
   return { id: raw.id, name: raw.name, description: raw.description ?? undefined };
 }
@@ -154,6 +169,7 @@ const TIMELINE_ICON_BY_ACTION: Record<string, string> = {
   FOLLOWUP_RESCHEDULED: "clock",
   FOLLOWUP_CANCELLED: "close",
   OPPORTUNITY_CREATED: "brief",
+  OPPORTUNITY_STAGE_CHANGED: "pulse",
   LEAD_DEACTIVATED: "alert",
   LEAD_REACTIVATED: "check",
 };

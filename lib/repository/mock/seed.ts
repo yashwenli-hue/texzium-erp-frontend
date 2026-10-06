@@ -170,14 +170,14 @@ export const SEED_NOTES: Note[] = [
 // already be Qualified before an opportunity is created from it.
 // ---------------------------------------------------------------------------
 export const SEED_OPPORTUNITIES: Opportunity[] = [
-  { id: "O1", leadId: "L2", title: "5MW Rooftop EPC — GreenVolt", customerName: "GreenVolt Energy", stage: "Proposal", expectedValue: 6_400_000, probability: 60, expectedCloseDate: daysFromNow(20), ownerName: "Anita S.", createdAt: daysAgo(5) },
-  { id: "O2", leadId: "L1", title: "Hydraulic Systems Upgrade", customerName: "Sterling Pumps", stage: "Negotiation", expectedValue: 1_840_000, probability: 75, expectedCloseDate: daysFromNow(10), ownerName: "Rohit M.", createdAt: daysAgo(8) },
-  { id: "O3", leadId: "L6", title: "Factory Automation Retrofit", customerName: "JSW Steel", stage: "Negotiation", expectedValue: 8_800_000, probability: 70, expectedCloseDate: daysFromNow(15), ownerName: "Rohit M.", createdAt: daysAgo(7) },
-  { id: "O4", leadId: "L7", title: "Control Room Equipment", customerName: "L&T Infra", stage: "Proposal", expectedValue: 3_600_000, probability: 50, expectedCloseDate: daysFromNow(25), ownerName: "Anita S.", createdAt: daysAgo(6) },
-  { id: "O5", leadId: "L8", title: "Rooftop Solar — Phase 1", customerName: "Adani Green", stage: "Proposal", expectedValue: 11_000_000, probability: 55, expectedCloseDate: daysFromNow(30), ownerName: "Vikram J.", createdAt: daysAgo(8) },
-  { id: "O6", leadId: "L9", title: "Bulk Procurement Contract", customerName: "Reliance Industries", stage: "Qualified", expectedValue: 4_200_000, probability: 35, expectedCloseDate: daysFromNow(35), ownerName: "Anita S.", createdAt: daysAgo(9) },
-  { id: "O7", leadId: "L10", title: "Warehouse Automation", customerName: "Tata Projects", stage: "Qualified", expectedValue: 2_850_000, probability: 35, expectedCloseDate: daysFromNow(38), ownerName: "Rohit M.", createdAt: daysAgo(10) },
-  { id: "O8", leadId: "L5", title: "Switchgear Replacement Order", customerName: "Havells India", stage: "Won", expectedValue: 5_200_000, probability: 100, expectedCloseDate: daysAgo(6), ownerName: "Priya N.", createdAt: daysAgo(13) },
+  { id: "O1", leadId: "L2", title: "5MW Rooftop EPC — GreenVolt", customerName: "GreenVolt Energy", stage: "PROPOSAL", expectedValue: 6_400_000, probability: 60, expectedCloseDate: daysFromNow(20), ownerName: "Anita S.", createdAt: daysAgo(5) },
+  { id: "O2", leadId: "L1", title: "Hydraulic Systems Upgrade", customerName: "Sterling Pumps", stage: "NEGOTIATION", expectedValue: 1_840_000, probability: 75, expectedCloseDate: daysFromNow(10), ownerName: "Rohit M.", createdAt: daysAgo(8) },
+  { id: "O3", leadId: "L6", title: "Factory Automation Retrofit", customerName: "JSW Steel", stage: "NEGOTIATION", expectedValue: 8_800_000, probability: 70, expectedCloseDate: daysFromNow(15), ownerName: "Rohit M.", createdAt: daysAgo(7) },
+  { id: "O4", leadId: "L7", title: "Control Room Equipment", customerName: "L&T Infra", stage: "PROPOSAL", expectedValue: 3_600_000, probability: 50, expectedCloseDate: daysFromNow(25), ownerName: "Anita S.", createdAt: daysAgo(6) },
+  { id: "O5", leadId: "L8", title: "Rooftop Solar — Phase 1", customerName: "Adani Green", stage: "PROPOSAL", expectedValue: 11_000_000, probability: 55, expectedCloseDate: daysFromNow(30), ownerName: "Vikram J.", createdAt: daysAgo(8) },
+  { id: "O6", leadId: "L9", title: "Bulk Procurement Contract", customerName: "Reliance Industries", stage: "QUALIFIED", expectedValue: 4_200_000, probability: 35, expectedCloseDate: daysFromNow(35), ownerName: "Anita S.", createdAt: daysAgo(9) },
+  { id: "O7", leadId: "L10", title: "Warehouse Automation", customerName: "Tata Projects", stage: "QUALIFIED", expectedValue: 2_850_000, probability: 35, expectedCloseDate: daysFromNow(38), ownerName: "Rohit M.", createdAt: daysAgo(10) },
+  { id: "O8", leadId: "L5", title: "Switchgear Replacement Order", customerName: "Havells India", stage: "WON", expectedValue: 5_200_000, probability: 100, expectedCloseDate: daysAgo(6), ownerName: "Priya N.", createdAt: daysAgo(13) },
 ];
 
 // ---------------------------------------------------------------------------

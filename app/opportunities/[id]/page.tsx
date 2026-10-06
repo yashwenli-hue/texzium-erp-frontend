@@ -5,9 +5,8 @@ import { useParams, useRouter } from "next/navigation";
 import { Icon } from "../../../components/ui/Icon";
 import { LeadHistoryTimeline } from "../../../components/ui/LeadHistoryTimeline";
 import { Panel } from "../../../components/ui/Card";
-import { StatusTag, QuotationStatusTag, Tag } from "../../../components/ui/Tag";
+import { OpportunityStageTag, QuotationStatusTag, Tag } from "../../../components/ui/Tag";
 import { Button, EmptyState } from "../../../components/ui/Button";
-import { DesignNote } from "../../../components/ui/PageHeader";
 import { DocumentTrail } from "../../../components/ui/DocumentTrail";
 import { LifecycleStepper } from "../../../components/ui/LifecycleStepper";
 import { QuickActions } from "../../../components/ui/QuickActions";
@@ -17,9 +16,11 @@ import { QuotationForm } from "../../../components/forms/QuotationForm";
 import { useOpportunityDetail } from "../../../lib/hooks/useOpportunities";
 import { useQuotations } from "../../../lib/hooks/useQuotations";
 import { useToast } from "../../../components/ui/Toast";
+import { useAuth } from "../../../lib/auth/AuthContext";
 import { initials } from "../../../components/ui/Who";
 import { formatInr, formatDate } from "../../../lib/format";
-import { OPPORTUNITY_STEPS, OpportunityStage, Quotation } from "../../../lib/types/domain";
+import { OPPORTUNITY_STEPS, OpportunityStage, Quotation, formatOpportunityStage } from "../../../lib/types/domain";
+import { canMoveOpportunityStage, isOpportunityStageFinal } from "../../../lib/repository/shared/opportunityStage";
 
 function goBackOrTo(router: ReturnType<typeof useRouter>, fallback: string) {
   if (typeof window !== "undefined" && window.history.length > 1) {
@@ -35,6 +36,8 @@ export default function OpportunityDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const toast = useToast();
+  const { hasPermission } = useAuth();
+  const canEditStage = hasPermission("opportunities.edit");
   const id = params?.id;
   const { opportunity, lead, timeline, loading, error, updateStage, refetch } = useOpportunityDetail(id);
   const { quotations, createQuotation, refetch: refetchQuotations } = useQuotations();
@@ -93,21 +96,29 @@ export default function OpportunityDetailPage() {
 
   const relatedQuotes = quotations.filter((q) => q.opportunityId === opportunity.id);
   const stepIdx = OPPORTUNITY_STEPS.indexOf(opportunity.stage);
-  const isLost = opportunity.stage === "Lost";
-  const isTerminal = isLost || opportunity.stage === "Won";
+  const isTerminal = isOpportunityStageFinal(opportunity.stage);
+  const stageLabel = formatOpportunityStage(opportunity.stage);
+  const stepAfter = stepIdx >= 0 ? OPPORTUNITY_STEPS[stepIdx + 1] : undefined;
+  const stepBefore = stepIdx > 0 ? OPPORTUNITY_STEPS[stepIdx - 1] : undefined;
   const nextStep: OpportunityStage | undefined =
-    !isTerminal && stepIdx >= 0 && stepIdx < OPPORTUNITY_STEPS.length - 1 ? OPPORTUNITY_STEPS[stepIdx + 1] : undefined;
+    stepAfter && canMoveOpportunityStage(opportunity.stage, stepAfter) ? stepAfter : undefined;
   const prevStep: OpportunityStage | undefined =
-    !isTerminal && stepIdx > 0 ? OPPORTUNITY_STEPS[stepIdx - 1] : undefined;
+    stepBefore && canMoveOpportunityStage(opportunity.stage, stepBefore) ? stepBefore : undefined;
+  const noStagePermission = "You don't have permission to change an opportunity's stage";
 
   async function runAction() {
     if (!pendingAction) return;
+    // Errors (a stage that changed in the meantime, no permission, a refused
+    // move) are thrown to the confirm dialog, which shows the message.
     if (pendingAction.kind === "lost") {
-      await updateStage("Lost");
+      await updateStage("LOST");
       toast.show("Opportunity marked Lost", "close");
+    } else if (pendingAction.stage === "WON") {
+      await updateStage("WON");
+      toast.show("Opportunity marked Won", "check");
     } else {
       await updateStage(pendingAction.stage);
-      toast.show(`Moved to ${pendingAction.stage}`, "check");
+      toast.show(`Moved to ${formatOpportunityStage(pendingAction.stage)}`, "check");
     }
   }
 
@@ -133,7 +144,7 @@ export default function OpportunityDetailPage() {
               </div>
             </div>
             <div className="tagrow">
-              <StatusTag status={opportunity.stage} />
+              <OpportunityStageTag stage={opportunity.stage} />
               <Tag color="n">{formatInr(opportunity.expectedValue)}</Tag>
               <Tag color="n">{opportunity.probability}% probability</Tag>
             </div>
@@ -151,30 +162,50 @@ export default function OpportunityDetailPage() {
 
           <div style={{ padding: "18px 19px" }}>
             <LifecycleStepper
-              steps={OPPORTUNITY_STEPS.map((s) => ({ key: s, label: s }))}
+              steps={OPPORTUNITY_STEPS.map((s) => ({ key: s, label: formatOpportunityStage(s) }))}
               currentKey={opportunity.stage}
-              lostKey="Lost"
+              lostKey="LOST"
               lostLabel="Lost"
             />
-            <div style={{ marginTop: 8 }}>
-              <Tag color="n">Not saved to backend</Tag>
-            </div>
             {!isTerminal && (
               <div style={{ display: "flex", gap: 9, marginTop: 16, flexWrap: "wrap" }}>
                 {nextStep && (
-                  <Button variant="primary" icon="arrow" onClick={() => setPendingAction({ kind: "forward", stage: nextStep })}>
-                    Move to {nextStep}
+                  <Button
+                    variant="primary"
+                    icon="arrow"
+                    disabled={!canEditStage}
+                    title={canEditStage ? undefined : noStagePermission}
+                    onClick={() => setPendingAction({ kind: "forward", stage: nextStep })}
+                  >
+                    Move to {formatOpportunityStage(nextStep)}
                   </Button>
                 )}
                 {prevStep && (
-                  <Button variant="ghost" onClick={() => setPendingAction({ kind: "back", stage: prevStep })}>
-                    Move back to {prevStep}
+                  <Button
+                    variant="ghost"
+                    disabled={!canEditStage}
+                    title={canEditStage ? undefined : noStagePermission}
+                    onClick={() => setPendingAction({ kind: "back", stage: prevStep })}
+                  >
+                    Move back to {formatOpportunityStage(prevStep)}
                   </Button>
                 )}
-                <Button variant="ghost" className="danger-ghost" icon="close" onClick={() => setPendingAction({ kind: "lost" })}>
+                <Button
+                  variant="ghost"
+                  className="danger-ghost"
+                  icon="close"
+                  disabled={!canEditStage}
+                  title={canEditStage ? undefined : noStagePermission}
+                  onClick={() => setPendingAction({ kind: "lost" })}
+                >
                   Mark Lost
                 </Button>
               </div>
+            )}
+            {isTerminal && (
+              <p style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 14 }}>
+                {stageLabel} is final — this opportunity can&apos;t be moved or reopened.
+              </p>
             )}
           </div>
 
@@ -232,23 +263,33 @@ export default function OpportunityDetailPage() {
         </div>
       </div>
 
-      <DesignNote>
-        <b>Design note.</b> Stage movement (forward, backward, or Lost) is UI-only — no backend PATCH
-        route for Opportunity stage exists (docs/backend-ui-contract.md §7, §17). It&apos;s saved in your
-        browser only, not the connected backend, so it won&apos;t follow this opportunity to another device.
-      </DesignNote>
-
       {pendingAction && (
         <ConfirmDialog
-          title={pendingAction.kind === "lost" ? "Mark Opportunity Lost" : pendingAction.kind === "back" ? "Move Stage Back" : "Advance Stage"}
+          title={
+            pendingAction.kind === "lost"
+              ? "Mark Opportunity Lost"
+              : pendingAction.stage === "WON"
+              ? "Mark Opportunity Won"
+              : pendingAction.kind === "back"
+              ? "Move Stage Back"
+              : "Advance Stage"
+          }
           body={
             pendingAction.kind === "lost"
-              ? `Mark "${opportunity.title}" as Lost? This is a terminal state — the opportunity will drop out of the active pipeline.`
+              ? `Mark "${opportunity.title}" as Lost? Lost is final — the opportunity can't be reopened and will drop out of the active pipeline.`
+              : pendingAction.stage === "WON"
+              ? `Mark "${opportunity.title}" as Won? Won is final — the opportunity can't be moved again or reopened.`
               : pendingAction.kind === "back"
-              ? `Move "${opportunity.title}" back to ${pendingAction.stage}? Use this if the deal genuinely regressed.`
-              : `Move "${opportunity.title}" to ${pendingAction.stage}?`
+              ? `Move "${opportunity.title}" back to ${formatOpportunityStage(pendingAction.stage)}? Use this if the deal genuinely regressed.`
+              : `Move "${opportunity.title}" to ${formatOpportunityStage(pendingAction.stage)}?`
           }
-          confirmLabel={pendingAction.kind === "lost" ? "Mark Lost" : `Move to ${pendingAction.stage}`}
+          confirmLabel={
+            pendingAction.kind === "lost"
+              ? "Mark Lost"
+              : pendingAction.stage === "WON"
+              ? "Mark Won"
+              : `Move to ${formatOpportunityStage(pendingAction.stage)}`
+          }
           destructive={pendingAction.kind === "lost"}
           onClose={() => setPendingAction(null)}
           onConfirm={runAction}

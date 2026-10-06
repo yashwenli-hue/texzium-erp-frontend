@@ -6,7 +6,9 @@ import { PageHeader, DesignNote } from "../../components/ui/PageHeader";
 import { StatCard, StatRow, Panel, Cols } from "../../components/ui/Card";
 import { Button } from "../../components/ui/Button";
 import { Icon } from "../../components/ui/Icon";
-import { Tag } from "../../components/ui/Tag";
+import { OPPORTUNITY_STAGE_TINT } from "../../components/ui/Tag";
+import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
+import { useToast } from "../../components/ui/Toast";
 import { KanbanBoard, KanbanColumnConfig } from "../../components/kanban/KanbanBoard";
 import { LeadFunnel } from "../../components/ui/Funnel";
 import { SourceBreakdown } from "../../components/ui/SourceBreakdown";
@@ -18,13 +20,15 @@ import { useQuotations } from "../../lib/hooks/useQuotations";
 import { useCustomers } from "../../lib/hooks/useCustomers";
 import { useQuoteToCashSummary } from "../../lib/hooks/useQuoteToCashSummary";
 import { useFinancialSummary } from "../../lib/hooks/useFinancialSummary";
-import { Opportunity, OpportunityStage, OPPORTUNITY_STEPS, isQualifiedLeadStatus } from "../../lib/types/domain";
+import { useAuth } from "../../lib/auth/AuthContext";
+import { Opportunity, OpportunityStage, OPPORTUNITY_STEPS, formatOpportunityStage, isQualifiedLeadStatus } from "../../lib/types/domain";
+import { canMoveOpportunityStage, validateOpportunityStageMove } from "../../lib/repository/shared/opportunityStage";
 import { formatInr, formatRelative } from "../../lib/format";
 import { classifyFollowup } from "../../lib/followup";
 
 const SNAPSHOT_COLUMNS: KanbanColumnConfig<OpportunityStage>[] = OPPORTUNITY_STEPS.map((stage) => ({
   key: stage,
-  label: stage,
+  label: formatOpportunityStage(stage),
 }));
 
 const FOCUS_DEFAULT_COUNT = 5;
@@ -61,6 +65,10 @@ export default function DashboardPage() {
   const router = useRouter();
   const { leads, createLead } = useLeads();
   const { opportunities, updateStage } = useOpportunities();
+  const toast = useToast();
+  const { hasPermission } = useAuth();
+  const canEditStage = hasPermission("opportunities.edit");
+  const [pendingWon, setPendingWon] = useState<Opportunity | null>(null);
   const { tasks } = useTasks();
   const { quotations } = useQuotations();
   const { customers } = useCustomers();
@@ -70,7 +78,7 @@ export default function DashboardPage() {
   const [focusExpanded, setFocusExpanded] = useState(false);
 
   const openOpportunities = useMemo(
-    () => opportunities.filter((o) => o.stage !== "Won" && o.stage !== "Lost"),
+    () => opportunities.filter((o) => o.stage !== "WON" && o.stage !== "LOST"),
     [opportunities]
   );
   const openPipelineValue = useMemo(
@@ -78,7 +86,7 @@ export default function DashboardPage() {
     [openOpportunities]
   );
   const wonValue = useMemo(
-    () => opportunities.filter((o) => o.stage === "Won").reduce((s, o) => s + o.expectedValue, 0),
+    () => opportunities.filter((o) => o.stage === "WON").reduce((s, o) => s + o.expectedValue, 0),
     [opportunities]
   );
   const openLeadsCount = leads.filter((l) => l.status !== "REJECTED").length;
@@ -146,6 +154,32 @@ export default function DashboardPage() {
 
   const focusItems = focusExpanded ? allFocusItems : allFocusItems.slice(0, FOCUS_DEFAULT_COUNT);
 
+  async function moveOpportunity(id: string, stage: OpportunityStage) {
+    try {
+      await updateStage(id, stage);
+    } catch (err) {
+      toast.show(err instanceof Error ? err.message : "Could not move this opportunity. Please try again.", "alert");
+    }
+  }
+
+  // Won cannot be undone, so it is confirmed first; every other move is a single drop.
+  function handleMove(id: string, stage: OpportunityStage) {
+    if (stage === "WON") {
+      const opp = opportunities.find((o) => o.id === id);
+      if (opp) setPendingWon(opp);
+      return;
+    }
+    void moveOpportunity(id, stage);
+  }
+
+  function explainBlockedMove(o: Opportunity, stage: OpportunityStage) {
+    try {
+      validateOpportunityStageMove(o.stage, stage);
+    } catch (err) {
+      toast.show(err instanceof Error ? err.message : "That move isn't allowed.", "alert");
+    }
+  }
+
   function renderOppCard(o: Opportunity) {
     return (
       <>
@@ -176,8 +210,8 @@ export default function DashboardPage() {
 
       <StatRow>
         <StatCard label="Open Leads" value={String(openLeadsCount)} note="not yet rejected" />
-        <StatCard label="Open Pipeline" value={formatInr(openPipelineValue)} note={`${openOpportunities.length} open · stage is local only`} />
-        <StatCard label="Won Value" value={formatInr(wonValue)} note={`${opportunities.filter((o) => o.stage === "Won").length} deals · local only`} />
+        <StatCard label="Open Pipeline" value={formatInr(openPipelineValue)} note={`${openOpportunities.length} open`} />
+        <StatCard label="Won Value" value={formatInr(wonValue)} note={`${opportunities.filter((o) => o.stage === "WON").length} deals`} />
         <StatCard label="Qualification Rate" value={`${qualificationRate}%`} note="of all leads" />
       </StatRow>
 
@@ -223,16 +257,21 @@ export default function DashboardPage() {
 
       <Cols>
         <Panel title="Opportunity Pipeline" more={{ label: "Open opportunities", onClick: () => router.push("/opportunities") }}>
-          <div style={{ padding: "0 19px 10px" }}>
-            <Tag color="n">Not saved to backend</Tag>
-          </div>
+          {!canEditStage && (
+            <p style={{ fontSize: 12.5, color: "var(--muted)", margin: "0 19px 10px" }}>
+              You don&apos;t have permission to change opportunity stages, so cards on this board can&apos;t be moved.
+            </p>
+          )}
           <KanbanBoard
             columns={SNAPSHOT_COLUMNS}
             items={openOpportunities}
             getStage={(o) => o.stage}
             renderCard={renderOppCard}
             gridColumns={4}
-            onMove={(id, stage) => updateStage(id, stage)}
+            colorMap={OPPORTUNITY_STAGE_TINT}
+            onMove={canEditStage ? handleMove : undefined}
+            canMove={(o, stage) => canMoveOpportunityStage(o.stage, stage)}
+            onBlockedMove={explainBlockedMove}
             onCardClick={(id) => router.push(`/opportunities/${id}`)}
           />
         </Panel>
@@ -300,14 +339,26 @@ export default function DashboardPage() {
       <DesignNote>
         <b>Design note.</b> &quot;Today&apos;s Focus&quot; is a presentation-only prioritization built from
         mock Task/Lead/Quotation data — follow-up urgency is not a real backend priority field yet (see
-        lib/followup.ts). Opportunity stage (and the Won Value/Open Pipeline figures derived from it) persists
-        across a refresh via local browser storage only — the backend Opportunity status never leaves
-        &quot;Open&quot; and has no stage-transition endpoint, so none of that is backend truth. Quote-to-Cash
+        lib/followup.ts). Opportunity stage, and the Open Pipeline and Won Value figures derived from it, come
+        from the backend&apos;s saved stage; the figures themselves are summed in the browser. Quote-to-Cash
         and Revenue &amp; Collections above are real, backend-sourced, all-time totals (no endpoint here
         supports a date range) — intentionally excluded are quotation/lead &quot;conversion rate&quot;,
         salesperson performance and customer ranking endpoints, each found during investigation to produce
         naive or misleading numbers rather than true analytics.
       </DesignNote>
+
+      {pendingWon && (
+        <ConfirmDialog
+          title="Mark Opportunity Won"
+          body={`Mark "${pendingWon.title}" as Won? Won is final — the opportunity can't be moved again or reopened.`}
+          confirmLabel="Mark Won"
+          onClose={() => setPendingWon(null)}
+          onConfirm={async () => {
+            await updateStage(pendingWon.id, "WON");
+            toast.show("Opportunity marked Won", "check");
+          }}
+        />
+      )}
 
       {showLeadForm && (
         <LeadForm onClose={() => setShowLeadForm(false)} onSubmit={createLead} />

@@ -1,4 +1,4 @@
-import { LeadStatus, formatLeadStatus, formatQuotationStatus, formatProformaInvoiceStatus, formatSalesOrderStatus, formatSalesInvoiceStatus, formatAccountsReceivableStatus, formatDispatchOrderStatus } from "../../lib/types/domain";
+import { LeadStatus, OPPORTUNITY_STAGES, formatOpportunityStage, formatLeadStatus, formatQuotationStatus, formatProformaInvoiceStatus, formatSalesOrderStatus, formatSalesInvoiceStatus, formatAccountsReceivableStatus, formatDispatchOrderStatus } from "../../lib/types/domain";
 
 export type TagColor = "g" | "w" | "b" | "i" | "n";
 
@@ -37,6 +37,22 @@ export const STAGE_COLOR: Record<string, TagColor> = {
 
 export function StatusTag({ status }: { status: string }) {
   return <Tag color={STAGE_COLOR[status] ?? "n"}>{status}</Tag>;
+}
+
+// Opportunity stage is the backend's raw Opportunity.status (QUALIFIED,
+// PROPOSAL, NEGOTIATION, WON, LOST), so it is styled and labelled the same way
+// as Quotation status: raw value in, formatted label out. Colours are the ones
+// these stages have always had.
+export const OPPORTUNITY_STAGE_STYLE: Record<string, TagColor> = {
+  QUALIFIED: "n",
+  PROPOSAL: "w",
+  NEGOTIATION: "i",
+  WON: "g",
+  LOST: "b",
+};
+
+export function OpportunityStageTag({ stage }: { stage: string }) {
+  return <Tag color={OPPORTUNITY_STAGE_STYLE[stage] ?? "n"}>{formatOpportunityStage(stage)}</Tag>;
 }
 
 // Quotation status is a raw backend value (DRAFT/REVISED/APPROVED/CONVERTED)
@@ -222,6 +238,11 @@ export const TINT: Record<TagColor, { bg: string; fg: string }> = {
   g: { bg: "var(--good-bg)", fg: "var(--good)" },
   b: { bg: "var(--bad-bg)", fg: "var(--bad)" },
 };
+
+/** Column tints for a board whose columns are opportunity stages (see KanbanBoard `colorMap`). */
+export const OPPORTUNITY_STAGE_TINT: Record<string, { bg: string; fg: string }> = Object.fromEntries(
+  OPPORTUNITY_STAGES.map((stage) => [stage, TINT[OPPORTUNITY_STAGE_STYLE[stage]]])
+);
 
 export function Chip({
   label,

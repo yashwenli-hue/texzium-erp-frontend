@@ -251,7 +251,7 @@ export interface INoteRepository {
 
 // Mirrors the VERIFIED CreateOpportunityDto. No customerName/stage input —
 // customer is derived from the linked lead, and new opportunities always
-// start at "Qualified" (a lead must already be qualified to spawn one).
+// start at QUALIFIED (the backend sets it; the form only offers qualified leads).
 export interface CreateOpportunityInput {
   leadId: ID;
   title: string;
@@ -265,12 +265,14 @@ export interface IOpportunityRepository {
   getById(id: ID): Promise<Opportunity | null>;
   create(input: CreateOpportunityInput): Promise<Opportunity>;
   /**
-   * UI-ONLY for now: no backend PATCH route for opportunity stage is
-   * confirmed yet (docs/backend-ui-contract.md §2 lists only POST/GET for
-   * Opportunities). Kept mock-only so the Stage detail page and stepper are
-   * ready to wire up the instant a real endpoint is confirmed.
+   * Moves an opportunity to another stage (PATCH /opportunities/:id/stage,
+   * permission opportunities.edit). `fromStage` is the stage the person was
+   * looking at: the move only happens if the opportunity is still in it. Rules
+   * (lib/repository/shared/opportunityStage.ts): one step forward or back, or
+   * Lost from any open stage; Won and Lost are final. Throws
+   * OpportunityStageConflictError when the stage has changed in the meantime.
    */
-  updateStage(id: ID, stage: OpportunityStage): Promise<Opportunity>;
+  updateStage(id: ID, fromStage: OpportunityStage, toStage: OpportunityStage): Promise<Opportunity>;
 }
 
 // Mirrors the VERIFIED CreateQuotationDto exactly: opportunityId, quoteDate,

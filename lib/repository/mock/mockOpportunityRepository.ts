@@ -1,5 +1,5 @@
 import { ID, ListQuery, Page } from "../../types/common";
-import { Opportunity, OpportunityStage, isQualifiedLeadStatus } from "../../types/domain";
+import { Opportunity, OpportunityStage, formatOpportunityStage, isQualifiedLeadStatus } from "../../types/domain";
 import {
   IOpportunityRepository,
   CreateOpportunityInput,
@@ -9,6 +9,11 @@ import { db } from "./db";
 import { delay, applyListQuery } from "./queryUtils";
 import { mockId } from "./entityStore";
 import { assertMockLeadActive } from "./leadGuards";
+import {
+  OpportunityStageConflictError,
+  opportunityStageConflictMessage,
+  validateOpportunityStageMove,
+} from "../shared/opportunityStage";
 
 const SEARCHABLE: (keyof Opportunity)[] = ["title", "customerName", "ownerName"];
 
@@ -34,7 +39,7 @@ export class MockOpportunityRepository implements IOpportunityRepository {
       leadId: input.leadId,
       title: input.title,
       customerName: lead.customerName,
-      stage: "Qualified",
+      stage: "QUALIFIED",
       expectedValue: input.expectedValue,
       probability: input.probability,
       expectedCloseDate: input.expectedCloseDate,
@@ -55,9 +60,30 @@ export class MockOpportunityRepository implements IOpportunityRepository {
     return delay(opp);
   }
 
-  async updateStage(id: ID, stage: OpportunityStage): Promise<Opportunity> {
-    const updated = db.opportunities.update(id, { stage });
-    if (!updated) throw new Error(`Opportunity ${id} not found`);
+  /** Same rules and wording as the backend: rule check, then missing/inactive checks, then the stage the caller saw must still be current. */
+  async updateStage(id: ID, fromStage: OpportunityStage, toStage: OpportunityStage): Promise<Opportunity> {
+    validateOpportunityStageMove(fromStage, toStage);
+
+    const current = db.opportunities.getById(id);
+    if (!current) throw new Error("Opportunity not found.");
+    assertMockLeadActive(current.leadId);
+    if (current.stage !== fromStage) {
+      throw new OpportunityStageConflictError(opportunityStageConflictMessage(current.stage));
+    }
+
+    const updated = db.opportunities.update(id, { stage: toStage });
+    if (!updated) throw new Error("Opportunity not found.");
+    db.leadTimeline.add({
+      source: "SYSTEM",
+      id: mockId("T"),
+      leadId: current.leadId,
+      icon: "pulse",
+      title: "Opportunity Stage Changed",
+      detail: `Opportunity "${current.title}": ${formatOpportunityStage(fromStage)} → ${formatOpportunityStage(toStage)}`,
+      actorName: "You",
+      actorId: "mock-user",
+      occurredAt: new Date().toISOString(),
+    });
     return delay(updated);
   }
 }

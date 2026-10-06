@@ -5,14 +5,14 @@ import { useRouter } from "next/navigation";
 import { PageHeader, DesignNote } from "../../components/ui/PageHeader";
 import { StatCard, StatRow, Panel } from "../../components/ui/Card";
 import { Button, EmptyState } from "../../components/ui/Button";
-import { StatusTag, ChipGroup, Chip } from "../../components/ui/Tag";
+import { OpportunityStageTag, ChipGroup, Chip } from "../../components/ui/Tag";
 import { DataTable, Column, toggleSortDirection } from "../../components/ui/DataTable";
 import { Pagination, paginate } from "../../components/ui/Button";
 import { OpportunityForm } from "../../components/forms/OpportunityForm";
 import { useOpportunities } from "../../lib/hooks/useOpportunities";
 import { useLeads } from "../../lib/hooks/useLeads";
 import { useAuth } from "../../lib/auth/AuthContext";
-import { Opportunity, OPPORTUNITY_STAGES } from "../../lib/types/domain";
+import { Opportunity, OPPORTUNITY_STAGES, formatOpportunityStage } from "../../lib/types/domain";
 import { formatInr, formatDate } from "../../lib/format";
 import { SortState } from "../../lib/types/common";
 import { OpportunitySortField } from "../../lib/repository/interfaces";
@@ -33,10 +33,10 @@ export default function OpportunitiesPage() {
   // LeadUIContext in lib/types/domain.ts). No new relation invented.
   const productByLeadId = useMemo(() => new Map(leads.map((l) => [l.id, l.uiContext?.productInterest])), [leads]);
 
-  const open = opportunities.filter((o) => o.stage !== "Won" && o.stage !== "Lost");
+  const open = opportunities.filter((o) => o.stage !== "WON" && o.stage !== "LOST");
   const weighted = open.reduce((s, o) => s + (o.expectedValue * o.probability) / 100, 0);
   const avgDeal = open.length ? Math.round(open.reduce((s, o) => s + o.expectedValue, 0) / open.length) : 0;
-  const won = opportunities.filter((o) => o.stage === "Won").length;
+  const won = opportunities.filter((o) => o.stage === "WON").length;
   const winRate = opportunities.length ? Math.round((won / opportunities.length) * 100) : 0;
 
   const stageCounts = useMemo(() => {
@@ -59,7 +59,7 @@ export default function OpportunitiesPage() {
         </div>
       ),
     },
-    { key: "stage", header: "Stage", render: (o) => <StatusTag status={o.stage} /> },
+    { key: "stage", header: "Stage", render: (o) => <OpportunityStageTag stage={o.stage} /> },
     {
       key: "product",
       header: "Product",
@@ -147,7 +147,7 @@ export default function OpportunitiesPage() {
       <ChipGroup>
         <Chip label={`All ${opportunities.length}`} active={stageChip === "All"} onClick={() => { setStageChip("All"); setPage(1); }} />
         {OPPORTUNITY_STAGES.filter((s) => stageCounts[s]).map((s) => (
-          <Chip key={s} label={`${s} ${stageCounts[s]}`} active={stageChip === s} onClick={() => { setStageChip(s); setPage(1); }} />
+          <Chip key={s} label={`${formatOpportunityStage(s)} ${stageCounts[s]}`} active={stageChip === s} onClick={() => { setStageChip(s); setPage(1); }} />
         ))}
       </ChipGroup>
 

@@ -3,43 +3,18 @@ import { Lead, Opportunity, OpportunityStage } from "../../types/domain";
 import { IOpportunityRepository, CreateOpportunityInput, OpportunitySortField, IUserRepository } from "../interfaces";
 import { apiFetch, ApiError } from "../../api/httpClient";
 import { applyListQuery } from "../shared/listQuery";
-import { BackendOpportunity, mapLead } from "./mappers";
+import { OpportunityStageConflictError, validateOpportunityStageMove } from "../shared/opportunityStage";
+import { BackendOpportunity, mapLead, mapOpportunityStage } from "./mappers";
 
 const SEARCHABLE: (keyof Opportunity)[] = ["title", "customerName", "ownerName"];
-const STAGE_KEY = "revenueos.real.opportunityStage";
 
-/** Client-side-only stage cache — see the comment on OpportunityStage in lib/types/domain.ts. */
-function readStageOverrides(): Record<string, OpportunityStage> {
-  try {
-    const raw = window.localStorage.getItem(STAGE_KEY);
-    return raw ? JSON.parse(raw) : {};
-  } catch {
-    return {};
-  }
-}
-
-function writeStageOverride(id: ID, stage: OpportunityStage): void {
-  try {
-    const current = readStageOverrides();
-    current[id] = stage;
-    window.localStorage.setItem(STAGE_KEY, JSON.stringify(current));
-  } catch {
-    // localStorage unavailable — stage change just won't survive a refresh this session.
-  }
-}
-
-function toOpportunity(
-  raw: BackendOpportunity,
-  overrides: Record<string, OpportunityStage>,
-  ownerName: string | undefined,
-  lead?: Lead,
-): Opportunity {
+function toOpportunity(raw: BackendOpportunity, ownerName: string | undefined, lead?: Lead): Opportunity {
   return {
     id: raw.id,
     leadId: raw.leadId,
     title: raw.title,
     customerName: raw.lead?.customerName ?? "—",
-    stage: overrides[raw.id] ?? "Qualified",
+    stage: mapOpportunityStage(raw.status),
     expectedValue: raw.expectedValue,
     probability: raw.probability,
     expectedCloseDate: raw.expectedCloseDate,
@@ -50,21 +25,19 @@ function toOpportunity(
 }
 
 /**
- * VERIFIED routes: POST /opportunities, GET /opportunities and GET
- * /opportunities/:id (which embeds the lead — source, assignee {id, fullName},
- * notes, timelines, followups). There is still no stage/status mutation
- * endpoint (docs/backend-ui-contract.md §7, §16, §17). `stage`
- * is therefore held entirely client-side (localStorage), separate from the
- * backend's own Opportunity.status (a plain string, always "OPEN", never
- * changed by any code path) — moving a card never claims the backend
- * changed.
+ * VERIFIED routes (backend 933231a): POST /opportunities, GET /opportunities,
+ * GET /opportunities/:id (embeds the lead — source, assignee {id, fullName},
+ * notes, timelines, followups) and PATCH /opportunities/:id/stage with
+ * { fromStage, toStage } (permission opportunities.edit).
+ *
+ * `stage` is the backend's Opportunity.status (QUALIFIED, PROPOSAL, NEGOTIATION,
+ * WON or LOST). Nothing about the stage is kept in the browser.
  */
 export class RealOpportunityRepository implements IOpportunityRepository {
   constructor(private users: IUserRepository) {}
 
   private async fetchAll(): Promise<Opportunity[]> {
     const rows = await apiFetch<BackendOpportunity[]>("/opportunities");
-    const overrides = readStageOverrides();
 
     let ownerNameById = new Map<string, string>();
     try {
@@ -76,7 +49,7 @@ export class RealOpportunityRepository implements IOpportunityRepository {
 
     return rows.map((raw) => {
       const assignedToId = raw.lead?.assignedToId ?? undefined;
-      return toOpportunity(raw, overrides, assignedToId ? ownerNameById.get(assignedToId) : undefined);
+      return toOpportunity(raw, assignedToId ? ownerNameById.get(assignedToId) : undefined);
     });
   }
 
@@ -88,12 +61,7 @@ export class RealOpportunityRepository implements IOpportunityRepository {
   async getById(id: ID): Promise<Opportunity | null> {
     try {
       const raw = await apiFetch<BackendOpportunity>(`/opportunities/${id}`);
-      return toOpportunity(
-        raw,
-        readStageOverrides(),
-        raw.lead?.assignedTo?.fullName,
-        raw.lead ? mapLead(raw.lead) : undefined,
-      );
+      return toOpportunity(raw, raw.lead?.assignedTo?.fullName, raw.lead ? mapLead(raw.lead) : undefined);
     } catch (err) {
       if (err instanceof ApiError && err.status === 404) return null;
       throw err;
@@ -119,7 +87,7 @@ export class RealOpportunityRepository implements IOpportunityRepository {
       leadId: raw.leadId,
       title: raw.title,
       customerName: "—",
-      stage: "Qualified",
+      stage: mapOpportunityStage(raw.status),
       expectedValue: raw.expectedValue,
       probability: raw.probability,
       expectedCloseDate: raw.expectedCloseDate,
@@ -128,8 +96,28 @@ export class RealOpportunityRepository implements IOpportunityRepository {
     };
   }
 
-  async updateStage(id: ID, stage: OpportunityStage): Promise<Opportunity> {
-    writeStageOverride(id, stage);
+  async updateStage(id: ID, fromStage: OpportunityStage, toStage: OpportunityStage): Promise<Opportunity> {
+    // The backend applies the same rules; checking first spares a round trip
+    // and gives the same wording for a move that can never be valid.
+    validateOpportunityStageMove(fromStage, toStage);
+
+    try {
+      await apiFetch<unknown>(`/opportunities/${id}/stage`, {
+        method: "PATCH",
+        body: { fromStage, toStage },
+      });
+    } catch (err) {
+      if (err instanceof ApiError) {
+        // 409: the stage changed since the person opened it (or the lead is
+        // deactivated). The backend's message says which; callers reload.
+        if (err.status === 409) throw new OpportunityStageConflictError(err.message);
+        if (err.status === 403) {
+          throw new ApiError("You don't have permission to change an opportunity's stage.", 403, err.details);
+        }
+      }
+      throw err;
+    }
+
     const updated = await this.getById(id);
     if (!updated) throw new Error(`Opportunity ${id} not found`);
     return updated;

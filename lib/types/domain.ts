@@ -401,28 +401,38 @@ export interface Note {
   pinned: boolean;
 }
 
-// VERIFIED: the backend's own Opportunity.status is a plain String
-// defaulting to "OPEN", with no enum and no mutation endpoint anywhere in
-// the codebase — it never changes. `stage` below is therefore a client-side
-// pipeline concept only, held in the browser (see realOpportunityRepository),
-// not a projection of that backend field. See docs/backend-ui-contract.md §7, §17.
+// VERIFIED (backend 933231a): Opportunity.status holds the stage, one of
+// exactly these five raw values, and PATCH /opportunities/:id/stage is the only
+// way to change it. `stage` below is that stored value as it comes back from
+// the backend; the backend is the authority and the frontend keeps no stage of
+// its own. Display labels come from formatOpportunityStage(). The move rules
+// live in lib/repository/shared/opportunityStage.ts.
 export type OpportunityStage =
-  | "Qualified"
-  | "Proposal"
-  | "Negotiation"
-  | "Won"
-  | "Lost";
+  | "QUALIFIED"
+  | "PROPOSAL"
+  | "NEGOTIATION"
+  | "WON"
+  | "LOST";
 
 export const OPPORTUNITY_STAGES: OpportunityStage[] = [
-  "Qualified",
-  "Proposal",
-  "Negotiation",
-  "Won",
-  "Lost",
+  "QUALIFIED",
+  "PROPOSAL",
+  "NEGOTIATION",
+  "WON",
+  "LOST",
 ];
 
 /** Linear happy-path order for the lifecycle stepper — "Lost" is a terminal flag, not a step. */
-export const OPPORTUNITY_STEPS: OpportunityStage[] = ["Qualified", "Proposal", "Negotiation", "Won"];
+export const OPPORTUNITY_STEPS: OpportunityStage[] = ["QUALIFIED", "PROPOSAL", "NEGOTIATION", "WON"];
+
+/** Presentation label for a raw stage value, e.g. "NEGOTIATION" -> "Negotiation". */
+export function formatOpportunityStage(stage: string): string {
+  return titleCaseFromConstant(stage);
+}
+
+export function isOpportunityStage(value: string): value is OpportunityStage {
+  return (OPPORTUNITY_STAGES as string[]).includes(value);
+}
 
 // VERIFIED CreateOpportunityDto: leadId, title, expectedValue, probability,
 // expectedCloseDate. Creation writes OPPORTUNITY_CREATED to the lead
