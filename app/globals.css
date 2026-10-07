@@ -734,7 +734,7 @@ a.doc-trail-node:hover{border-color:var(--m);background:var(--m-soft)}
 .callout{display:flex;gap:12px;padding:14px 16px;border-radius:12px;border:1px solid var(--line);border-left-width:4px;background:var(--surface);margin-bottom:16px}
 .callout .ic{flex:none;width:30px;height:30px;border-radius:9px;display:grid;place-items:center;background:var(--line-2);color:var(--muted)}
 .callout .txt{min-width:0;flex:1}
-.callout h4{font-size:13.5px;font-weight:700;color:var(--ink)}
+.callout h3{font-size:13.5px;font-weight:700;color:var(--ink)}
 .callout p{font-size:12.5px;color:var(--muted);margin-top:3px;overflow-wrap:anywhere}
 .callout p + p{margin-top:5px}
 .callout .quote{font-style:italic;color:var(--text)}
@@ -973,3 +973,58 @@ a.doc-trail-node:hover{border-color:var(--m);background:var(--m-soft)}
 .indent-1{padding-left:18px}
 .indent-2{padding-left:36px}
 @media(max-width:720px){.indent-1{padding-left:10px}.indent-2{padding-left:20px}.kpis{grid-template-columns:1fr 1fr}.panel-head .panel-act .btn{min-height:44px}}
+
+/* ============================================================
+   CP8 - Customer experience review
+   ============================================================ */
+
+/* A list that is a table when it has room and cards when it does not, decided by
+   the list's own width. The media query above stays as the fallback for a browser
+   without container queries. */
+.rl{container-type:inline-size}
+@container (max-width:780px){
+  .rl-table{display:none}
+  .rl-cards{display:flex}
+}
+
+/* Row-sized DocumentActions: the buttons are a grid item of the row and the reason
+   lines span the whole row under it. */
+.da-contents{display:contents}
+.doc-actions.compact{padding:0;justify-content:flex-end;align-content:flex-start}
+.reg .action-reasons.compact{grid-column:1 / -1;padding:0;margin:0;font-size:11.5px}
+@media(max-width:720px){.reg .doc-actions.compact{justify-content:flex-start}.reg .doc-actions.compact .btn{min-height:44px}}
+
+/* One sentence above a list whose rows are all locked for the same reason */
+.lock-note{display:flex;gap:9px;align-items:flex-start;margin:0;padding:11px 21px;font-size:12.5px;color:var(--text);background:var(--warn-bg);border-top:1px solid var(--line-2);border-bottom:1px solid var(--line-2)}
+.lock-note svg{flex:none;color:var(--warn);margin-top:2px}
+.lock-note b{color:var(--ink);font-weight:600}
+@media(max-width:720px){.lock-note{padding:11px 16px}}
+
+/* Totals strip: cells separated by their own rules, so an odd count leaves an empty
+   slot the colour of the card, not a grey block */
+.kpis{gap:0;background:var(--surface)}
+.kpis > div{box-shadow:inset -1px -1px 0 var(--line-2)}
+
+/* The amount block of a document header sits under the title, left-aligned, when
+   the header is too narrow to hold both side by side */
+.doc-head{container-type:inline-size}
+@container (max-width:560px){.doc-amount{text-align:left;width:100%}}
+
+/* A button that reads as an in-text link: for the one action that resolves the notice it sits in */
+.link-btn{display:inline;padding:0;border:0;background:none;font:inherit;color:inherit;text-decoration:underline;text-underline-offset:2px;cursor:pointer}
+.link-btn:hover{color:var(--m)}
+
+/* Back links: the visible text is small, so the tappable area reaches past it */
+.back-link{position:relative}
+.back-link::after{content:"";position:absolute;inset:-12px -10px}
+
+/* A short dialog on a phone is a bottom sheet that is as tall as its content (a
+   long form still fills the screen: the body scrolls and the footer stays in view) */
+@media(max-width:640px){
+  .modal-overlay{align-items:flex-end}
+  .modal{height:auto;max-height:calc(100dvh - 12px);border-radius:18px 18px 0 0}
+}
+
+/* A status tag that is also a link */
+.tag-link{display:inline-flex;text-decoration:none;border-radius:999px}
+.tag-link:hover .tag,.tag-link:hover > *{filter:brightness(1.12)}

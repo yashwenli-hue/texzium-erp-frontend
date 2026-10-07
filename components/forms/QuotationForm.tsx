@@ -32,10 +32,18 @@ export function QuotationForm({
   onClose,
   onSubmit,
   defaultOpportunityId,
+  onLinkCustomer,
 }: {
   onClose: () => void;
   onSubmit: (input: CreateQuotationInput) => Promise<unknown>;
   defaultOpportunityId?: string;
+  /**
+   * Resolves "this opportunity has no customer" without leaving the page: the host
+   * closes this form and opens its own link dialog. A host that is already on the
+   * opportunity's page must pass it, because the fallback below is a link to that
+   * same page, which would do nothing.
+   */
+  onLinkCustomer?: () => void;
 }) {
   const toast = useToast();
   const { opportunities, loading: opportunitiesLoading } = useOpportunities();
@@ -170,7 +178,14 @@ export function QuotationForm({
               {blockReason === "no-customer" && (
                 <>
                   <b>This opportunity has no customer yet.</b> A quotation is made for a customer, with that customer&apos;s GST registration.{" "}
-                  <Link href={`/opportunities/${selectedOpportunity.id}`}>Link a customer to this opportunity</Link> first.
+                  {onLinkCustomer ? (
+                    <button type="button" className="link-btn" onClick={onLinkCustomer}>
+                      Link a customer to this opportunity
+                    </button>
+                  ) : (
+                    <Link href={`/opportunities/${selectedOpportunity.id}`}>Link a customer to this opportunity</Link>
+                  )}{" "}
+                  first.
                 </>
               )}
               {blockReason === "inactive" && (

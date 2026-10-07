@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { Icon } from "../../../components/ui/Icon";
+import { LoadingRegion } from "../../../components/ui/LoadingRegion";
 import { Panel } from "../../../components/ui/Card";
 import { Button, EmptyState } from "../../../components/ui/Button";
 import { Tag, CustomerStatusTag, QuotationStatusTag, ProformaInvoiceStatusTag, SalesOrderStatusTag, OpportunityStageTag } from "../../../components/ui/Tag";
@@ -44,6 +45,7 @@ function RegistrationRow({
   customer,
   otherActive,
   may,
+  lock,
   onEdit,
   onDeactivate,
   onReactivate,
@@ -53,13 +55,21 @@ function RegistrationRow({
   customer: Customer;
   otherActive: number;
   may: { gstManage: boolean };
+  /** The reason every row is locked for, written once above the list. */
+  lock?: { id: string; text: string };
   onEdit: () => void;
   onDeactivate: () => void;
   onReactivate: () => void;
   onMakeDefault: () => void;
 }) {
   const a = gstActions(reg, { customerActive: customer.isActive, may, otherActiveCount: otherActive });
-  const whyNot = reg.isActive && reg.isDefault && otherActive > 0 && customer.isActive && may.gstManage ? "To deactivate the default, make another registration the default first." : undefined;
+  const rowActions: DocumentAction[] = [
+    { key: "edit", label: "Edit", state: a.edit, onClick: onEdit },
+    ...(reg.isActive && !reg.isDefault ? [{ key: "makeDefault", label: "Make default", state: a.makeDefault, onClick: onMakeDefault }] : []),
+    reg.isActive
+      ? { key: "deactivate", label: "Deactivate", className: "danger-ghost", state: a.deactivate, onClick: onDeactivate }
+      : { key: "reactivate", label: "Reactivate", state: a.reactivate, onClick: onReactivate },
+  ];
   return (
     <li className={`reg ${reg.isActive ? "" : "inactive"}`} data-testid="gst-row" data-gstin={reg.gstin}>
       <div>
@@ -80,26 +90,7 @@ function RegistrationRow({
         <br />
         {reg.city} {reg.pincode}
       </div>
-      <div className="acts">
-        <Button className="sm" onClick={onEdit} disabled={!a.edit.enabled} title={a.edit.reason}>
-          Edit
-        </Button>
-        {reg.isActive && !reg.isDefault && (
-          <Button className="sm" onClick={onMakeDefault} disabled={!a.makeDefault.enabled} title={a.makeDefault.reason}>
-            Make default
-          </Button>
-        )}
-        {reg.isActive ? (
-          <Button className="sm danger-ghost" onClick={onDeactivate} disabled={!a.deactivate.enabled} title={a.deactivate.reason}>
-            Deactivate
-          </Button>
-        ) : (
-          <Button className="sm" onClick={onReactivate} disabled={!a.reactivate.enabled} title={a.reactivate.reason}>
-            Reactivate
-          </Button>
-        )}
-      </div>
-      {whyNot && <div className="why-not">{whyNot}</div>}
+      <DocumentActions size="sm" actions={rowActions} sharedReason={lock} testId="gst-row-actions" />
     </li>
   );
 }
@@ -212,9 +203,11 @@ export default function CustomerCockpitPage() {
   if (d.loading && !d.customer) {
     return (
       <div className="page">
-        <div className="skeleton" style={{ height: 150, marginBottom: 16 }} />
-        <div className="skeleton" style={{ height: 80, marginBottom: 16 }} />
-        <div className="skeleton" style={{ height: 280 }} />
+        <LoadingRegion label="Loading customer">
+          <div className="skeleton" style={{ height: 150, marginBottom: 16 }} />
+          <div className="skeleton" style={{ height: 80, marginBottom: 16 }} />
+          <div className="skeleton" style={{ height: 280 }} />
+        </LoadingRegion>
       </div>
     );
   }
@@ -276,10 +269,14 @@ export default function CustomerCockpitPage() {
       : { key: "reactivate", label: "Reactivate", icon: "check", variant: "primary", state: actions.reactivate, onClick: () => setDialog({ kind: "reactivate" }) },
   ];
 
+  // When the customer (or the user's permission) locks every registration, say so once above the list.
+  const gstLockId = "gst-lock-note"; // one per page; a constant because this runs after the early returns, where a hook may not
+  const gstLock = !actions.addGst.enabled && actions.addGst.reason ? { id: gstLockId, text: actions.addGst.reason } : undefined;
+
   const quoteBlockedReason = !canQuoteWith ? "You don't have permission to create quotations." : blockers.length ? quotingBlockerText(blockers[0]) : undefined;
 
   const readiness = [
-    { key: "active", ok: customer.isActive, title: "The customer is active", why: customer.isActive ? undefined : "Reactivate it to create new quotations, Proforma Invoices and Sales Orders." },
+    { key: "active", ok: customer.isActive, title: customer.isActive ? "The customer is active" : "The customer is inactive", why: customer.isActive ? undefined : "Reactivate it to create new quotations, Proforma Invoices and Sales Orders." },
     {
       key: "gst",
       ok: activeCount > 0,
@@ -393,11 +390,19 @@ export default function CustomerCockpitPage() {
             <div className="panel-head">
               <h3>GST registrations</h3>
               <span className="panel-act">
-                <Button className="sm" icon="plus" onClick={() => setDialog({ kind: "gstAdd" })} disabled={!actions.addGst.enabled} title={actions.addGst.reason}>
+                <Button className="sm" icon="plus" onClick={() => setDialog({ kind: "gstAdd" })} disabled={!actions.addGst.enabled} aria-describedby={gstLock?.id}>
                   Add registration
                 </Button>
               </span>
             </div>
+            {gstLock && (
+              <p className="lock-note" id={gstLock.id} data-testid="gst-lock">
+                <Icon name="alert" size={14} />
+                <span>
+                  <b>Registrations are read-only.</b> {gstLock.text}
+                </span>
+              </p>
+            )}
             {registrations.length === 0 ? (
               <EmptyState icon="percent" title="No GST registrations" body="A quotation needs the buyer's GST registration. Add the first one — it becomes the default." />
             ) : (
@@ -409,6 +414,7 @@ export default function CustomerCockpitPage() {
                     customer={customer}
                     otherActive={registrations.filter((x) => x.isActive && x.id !== g.id).length}
                     may={may}
+                    lock={gstLock}
                     onEdit={() => setDialog({ kind: "gstEdit", reg: g })}
                     onDeactivate={() => setDialog({ kind: "gstDeactivate", reg: g })}
                     onReactivate={() => setDialog({ kind: "gstReactivate", reg: g })}

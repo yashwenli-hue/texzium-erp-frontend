@@ -16,7 +16,10 @@ export interface ResponsiveColumn<T> {
  * and opened from the keyboard and read out by assistive technology, and the
  * whole row is clickable. Both layouts are rendered and CSS shows one of them
  * (the other is display:none, so it is not read twice); there is no width
- * measurement, so it renders the same on the server and the client.
+ * measurement, so it renders the same on the server and the client. The switch
+ * follows the width of the list itself (a container query), not the width of the
+ * screen, so a tablet with the navigation open gets cards instead of a table that
+ * scrolls sideways and hides its last columns.
  *
  * Presentational only: filtering, sorting and paging stay with the caller.
  */
@@ -54,7 +57,7 @@ export function ResponsiveList<T extends { id: string }>({
   const primaryKey = (columns.find((c) => c.primary) ?? columns[0]).key;
 
   return (
-    <div data-testid={testId}>
+    <div data-testid={testId} className="rl">
       <div className="table-scroll rl-table">
         <table>
           {caption && <caption className="sr-only">{caption}</caption>}

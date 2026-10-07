@@ -29,7 +29,7 @@ export function LifecycleCallout({
         <Icon name={icon} size={16} />
       </div>
       <div className="txt">
-        <h4>{title}</h4>
+        <h3>{title}</h3>
         {children}
         {actions && <div className="callout-actions">{actions}</div>}
       </div>

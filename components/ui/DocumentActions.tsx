@@ -26,29 +26,47 @@ function joinLabels(labels: string[]): string {
  * invisible on touch and to assistive technology). Actions that are unavailable
  * for the same reason are grouped into one line ("Approve, Revise and Reject —
  * A rejected quotation is final.").
+ *
+ * `size="sm"` is the row-sized version for the actions of one row in a list (a GST
+ * registration, say): small buttons, and the reason lines span the whole row.
+ * `sharedReason` is for a list whose rows are all locked for one reason: the caller
+ * writes that reason once above the list (an element with `id`), and the buttons
+ * locked for it point at that element instead of each row repeating the sentence.
  */
-export function DocumentActions({ actions, testId }: { actions: DocumentAction[]; testId?: string }) {
+export function DocumentActions({
+  actions,
+  testId,
+  size,
+  sharedReason,
+}: {
+  actions: DocumentAction[];
+  testId?: string;
+  size?: "sm";
+  sharedReason?: { id: string; text: string };
+}) {
   const baseId = useId();
+  const compact = size === "sm";
+  const isShared = (a: DocumentAction) => !!sharedReason && !a.state.enabled && a.state.reason === sharedReason.text;
 
   const reasons = new Map<string, string[]>();
   for (const a of actions) {
-    if (!a.state.enabled && a.state.reason) {
+    if (!a.state.enabled && a.state.reason && !isShared(a)) {
       reasons.set(a.state.reason, [...(reasons.get(a.state.reason) ?? []), a.label]);
     }
   }
   const reasonIds = new Map([...reasons.keys()].map((r, i) => [r, `${baseId}-r${i}`]));
 
   return (
-    <div data-testid={testId}>
-      <div className="doc-actions">
+    <div data-testid={testId} className={compact ? "da-contents" : undefined}>
+      <div className={compact ? "doc-actions compact" : "doc-actions"}>
         {actions.map((a) => (
           <Button
             key={a.key}
             variant={a.variant ?? "ghost"}
             icon={a.icon}
-            className={a.className}
+            className={`${compact ? "sm " : ""}${a.className ?? ""}`.trim() || undefined}
             disabled={!a.state.enabled}
-            aria-describedby={!a.state.enabled && a.state.reason ? reasonIds.get(a.state.reason) : undefined}
+            aria-describedby={isShared(a) ? sharedReason!.id : !a.state.enabled && a.state.reason ? reasonIds.get(a.state.reason) : undefined}
             data-action={a.key}
             onClick={a.onClick}
           >
@@ -57,7 +75,7 @@ export function DocumentActions({ actions, testId }: { actions: DocumentAction[]
         ))}
       </div>
       {reasons.size > 0 && (
-        <ul className="action-reasons" aria-label="Why some actions are unavailable">
+        <ul className={compact ? "action-reasons compact" : "action-reasons"} aria-label="Why some actions are unavailable">
           {[...reasons.entries()].map(([reason, labels]) => (
             <li key={reason} id={reasonIds.get(reason)}>
               <span>

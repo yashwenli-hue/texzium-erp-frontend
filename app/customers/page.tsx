@@ -6,6 +6,7 @@ import { PageHeader } from "../../components/ui/PageHeader";
 import { Panel } from "../../components/ui/Card";
 import { Button, EmptyState, Pagination, paginate } from "../../components/ui/Button";
 import { Icon } from "../../components/ui/Icon";
+import { LoadingRegion } from "../../components/ui/LoadingRegion";
 import { Who } from "../../components/ui/Who";
 import { Chip, ChipGroup, CustomerStatusTag, Tag } from "../../components/ui/Tag";
 import { ResponsiveList, ResponsiveColumn } from "../../components/ui/ResponsiveList";
@@ -126,8 +127,10 @@ export default function CustomersPage() {
     return (
       <div className="page">
         {header}
-        <div className="skeleton" style={{ height: 44, marginBottom: 14 }} />
-        <div className="skeleton" style={{ height: 320 }} />
+        <LoadingRegion label="Loading customers">
+          <div className="skeleton" style={{ height: 44, marginBottom: 14 }} />
+          <div className="skeleton" style={{ height: 320 }} />
+        </LoadingRegion>
       </div>
     );
   }

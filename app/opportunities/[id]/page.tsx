@@ -9,6 +9,7 @@ import { Panel } from "../../../components/ui/Card";
 import { CustomerStatusTag, OpportunityStageTag, QuotationStatusTag, Tag } from "../../../components/ui/Tag";
 import { DocumentActions, DocumentAction } from "../../../components/ui/DocumentActions";
 import { LinkCustomerDialog } from "../../../components/forms/LinkCustomerDialog";
+import { LoadingRegion } from "../../../components/ui/LoadingRegion";
 import { Button, EmptyState } from "../../../components/ui/Button";
 import { DocumentTrail } from "../../../components/ui/DocumentTrail";
 import { LifecycleStepper } from "../../../components/ui/LifecycleStepper";
@@ -53,8 +54,10 @@ export default function OpportunityDetailPage() {
   if (loading && !opportunity) {
     return (
       <div className="page">
-        <div className="skeleton" style={{ height: 220, marginBottom: 16 }} />
-        <div className="skeleton" style={{ height: 260 }} />
+        <LoadingRegion label="Loading opportunity">
+          <div className="skeleton" style={{ height: 220, marginBottom: 16 }} />
+          <div className="skeleton" style={{ height: 260 }} />
+        </LoadingRegion>
       </div>
     );
   }
@@ -165,6 +168,15 @@ export default function OpportunityDetailPage() {
               <OpportunityStageTag stage={opportunity.stage} />
               <Tag color="n">{formatInr(opportunity.expectedValue)}</Tag>
               <Tag color="n">{opportunity.probability}% probability</Tag>
+              {opportunity.customer ? (
+                <Link href={`/customers/${opportunity.customer.id}`} className="tag-link" aria-label={`Customer: ${opportunity.customer.customerName}`}>
+                  <Tag color="g">Customer · {opportunity.customer.customerName}</Tag>
+                </Link>
+              ) : (
+                <a href="#customer-panel" className="tag-link" aria-label="No customer linked. Go to the customer section">
+                  <Tag color="w">No customer linked</Tag>
+                </a>
+              )}
             </div>
             {lead && <QuickActions phone={lead.phone} email={lead.email} contactName={opportunity.customerName} />}
           </div>
@@ -261,7 +273,7 @@ export default function OpportunityDetailPage() {
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <div className="card panel" data-testid="customer-panel">
+          <div className="card panel" id="customer-panel" data-testid="customer-panel">
             <div className="panel-head">
               <h3>Customer</h3>
             </div>
@@ -373,6 +385,10 @@ export default function OpportunityDetailPage() {
         <QuotationForm
           defaultOpportunityId={opportunity.id}
           onClose={() => setShowQuotationForm(false)}
+          onLinkCustomer={() => {
+            setShowQuotationForm(false);
+            setCustomerDialog("link");
+          }}
           onSubmit={async (input) => {
             const q = await createQuotation(input);
             refetchQuotations();
