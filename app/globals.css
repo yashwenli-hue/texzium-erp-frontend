@@ -794,7 +794,7 @@ a.doc-trail-node:hover{border-color:var(--m);background:var(--m-soft)}
 /* Key facts under the summary */
 .facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;padding:16px 19px}
 .facts .f{font-size:12px}
-.facts .f label{display:block;color:var(--muted);font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px;font-weight:700}
+.facts .f label,.facts .f .k{display:block;color:var(--muted);font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px;font-weight:700}
 .facts .f div{color:var(--text);font-weight:500}
 .facts .f .note{font-size:11.5px;color:var(--muted);font-weight:400;margin-top:2px}
 .facts .f .note.good{color:var(--good)} .facts .f .note.warn{color:var(--warn)} .facts .f .note.bad{color:var(--bad)}
@@ -821,3 +821,76 @@ a.doc-trail-node:hover{border-color:var(--m);background:var(--m-soft)}
 .nextstep.action::before{background:var(--m)} .nextstep.good::before{background:var(--good-strong)} .nextstep.warn::before{background:var(--warn)} .nextstep.bad::before{background:var(--bad)}
 .nextstep.neutral{color:var(--muted);font-weight:500}
 .nextstep.bad{color:var(--bad)}
+
+/* ============================================================
+   Frontend foundation (Customer V1 checkpoint)
+   Platform-level rules that the new customer screens depend on and
+   that every other screen inherits harmlessly: a visible keyboard
+   focus ring, screen-reader-only text, field hints, the dialog as a
+   full-height sheet on a phone, and a top bar that no longer pushes
+   the page wider than the screen.
+   ============================================================ */
+
+/* One keyboard focus ring for everything that can take focus. Inputs keep
+   their own border + glow (see .field) so they are not ringed twice. */
+:where(a[href], button, [role="button"], summary, [tabindex]:not([tabindex="-1"])):focus-visible{
+  outline:2px solid var(--m);outline-offset:2px;border-radius:6px;
+}
+:where(input, select, textarea):focus-visible{outline:2px solid var(--m);outline-offset:1px}
+.field :where(input, select, textarea):focus-visible{outline:none}
+.modal:focus{outline:none}
+
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.field .hint{color:var(--muted);font-size:11.5px}
+
+/* Top bar: the breadcrumb and the search give way instead of overflowing */
+.crumb{flex:0 1 auto;min-width:0;overflow:hidden;white-space:nowrap}
+.crumb b{overflow:hidden;text-overflow:ellipsis;min-width:0}
+.topbar .search{min-width:0;flex:1 1 120px}
+.topbar .search input{min-width:0;width:100%}
+.top-actions{flex:none}
+@media(max-width:1080px){.search kbd{display:none}}
+@media(max-width:860px){.topbar .search{display:none}}
+@media(max-width:720px){
+  .topbar{padding:0 14px;gap:10px}
+  .crumb-root{display:none}
+  .crumb > span:nth-child(2) > .sep{display:none}
+}
+
+/* The dialog on a phone: a full-height sheet, footer always in view */
+@media(max-width:640px){
+  .modal-overlay{padding:0;align-items:stretch;overflow:hidden}
+  .modal{max-width:none;width:100%;height:100vh;height:100dvh;max-height:none;border-radius:0;animation:sheetIn .2s ease-out}
+  .modal-head{padding:14px 16px}
+  .modal-body{padding:16px}
+  .modal-foot{padding:12px 16px calc(12px + env(safe-area-inset-bottom));gap:8px;background:var(--surface-2, var(--surface))}
+  .modal-foot .btn{flex:1;justify-content:center;min-height:44px}
+  .modal-close{width:44px;height:44px;margin-right:-8px}
+  .field input,.field select,.field textarea{min-height:44px;font-size:16px}
+}
+@keyframes sheetIn{from{opacity:.6;transform:translateY(24px)}to{opacity:1;transform:none}}
+
+@media(prefers-reduced-motion:reduce){
+  .modal,.toast{animation:none}
+  *{scroll-behavior:auto!important}
+}
+
+/* Responsive list: table on a wide screen, cards on a phone, every row a real link */
+.rl-cards{display:none;list-style:none;margin:0;padding:12px;gap:10px;flex-direction:column}
+.rl-table tr.rl-row{position:relative}
+.rl-table tr.rl-row:hover{background:var(--row-hover, var(--canvas))}
+.rl-table .row-link{color:inherit;text-decoration:none;display:block}
+/* the link covers its whole row so the row is one big target */
+.rl-table .row-link::after{content:"";position:absolute;inset:0}
+.rl-table .row-link:focus-visible{outline-offset:-2px}
+.rl-card{display:flex;flex-direction:column;gap:9px;padding:14px;border:1px solid var(--line);border-radius:12px;background:var(--surface);color:inherit;text-decoration:none;min-height:44px}
+.rl-card:hover{border-color:var(--faint)}
+.rl-card .rl-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.rl-card .rl-title{font-weight:700;color:var(--ink);overflow-wrap:anywhere}
+.rl-card .rl-sub{font-size:12px;color:var(--muted);overflow-wrap:anywhere}
+.rl-card .rl-meta{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--muted)}
+.rl-card .rl-hint{font-size:12px;color:var(--warn);font-weight:600}
+@media(max-width:720px){
+  .rl-table{display:none}
+  .rl-cards{display:flex}
+}

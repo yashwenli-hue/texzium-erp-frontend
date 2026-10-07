@@ -58,7 +58,7 @@ export function Topbar({ onMenuClick }: { onMenuClick: () => void }) {
         <Icon name="menu" size={18} />
       </button>
       <div className="crumb">
-        <span>RevenueOS</span>
+        <span className="crumb-root">RevenueOS</span>
         {trail.map((c, i) => (
           <span key={i} style={{ display: "contents" }}>
             <span className="sep">/</span>
