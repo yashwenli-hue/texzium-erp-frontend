@@ -18,6 +18,11 @@ import { formatInr } from "../../lib/format";
  * taxType/placeOfSupply from the GST pair server-side, so none of that is
  * computed or sent here.
  *
+ * An order is made with the GST registrations its Quotation was made with, so
+ * when the Quotation has them (`quotationBuyerGstId` / `quotationSellerGstId`)
+ * they are preselected and fixed: the backend refuses any other. A legacy
+ * Quotation that has none leaves the choice open.
+ *
  * There is NO total field. The order's total is the approved Proforma
  * Invoice's totalAmount, set by the backend: this form shows it read-only and
  * neither collects nor sends an amount, so it cannot be overridden. No tax is
@@ -28,6 +33,8 @@ export function SalesOrderForm({
   proformaInvoiceId,
   proformaNumber,
   proformaTotalAmount,
+  quotationBuyerGstId,
+  quotationSellerGstId,
   onClose,
   onSubmit,
 }: {
@@ -35,6 +42,9 @@ export function SalesOrderForm({
   proformaNumber: string;
   /** The approved Proforma Invoice's total — the order's total, shown read-only. */
   proformaTotalAmount: number;
+  /** The registrations the Quotation was made with, when it has them. */
+  quotationBuyerGstId?: string;
+  quotationSellerGstId?: string;
   onClose: () => void;
   onSubmit: (input: CreateSalesOrderInput) => Promise<unknown>;
 }) {
@@ -56,9 +66,9 @@ export function SalesOrderForm({
   // filter or validate isActive itself, so this is a frontend-only default
   // preference, not an enforced rule. Same pattern as QuotationForm.
   const effectiveSellerGstId =
-    sellerGstId || sellerGstOptions.find((g) => g.isActive)?.id || sellerGstOptions[0]?.id || "";
+    quotationSellerGstId || sellerGstId || sellerGstOptions.find((g) => g.isActive)?.id || sellerGstOptions[0]?.id || "";
   const effectiveBuyerGstId =
-    buyerGstId || buyerGstOptions.find((g) => g.isActive)?.id || buyerGstOptions[0]?.id || "";
+    quotationBuyerGstId || buyerGstId || buyerGstOptions.find((g) => g.isActive)?.id || buyerGstOptions[0]?.id || "";
   const mastersLoading = itemsLoading || sellerGstLoading || buyerGstLoading;
 
   function validate(): boolean {
@@ -132,7 +142,8 @@ export function SalesOrderForm({
         value={effectiveSellerGstId}
         onChange={(e) => setSellerGstId(e.target.value)}
         error={errors.sellerGstId}
-        disabled={sellerGstLoading}
+        hint={quotationSellerGstId ? "Taken from the approved quotation." : undefined}
+        disabled={sellerGstLoading || !!quotationSellerGstId}
         options={sellerGstOptions.map((g) => ({
           value: g.id,
           label: g.isActive ? g.label : `${g.label} (Inactive)`,
@@ -145,7 +156,8 @@ export function SalesOrderForm({
         value={effectiveBuyerGstId}
         onChange={(e) => setBuyerGstId(e.target.value)}
         error={errors.buyerGstId}
-        disabled={buyerGstLoading}
+        hint={quotationBuyerGstId ? "Taken from the approved quotation." : undefined}
+        disabled={buyerGstLoading || !!quotationBuyerGstId}
         options={buyerGstOptions.map((g) => ({
           value: g.id,
           label: g.isActive ? g.label : `${g.label} (Inactive)`,

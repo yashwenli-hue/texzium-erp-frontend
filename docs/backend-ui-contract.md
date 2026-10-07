@@ -148,37 +148,44 @@ VERIFIED: invalid repeated lifecycle transitions are rejected by the backend and
 
 FRONTEND RULE: Use the backend lifecycle; do not create another production status.
 
-## 6. Customers
+## 6. Customers (Customer Management V1: backend bb9f81f, 70a8609, 7c10ab0)
 
-### Customer master
-VERIFIED CreateCustomerDto:
-- `customerCode`
-- `customerName`
-- `panNumber?`
-- `email?`
-- `phone?`
-- `customerType?`
+A Customer is the commercial identity of the party RevenueOS sells to. It is active or inactive; its code is assigned by the server (`CUST-000001`, ...) and never changes; it has GST registrations, one of which (among the active ones) is its default; and a deal belongs to it through `Opportunity.customerId`, from which the quotation, Proforma and Sales Order under the deal take their customer. Legacy opportunities have no customer until a person links one. Nothing is back-filled.
 
-`customerCode` is required and unique.
+### Customer master (all routes need a signed-in user and one permission)
+| Route | Permission | Notes |
+|---|---|---|
+| `GET /customers` | `customers.view` | every customer, registrations nested (default first), `deactivatedBy {id, fullName}` while inactive |
+| `GET /customers/:id` | `customers.view` | same shape |
+| `POST /customers` | `customers.create` | body `customerName`, `customerType?`, `panNumber?`, `email?`, `phone?`. **No `customerCode`** (rejected 400). PAN is upper-cased (`ABCDE1234F`), email lower-cased, blank optionals are dropped |
+| `PATCH /customers/:id` | `customers.edit` | any of the five fields; `null`/blank clears an optional one; the name cannot be cleared; an unchanged edit records nothing; **409 `CUSTOMER_INACTIVE`** while inactive |
+| `PATCH /customers/:id/deactivate` | `customers.deactivate` | body `{ reason }` (1-500, required); 409 `ALREADY_INACTIVE` |
+| `PATCH /customers/:id/reactivate` | `customers.deactivate` | body `{ remarks? }`; 409 `ALREADY_ACTIVE` |
+| `GET /customers/duplicate-check?customerName&panNumber&phone&email&excludeCustomerId` | `customers.view` | `{ blocking: [...], warnings: [...] }`, each `{ id, customerCode, customerName, isActive, reasons: PAN|NAME|PHONE|EMAIL[] }`; at least one field |
+| `GET /customers/:id/events` | `customers.view` | newest first; `actor {id, fullName}`, `gstRegistration {id, gstin, branchName, legalName}`, `opportunityId`, `changes {field: {from, to}}` |
+| `GET /customers/:id/overview` | `customers.view` | the chain by id: `customer`, `quotingReadiness {ready, reasons[]}`, `opportunities`, `quotations`, `proformas` (+`isExpired`), `salesOrders`, `invoices` (+`receivables`), `totals`, `legacyMatches` |
 
-FRONTEND RULE: New Customer must provide the required customer code during API integration.
+Duplicates: a second customer with the same **PAN** or the same **name** (case, surrounding and repeated space ignored; no fuzzy matching) is refused with **409** `DUPLICATE_PAN` / `DUPLICATE_NAME`, carrying `existing {id, customerCode, customerName, isActive}`. The same phone or email only warns (duplicate-check). Customers created by the OperationsOS vendor flow are not checked.
 
-### Customer GST
-VERIFIED CreateCustomerGstDto:
-- `customerId`
-- `gstin`
-- `legalName`
-- `tradeName?`
-- `branchName?`
-- `stateCode`
-- `stateName`
-- `addressLine1`
-- `addressLine2?`
-- `city`
-- `pincode`
-- `isDefault?`
+`totals` (all as recorded; invoices and receivables are FinanceOS data): `approvedQuotationValue` (APPROVED quotations), `orderedValue` (orders not CANCELLED), `invoicedValue` (invoices not DRAFT), `collectedValue` / `outstandingValue` (their receivables; outstanding leaves out WRITTEN_OFF). Opportunities not linked to the customer are never counted; `legacyMatches` lists unlinked opportunities whose lead carries the customer's name, as a guess for a person to link.
 
-FRONTEND RULE: Use the real backend fields and validation.
+### Customer GST registrations
+| Route | Permission | Notes |
+|---|---|---|
+| `POST /customer-gst` | `customers.gst.manage` | body `customerId`, `gstin`, `legalName`, `tradeName?`, `branchName?`, `addressLine1`, `addressLine2?`, `city`, `pincode`, `isDefault?`. **No `stateCode`/`stateName`** (rejected 400): the server reads the state from the GSTIN |
+| `PATCH /customer-gst/:id` | `customers.gst.manage` | `legalName`, `tradeName`, `branchName`, `addressLine1`, `addressLine2`, `city`, `pincode`; **the GSTIN and the state cannot be edited** |
+| `PATCH /customer-gst/:id/deactivate` | `customers.gst.manage` | body `{ reason }` required; 409 `GST_IS_DEFAULT` while it is the default and another is active |
+| `PATCH /customer-gst/:id/reactivate`, `/default` | `customers.gst.manage` | reactivating makes it the default if none is |
+| `GET /customer-gst`, `GET /customer-gst/:id` | `customers.view` | each with a limited `customer {id, customerCode, customerName, isActive}` |
+
+Rules: GSTIN = 15 characters (`27ABCDE1234F1Z5`), the first two a **state code that can be issued**, characters 3-12 the holder's PAN, which must equal the customer's PAN when it has one (400 `GSTIN_PAN_MISMATCH`); the check digit is **not** verified. A GSTIN is registered to one customer (409 `DUPLICATE_GSTIN`, with `existing`). PIN code 6 digits. A customer with any active registration has exactly one active default; the first becomes the default. Registrations are never deleted. An inactive customer's registrations cannot change (409 `CUSTOMER_INACTIVE`). A customer's PAN cannot be changed to one that disagrees with an active registration (409 `PAN_MISMATCHES_GST`).
+
+### Selling to a customer
+- `PATCH /opportunities/:id/customer` (`opportunities.edit`) body `{ customerId }` links or changes, `{ customerId: null }` removes. The customer and the lead must be active. **An opportunity that has a customer and a quotation keeps its customer** (409 `OPPORTUNITY_CUSTOMER_LOCKED`); one without a customer can be given one even if it has documents, unless one uses another customer's registration (409 `OPPORTUNITY_GST_OF_ANOTHER_CUSTOMER`). `POST /opportunities` also accepts an optional `customerId`. `GET /opportunities` and `/:id` carry `customerId` and `customer {id, customerCode, customerName, isActive}`.
+- `POST /quotations`: the opportunity must have a customer (409 `OPPORTUNITY_NOT_LINKED`), who is active (409 `CUSTOMER_INACTIVE`); the buyer registration must be that customer's own (400 `BUYER_GST_NOT_CUSTOMERS`) and active (409 `GST_INACTIVE`); the seller registration must be active.
+- `POST /proforma-invoices` and `POST /sales-orders`: refused for an inactive customer (409 `CUSTOMER_INACTIVE`). A Sales Order must use the buyer and seller registrations of its Quotation when it has them (400 `BUYER_GST_DIFFERS` / `SELLER_GST_DIFFERS`), and, under an opportunity with a customer, an active buyer registration of that customer. Legacy (unlinked) opportunities behave as before.
+
+FRONTEND RULES: never send `customerCode` or a state; show the server's message for every 409; reload after a 409 (the record moved on); the customer comes from the opportunity, so the quotation form offers only that customer's registrations; Key Contacts are mock-only and are not shown for a real customer.
 
 ## 7. Opportunities
 

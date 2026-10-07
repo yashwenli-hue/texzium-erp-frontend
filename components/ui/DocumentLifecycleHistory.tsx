@@ -4,8 +4,10 @@ import { Icon } from "./Icon";
 import { Tag } from "./Tag";
 import { Button } from "./Button";
 import {
+  CustomerEvent,
   ProformaEvent,
   QuotationEvent,
+  formatCustomerEventAction,
   formatProformaEventAction,
   formatProformaInvoiceStatus,
   formatQuotationEventAction,
@@ -32,6 +34,10 @@ interface Entry {
   actorName: string;
   occurredAt: string;
   changes: Change[];
+  /** What the event is about, e.g. the GST registration or the opportunity. */
+  detail?: string;
+  /** Text fields that changed: label, before, after. */
+  textChanges?: Array<{ label: string; from: string | null; to: string | null }>;
 }
 
 function EntryList({
@@ -98,6 +104,16 @@ function EntryList({
                 {e.fromLabel ? <Tag color="n">{e.fromLabel}</Tag> : <small style={{ color: "var(--muted)", fontSize: 11.5 }}>Started as</small>}
                 {e.fromLabel && <Icon name="arrow" size={12} />}
                 <Tag color="n">{e.toLabel}</Tag>
+              </div>
+            )}
+            {e.detail && <p className="hist-detail">{e.detail}</p>}
+            {e.textChanges && e.textChanges.length > 0 && (
+              <div className="hist-delta">
+                {e.textChanges.map((c) => (
+                  <span key={c.label}>
+                    {c.label}: {c.from ? c.from : <i>none</i>} → <b>{c.to ? c.to : <i>none</i>}</b>
+                  </span>
+                ))}
               </div>
             )}
             {e.changes.length > 0 && (
@@ -222,4 +238,77 @@ export function ProformaHistory({
     changes: [],
   }));
   return <EntryList entries={entries} loading={loading} error={error} onRetry={onRetry} noun="Proforma Invoice" creationAction="PROFORMA_CREATED" testId="proforma-history" />;
+}
+
+const CUSTOMER_ICON: Record<string, string> = {
+  CUSTOMER_CREATED: "plus",
+  CUSTOMER_UPDATED: "edit",
+  CUSTOMER_DEACTIVATED: "close",
+  CUSTOMER_REACTIVATED: "check",
+  GST_ADDED: "plus",
+  GST_UPDATED: "edit",
+  GST_DEACTIVATED: "close",
+  GST_REACTIVATED: "check",
+  GST_DEFAULT_CHANGED: "pin",
+  OPPORTUNITY_LINKED: "target",
+  OPPORTUNITY_UNLINKED: "close",
+};
+
+const CUSTOMER_FIELD_LABEL: Record<string, string> = {
+  customerName: "Name",
+  customerType: "Type",
+  panNumber: "PAN",
+  email: "Email",
+  phone: "Phone",
+  legalName: "Legal name",
+  tradeName: "Trade name",
+  branchName: "Branch",
+  addressLine1: "Address",
+  addressLine2: "Address line 2",
+  city: "City",
+  pincode: "PIN code",
+  defaultGstin: "Default registration",
+};
+
+const statusWord = (s: string) => (s === "ACTIVE" ? "Active" : s === "INACTIVE" ? "Inactive" : s);
+
+/**
+ * A customer's history: created, details changed (each field with before and
+ * after), deactivated (with the reason) and reactivated, GST registrations
+ * added, edited, deactivated, reactivated or made the default, and opportunities
+ * linked or unlinked. It only holds what the backend recorded: a customer that
+ * existed before the history began shows no earlier entries.
+ */
+export function CustomerHistory({
+  events,
+  loading,
+  error,
+  onRetry,
+}: {
+  events: CustomerEvent[];
+  loading?: boolean;
+  error?: Error | null;
+  onRetry?: () => void;
+}) {
+  const entries: Entry[] = events.map((e) => {
+    const reg = e.gstRegistration;
+    const regLabel = reg ? [reg.gstin, reg.branchName].filter(Boolean).join(" · ") : undefined;
+    const isOpportunity = e.action === "OPPORTUNITY_LINKED" || e.action === "OPPORTUNITY_UNLINKED";
+    return {
+      id: e.id,
+      action: e.action,
+      title: formatCustomerEventAction(e.action),
+      icon: CUSTOMER_ICON[e.action] ?? "pulse",
+      fromLabel: e.fromStatus && e.fromStatus !== e.toStatus ? statusWord(e.fromStatus) : undefined,
+      toLabel: e.toStatus && e.fromStatus !== e.toStatus ? statusWord(e.toStatus) : undefined,
+      remarks: isOpportunity ? undefined : e.remarks,
+      isReason: e.action === "CUSTOMER_DEACTIVATED" || e.action === "GST_DEACTIVATED",
+      actorName: e.actorName,
+      occurredAt: e.occurredAt,
+      changes: [],
+      detail: regLabel ?? (isOpportunity && e.remarks ? e.remarks : undefined),
+      textChanges: e.changes ? Object.entries(e.changes).map(([key, c]) => ({ label: CUSTOMER_FIELD_LABEL[key] ?? key, from: c.from, to: c.to })) : undefined,
+    };
+  });
+  return <EntryList entries={entries} loading={loading} error={error} onRetry={onRetry} noun="customer" creationAction="CUSTOMER_CREATED" testId="customer-history" />;
 }

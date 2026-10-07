@@ -55,7 +55,10 @@ export default function OpportunitiesPage() {
       render: (o) => (
         <div>
           <b style={{ fontSize: 13.5, fontWeight: 600 }}>{o.title}</b>
-          <small style={{ display: "block", color: "var(--muted)", fontSize: 12, marginTop: 1 }}>{o.customerName}</small>
+          <small style={{ display: "block", color: "var(--muted)", fontSize: 12, marginTop: 1 }}>
+            {o.customer ? o.customer.customerName : o.customerName}
+            {!o.customerId && <span style={{ color: "var(--warn)", fontWeight: 600 }}> · no customer yet</span>}
+          </small>
         </div>
       ),
     },

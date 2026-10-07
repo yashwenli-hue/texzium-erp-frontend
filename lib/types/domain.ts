@@ -250,26 +250,17 @@ export interface LeadTimelineEntry {
   recordedAt?: string;
 }
 
-// UI ASSUMPTION — carried over from the prototype. The VERIFIED
-// CreateCustomerDto (customerCode, customerName, panNumber?, email?,
-// phone?, customerType?) has no status field at all, so this is not a
-// case of "unconfirmed enum values" like Lead/Opportunity/Quotation —
-// there is currently no backend account-health concept to mirror. Kept as
-// a frontend-only presentation label until a real field is confirmed; do
-// not treat these four values as backend-verified. See
-// docs/backend-ui-contract.md §6.
-export type CustomerStatus = "Active" | "At Risk" | "New" | "Churned";
-
-// VERIFIED: CustomerGSTRegistration — GET /customers nests this array as
-// `gstRegistrations`; a flat GET /customer-gst also exists (already
-// consumed read-only as the Buyer GST dropdown lookup — see
-// GstRegistrationOption/IBuyerGstRepository). A customer can have multiple
-// registrations, and the backend does NOT enforce exactly one `isDefault`
-// per customer (confirmed by reading customer-gst.service.ts directly — no
-// other registration is unset when a new default is created), so more than
-// one may legitimately show isDefault: true; never silently correct that.
-// No GSTIN format/checksum validation exists either. POST /customer-gst is
-// currently broken for every payload — see the Stage 2H report.
+// VERIFIED (backend commits bb9f81f, 70a8609, 7c10ab0 - Customer Management V1).
+//
+// A Customer is the commercial identity of the party RevenueOS sells to. It is
+// active or inactive (`isActive`; deactivation needs a reason, and an inactive
+// customer takes no new quotation, Proforma, Sales Order, opportunity link or GST
+// registration while everything it already has stays readable). Its code is
+// assigned by the server (CUST-000001, ...) and never changes. A customer has
+// GST registrations; one of the active ones is its default. A deal belongs to a
+// customer through Opportunity.customerId, and the quotation, Proforma and Sales
+// Order under it take their customer from there. See
+// lib/repository/shared/customerLifecycle.ts.
 export interface CustomerGstRegistration {
   id: ID;
   customerId: ID;
@@ -283,6 +274,7 @@ export interface CustomerGstRegistration {
   addressLine2?: string;
   city: string;
   pincode: string;
+  /** At most one active registration of a customer is its default. */
   isDefault: boolean;
   isActive: boolean;
   createdAt: string;
@@ -291,45 +283,228 @@ export interface CustomerGstRegistration {
 
 export interface Customer {
   id: ID;
-  // VERIFIED CreateCustomerDto/Customer model fields — see CreateCustomerInput.
-  // customerName was renamed from the prototype's plain `name` to match the
-  // DTO's own field name and the already-committed CustomerSortField literal.
   customerName: string;
+  /** Server-assigned (CUST-000001) for customers created through the API; older ones keep the code they were given. */
   customerCode: string;
   panNumber?: string;
   email?: string;
   phone?: string;
   customerType?: string;
   isActive: boolean;
-  // VERIFIED: populated only via the POST /vendors (isCustomer: true)
-  // auto-link path, never via direct customer creation — see the Stage 2H
-  // report. Not a real Prisma relation on either side (linkedVendorId is a
-  // bare string, not a foreign key).
+  /**
+   * Not reliable: the vendor flow sets linkedVendorId but never sets this flag,
+   * so "is also a vendor" is read from `linkedVendorId`.
+   */
   isVendor: boolean;
   linkedVendorId?: ID;
+  /** Default registration first. */
   gstRegistrations: CustomerGstRegistration[];
+  /** Set while the customer is inactive: when, by whom and why. */
+  deactivatedAt?: string;
+  deactivatedById?: ID;
+  deactivatedByName?: string;
+  deactivationReason?: string;
   createdAt: string;
   updatedAt: string;
-  // MOCK/UI-ONLY presentation fields below — carried over from the
-  // prototype, with NO basis in the real Customer model at all (confirmed
-  // by reading the Prisma schema directly — see the Stage 2H report).
-  // Always present for a mock customer; always undefined for a real one —
-  // never synthesized or defaulted for real customers, since a placeholder
-  // value would misrepresent verified backend truth. The create form no
-  // longer collects any of these, since CreateCustomerInput doesn't accept
-  // them; MockCustomerRepository.create() still defaults them for new mock
-  // customers only, to keep the existing mock-mode UI working.
-  industry?: string;
-  city?: string;
-  ownerId?: ID;
-  ownerName?: string;
-  lifetimeValue?: number; // INR
-  openOrders?: number;
-  status?: CustomerStatus;
-  customerSince?: string; // ISO 8601 — the "Customer Since" label mock mode shows
-  // @backend-verify: is contactsCount derived server-side or computed
-  // client-side from the Contacts collection? Currently computed client-side.
-  originLeadId?: ID;
+}
+
+/** The customer fields an opportunity carries when it is linked to one. */
+export interface OpportunityCustomer {
+  id: ID;
+  customerCode: string;
+  customerName: string;
+  isActive: boolean;
+}
+
+export const CUSTOMER_EVENT_ACTIONS = [
+  "CUSTOMER_CREATED",
+  "CUSTOMER_UPDATED",
+  "CUSTOMER_DEACTIVATED",
+  "CUSTOMER_REACTIVATED",
+  "GST_ADDED",
+  "GST_UPDATED",
+  "GST_DEACTIVATED",
+  "GST_REACTIVATED",
+  "GST_DEFAULT_CHANGED",
+  "OPPORTUNITY_LINKED",
+  "OPPORTUNITY_UNLINKED",
+] as const;
+
+const CUSTOMER_EVENT_LABEL: Record<string, string> = {
+  CUSTOMER_CREATED: "Customer created",
+  CUSTOMER_UPDATED: "Details updated",
+  CUSTOMER_DEACTIVATED: "Deactivated",
+  CUSTOMER_REACTIVATED: "Reactivated",
+  GST_ADDED: "GST registration added",
+  GST_UPDATED: "GST registration updated",
+  GST_DEACTIVATED: "GST registration deactivated",
+  GST_REACTIVATED: "GST registration reactivated",
+  GST_DEFAULT_CHANGED: "Default GST registration changed",
+  OPPORTUNITY_LINKED: "Opportunity linked",
+  OPPORTUNITY_UNLINKED: "Opportunity unlinked",
+};
+
+export function formatCustomerEventAction(action: string): string {
+  return CUSTOMER_EVENT_LABEL[action] ?? titleCaseFromConstant(action);
+}
+
+/**
+ * One entry of a customer's history (GET /customers/:id/events, permission
+ * customers.view): created, details changed, deactivated or reactivated, a GST
+ * registration added, edited, deactivated, reactivated or made the default, an
+ * opportunity linked or unlinked. Customers created before the history existed
+ * have none until their next change.
+ */
+export interface CustomerEvent {
+  id: ID;
+  customerId: ID;
+  action: string;
+  fromStatus?: string;
+  toStatus?: string;
+  /** For a deactivation, the mandatory reason. */
+  remarks?: string;
+  /** For an edit: each field that changed. For a default change: defaultGstin. */
+  changes?: Record<string, { from: string | null; to: string | null }>;
+  /** The registration a GST event is about. */
+  gstRegistration?: { id: ID; gstin: string; branchName?: string; legalName?: string };
+  /** The opportunity a link event is about (its title is in `remarks`). */
+  opportunityId?: ID;
+  /** Empty when the actor's account no longer exists. */
+  actorName: string;
+  actorId?: ID;
+  occurredAt: string;
+}
+
+export type CustomerMatchReason = "PAN" | "NAME" | "PHONE" | "EMAIL";
+
+export interface CustomerDuplicateMatch {
+  id: ID;
+  customerCode: string;
+  customerName: string;
+  isActive: boolean;
+  reasons: CustomerMatchReason[];
+}
+
+/** What GET /customers/duplicate-check found: PAN and name matches are refused by the backend, phone and email only warn. */
+export interface CustomerDuplicateCheck {
+  blocking: CustomerDuplicateMatch[];
+  warnings: CustomerDuplicateMatch[];
+}
+
+export type QuotingBlocker = "CUSTOMER_INACTIVE" | "NO_ACTIVE_GST";
+
+export interface CustomerOverviewOpportunity {
+  id: ID;
+  opportunityCode?: string;
+  title: string;
+  stage: string;
+  expectedValue: number;
+  probability: number;
+  expectedCloseDate: string;
+  createdAt: string;
+  leadId: ID;
+  leadName: string;
+}
+
+export interface CustomerOverviewQuotation {
+  id: ID;
+  quotationCode?: string;
+  opportunityId: ID;
+  quoteDate: string;
+  status: string;
+  taxableAmount: number;
+  gstAmount: number;
+  totalAmount: number;
+  buyerGstId?: ID;
+  createdAt: string;
+}
+
+export interface CustomerOverviewProforma {
+  id: ID;
+  proformaNumber?: string;
+  quotationId: ID;
+  issueDate: string;
+  status: string;
+  totalAmount: number;
+  validityDate: string | null;
+  isExpired: boolean;
+  createdAt: string;
+}
+
+export interface CustomerOverviewOrder {
+  id: ID;
+  salesOrderCode?: string;
+  orderDate: string;
+  status: string;
+  totalAmount: number;
+  quotationId?: ID;
+  proformaInvoiceId?: ID;
+  createdAt: string;
+}
+
+/** FinanceOS data, read-only and as FinanceOS recorded it. */
+export interface CustomerOverviewReceivable {
+  id: ID;
+  dueDate: string;
+  outstandingAmount: number;
+  paidAmount: number;
+  balanceAmount: number;
+  paymentStatus: string;
+}
+
+export interface CustomerOverviewInvoice {
+  id: ID;
+  invoiceNumber?: string;
+  salesOrderId: ID;
+  invoiceDate: string;
+  status: string;
+  paymentStatus: string;
+  totalAmount: number;
+  receivables: CustomerOverviewReceivable[];
+}
+
+/** An opportunity that is not linked to any customer but whose lead carries this customer's name: a guess, for a person to confirm by linking. */
+export interface CustomerLegacyMatch {
+  id: ID;
+  title: string;
+  stage: string;
+  leadName: string;
+  leadCompany?: string;
+  quotationCount: number;
+  matchedBy: "LEAD_NAME" | "LEAD_COMPANY";
+}
+
+export interface CustomerTotals {
+  counts: { opportunities: number; quotations: number; proformas: number; salesOrders: number; invoices: number };
+  /** APPROVED quotations. */
+  approvedQuotationValue: number;
+  /** Sales Orders that are not cancelled. */
+  orderedValue: number;
+  /** Invoices that are not drafts. */
+  invoicedValue: number;
+  /** Receivables of those invoices, as FinanceOS recorded them. */
+  collectedValue: number;
+  /** The same, leaving out written-off receivables. */
+  outstandingValue: number;
+}
+
+/**
+ * GET /customers/:id/overview (customers.view): the customer's whole
+ * quote-to-cash chain, followed by id (customer -> opportunities -> quotations
+ * -> proformas -> orders -> invoices -> receivables). Invoices and receivables
+ * are FinanceOS data. Opportunities that are not linked to the customer are
+ * never in it, however much their lead looks like the customer.
+ */
+export interface CustomerOverview {
+  customer: Customer;
+  quotingReadiness: { ready: boolean; reasons: QuotingBlocker[] };
+  opportunities: CustomerOverviewOpportunity[];
+  quotations: CustomerOverviewQuotation[];
+  proformas: CustomerOverviewProforma[];
+  salesOrders: CustomerOverviewOrder[];
+  invoices: CustomerOverviewInvoice[];
+  totals: CustomerTotals;
+  legacyMatches: CustomerLegacyMatch[];
 }
 
 export type ContactType = "Decision Maker" | "Champion" | "Influencer";
@@ -448,6 +623,9 @@ export interface Opportunity {
   expectedCloseDate: string; // ISO 8601
   ownerName: string;
   createdAt: string; // ISO 8601
+  /** The customer this deal is for. Absent for a legacy opportunity that has not been linked to one. */
+  customerId?: ID;
+  customer?: OpportunityCustomer;
   /** Present only when loaded via GET /opportunities/:id, which embeds the lead. */
   lead?: Lead;
 }
@@ -491,6 +669,9 @@ export interface Quotation {
   totalAmount?: number;
   taxType?: string;
   placeOfSupply?: string;
+  /** The GST registrations the quotation was made with. Older quotations may have none. */
+  buyerGstId?: ID;
+  sellerGstId?: ID;
 }
 
 /**

@@ -291,3 +291,8 @@ export function Chip({
 export function ChipGroup({ children }: { children: React.ReactNode }) {
   return <div className="chips">{children}</div>;
 }
+
+/** A customer is active or inactive (an inactive one is kept, with everything it has, but takes nothing new). */
+export function CustomerStatusTag({ isActive }: { isActive: boolean }) {
+  return <Tag color={isActive ? "g" : "n"}>{isActive ? "Active" : "Inactive"}</Tag>;
+}

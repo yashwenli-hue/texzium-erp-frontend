@@ -292,6 +292,8 @@ export default function ProformaInvoiceDetailPage() {
           proformaInvoiceId={proforma.id}
           proformaNumber={proforma.proformaNumber}
           proformaTotalAmount={proforma.totalAmount}
+          quotationBuyerGstId={quotation?.buyerGstId}
+          quotationSellerGstId={quotation?.sellerGstId}
           onClose={() => setDialog(null)}
           onSubmit={(input) => createSalesOrder(input)}
         />

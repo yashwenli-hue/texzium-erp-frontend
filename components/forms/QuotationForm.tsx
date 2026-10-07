@@ -1,16 +1,26 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Modal } from "../ui/Modal";
 import { TextField, SelectField, FieldRow } from "../ui/FormField";
 import { Button } from "../ui/Button";
 import { useToast } from "../ui/Toast";
 import { CreateQuotationInput } from "../../lib/repository/interfaces";
 import { useOpportunities } from "../../lib/hooks/useOpportunities";
-import { useInventoryItems, useSellerGstRegistrations, useBuyerGstRegistrations } from "../../lib/hooks/useQuotationMasters";
+import { useInventoryItems, useSellerGstRegistrations } from "../../lib/hooks/useQuotationMasters";
+import { useAsyncList } from "../../lib/hooks/useAsyncList";
+import { useRepository } from "../../lib/repository/RepositoryProvider";
+import { defaultRegistration, registrationLabel } from "../../lib/repository/shared/customerLifecycle";
 import { formatInr } from "../../lib/format";
 
 /**
+ * The buyer is the opportunity's customer (it is never typed or chosen here): the
+ * buyer GST registration is one of that customer's own, the active default
+ * preselected. An opportunity with no customer, or an inactive customer, can't be
+ * quoted, and the form says what to do instead of offering a choice the backend
+ * would refuse.
+ *
  * Field-for-field mirror of the VERIFIED CreateQuotationDto: opportunityId,
  * quoteDate, inventoryItemId, quantity, unitPrice, sellerGstId, buyerGstId.
  * The backend computes taxableAmount/GST/total from these — the taxable
@@ -31,7 +41,7 @@ export function QuotationForm({
   const { opportunities, loading: opportunitiesLoading } = useOpportunities();
   const { items: inventoryItems, loading: itemsLoading } = useInventoryItems();
   const { registrations: sellerGstOptions, loading: sellerGstLoading } = useSellerGstRegistrations();
-  const { registrations: buyerGstOptions, loading: buyerGstLoading } = useBuyerGstRegistrations();
+  const repo = useRepository();
 
   const [opportunityId, setOpportunityId] = useState(defaultOpportunityId ?? "");
   const [quoteDate, setQuoteDate] = useState(() => new Date().toISOString().slice(0, 10));
@@ -53,8 +63,29 @@ export function QuotationForm({
   // so the form isn't left with an empty default in that edge case.
   const effectiveSellerGstId =
     sellerGstId || sellerGstOptions.find((g) => g.isActive)?.id || sellerGstOptions[0]?.id || "";
-  const effectiveBuyerGstId =
-    buyerGstId || buyerGstOptions.find((g) => g.isActive)?.id || buyerGstOptions[0]?.id || "";
+
+  // The customer comes from the opportunity; its registrations are the only buyer choices.
+  const customerId = selectedOpportunity?.customerId;
+  const { data: customer, loading: customerLoading, error: customerError } = useAsyncList(
+    () => (customerId ? repo.customers.getById(customerId) : Promise.resolve(null)),
+    [repo, customerId]
+  );
+  const buyerOptions = (customer?.gstRegistrations ?? []).map((g) => ({ id: g.id, label: registrationLabel(g), isActive: g.isActive, isDefault: g.isDefault }));
+  const chosenBuyer = buyerOptions.find((o) => o.id === buyerGstId && o.isActive)?.id;
+  const effectiveBuyerGstId = chosenBuyer || defaultRegistration(buyerOptions)?.id || "";
+  const buyerGstLoading = !!customerId && customerLoading;
+  const quotable = !!customerId && !!customer && customer.isActive && !customerError && !!defaultRegistration(buyerOptions);
+  const blockReason = !selectedOpportunity
+    ? undefined
+    : !customerId
+    ? "no-customer"
+    : customerError
+    ? "customer-unreadable"
+    : customer && !customer.isActive
+    ? "inactive"
+    : customer && !defaultRegistration(buyerOptions)
+    ? "no-gst"
+    : undefined;
 
   const mastersLoading = opportunitiesLoading || itemsLoading || sellerGstLoading || buyerGstLoading;
   const taxablePreview = Number(quantity) > 0 && Number(unitPrice) > 0 ? Number(quantity) * Number(unitPrice) : 0;
@@ -70,6 +101,7 @@ export function QuotationForm({
       e.unitPrice = "Enter a unit price greater than 0";
     if (!effectiveSellerGstId) e.sellerGstId = "Select a seller GST registration";
     if (!effectiveBuyerGstId) e.buyerGstId = "Select a buyer GST registration";
+    if (selectedOpportunity && !quotable) e.form = "This opportunity can't be quoted yet. See the note above.";
     setErrors(e);
     return Object.keys(e).length === 0;
   }
@@ -103,7 +135,7 @@ export function QuotationForm({
       footer={
         <>
           <Button variant="ghost" onClick={onClose} disabled={submitting}>Cancel</Button>
-          <Button variant="primary" onClick={handleSubmit} disabled={submitting || mastersLoading}>
+          <Button variant="primary" onClick={handleSubmit} disabled={submitting || mastersLoading || !!blockReason}>
             {submitting ? "Creating…" : "Create Quotation"}
           </Button>
         </>
@@ -122,12 +154,41 @@ export function QuotationForm({
             onChange={(e) => setOpportunityId(e.target.value)}
             error={errors.opportunityId}
             disabled={!!defaultOpportunityId || opportunitiesLoading}
-            options={opportunities.map((o) => ({ value: o.id, label: `${o.title} — ${o.customerName}` }))}
+            options={opportunities.map((o) => ({ value: o.id, label: `${o.title} — ${o.customer?.customerName ?? o.customerName}${o.customerId ? "" : " (no customer yet)"}` }))}
           />
-          {selectedOpportunity && (
+          {selectedOpportunity && customerId && (
             <p style={{ fontSize: 12, color: "var(--muted)", marginTop: -8, marginBottom: 14 }}>
-              Customer <b style={{ color: "var(--text)" }}>{selectedOpportunity.customerName}</b> · Owner {selectedOpportunity.ownerName}
+              Customer{" "}
+              <Link href={`/customers/${customerId}`} style={{ color: "var(--text)", fontWeight: 700 }}>
+                {selectedOpportunity.customer?.customerName ?? selectedOpportunity.customerName}
+              </Link>{" "}
+              · Owner {selectedOpportunity.ownerName}
             </p>
+          )}
+          {blockReason && selectedOpportunity && (
+            <div className="dup warn" role="status" data-testid="quote-block">
+              {blockReason === "no-customer" && (
+                <>
+                  <b>This opportunity has no customer yet.</b> A quotation is made for a customer, with that customer&apos;s GST registration.{" "}
+                  <Link href={`/opportunities/${selectedOpportunity.id}`}>Link a customer to this opportunity</Link> first.
+                </>
+              )}
+              {blockReason === "inactive" && (
+                <>
+                  <b>The customer is inactive.</b> No new quotation can be made until <Link href={`/customers/${customerId}`}>the customer is reactivated</Link>.
+                </>
+              )}
+              {blockReason === "no-gst" && (
+                <>
+                  <b>The customer has no active GST registration.</b> <Link href={`/customers/${customerId}`}>Add one</Link> first: the tax depends on the buyer&apos;s state.
+                </>
+              )}
+              {blockReason === "customer-unreadable" && (
+                <>
+                  <b>The customer&apos;s GST registrations couldn&apos;t be read</b> ({customerError?.message}). Choosing the buyer registration needs the customers.view permission.
+                </>
+              )}
+            </div>
           )}
           <FieldRow>
             <TextField label="Quote Date" required type="date" value={quoteDate} onChange={(e) => setQuoteDate(e.target.value)} error={errors.quoteDate} />
@@ -167,14 +228,15 @@ export function QuotationForm({
             value={effectiveBuyerGstId}
             onChange={(e) => setBuyerGstId(e.target.value)}
             error={errors.buyerGstId}
-            disabled={buyerGstLoading}
-            options={buyerGstOptions.map((g) => ({
+            disabled={buyerGstLoading || buyerOptions.length === 0}
+            hint={customer ? `The registrations of ${customer.customerName}. The default is preselected.` : undefined}
+            options={buyerOptions.length ? buyerOptions.map((g) => ({
               value: g.id,
-              label: g.isActive ? g.label : `${g.label} (Inactive)`,
+              label: `${g.label}${g.isDefault && g.isActive ? " (default)" : ""}${g.isActive ? "" : " (Inactive)"}`,
               disabled: !g.isActive,
-            }))}
+            })) : [{ value: "", label: selectedOpportunity && !customerId ? "Link a customer first" : "—" }]}
           />
-          {(sellerGstOptions.some((g) => !g.isActive) || buyerGstOptions.some((g) => !g.isActive)) && (
+          {(sellerGstOptions.some((g) => !g.isActive) || buyerOptions.some((g) => !g.isActive)) && (
             <p style={{ fontSize: 11.5, color: "var(--faint)" }}>
               Inactive GST registrations are shown greyed out and can&apos;t be newly selected.
             </p>

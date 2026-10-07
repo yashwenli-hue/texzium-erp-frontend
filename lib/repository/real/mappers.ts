@@ -29,7 +29,13 @@ import {
   CustomerStatement,
   ReceiptVoucher,
   Customer,
+  CustomerDuplicateCheck,
+  CustomerEvent,
   CustomerGstRegistration,
+  CustomerMatchReason,
+  CustomerOverview,
+  CustomerTotals,
+  QuotingBlocker,
   SalesRevenueSummary,
   CollectionsSummary,
   CollectionsAging,
@@ -136,6 +142,8 @@ export interface BackendOpportunity {
   status: string;
   createdAt: string;
   updatedAt?: string;
+  customerId?: string | null;
+  customer?: { id: string; customerCode: string; customerName: string; isActive: boolean } | null;
   lead?: BackendLead | null;
 }
 
@@ -358,6 +366,8 @@ export function mapQuotation(raw: BackendQuotation, opportunityById: Map<string,
     totalAmount: raw.totalAmount,
     taxType: raw.taxType ?? undefined,
     placeOfSupply: raw.placeOfSupply ?? undefined,
+    buyerGstId: raw.buyerGstId ?? undefined,
+    sellerGstId: raw.sellerGstId ?? undefined,
   };
 }
 
@@ -921,17 +931,20 @@ export interface BackendCustomer {
   updatedAt: string;
   isVendor: boolean;
   linkedVendorId?: string | null;
-  /** Only present on GET /customers — not returned by POST /customers (which is currently broken anyway; see the Stage 2H report). */
+  deactivatedAt?: string | null;
+  deactivatedById?: string | null;
+  deactivationReason?: string | null;
+  /** Only id and name of whoever deactivated it. */
+  deactivatedBy?: { id: string; fullName?: string | null } | null;
+  /** Default first. */
   gstRegistrations?: BackendCustomerGstRegistration[];
 }
 
 /**
  * Maps a real Customer record field-for-field against the VERIFIED Prisma
- * model — deliberately does NOT set any of the legacy mock-only presentation
- * fields (industry, city, ownerName, lifetimeValue, openOrders, status,
- * customerSince); those stay undefined for every real customer rather than
- * being defaulted to a placeholder, since a placeholder would misrepresent
- * verified backend truth. See Customer in lib/types/domain.ts.
+ * model and the V1 API (GET /customers, GET /customers/:id, and the create /
+ * edit / deactivate / reactivate responses, which all return the customer with
+ * its registrations).
  */
 export function mapCustomer(raw: BackendCustomer): Customer {
   return {
@@ -946,8 +959,214 @@ export function mapCustomer(raw: BackendCustomer): Customer {
     isVendor: raw.isVendor,
     linkedVendorId: raw.linkedVendorId ?? undefined,
     gstRegistrations: (raw.gstRegistrations ?? []).map(mapCustomerGstRegistration),
+    deactivatedAt: raw.deactivatedAt ?? undefined,
+    deactivatedById: raw.deactivatedById ?? undefined,
+    deactivatedByName: raw.deactivatedBy?.fullName ?? undefined,
+    deactivationReason: raw.deactivationReason ?? undefined,
     createdAt: raw.createdAt,
     updatedAt: raw.updatedAt,
+  };
+}
+
+export interface BackendCustomerEvent {
+  id: string;
+  customerId: string;
+  action: string;
+  fromStatus?: string | null;
+  toStatus?: string | null;
+  remarks?: string | null;
+  changes?: Record<string, { from: string | null; to: string | null }> | null;
+  gstRegistrationId?: string | null;
+  gstRegistration?: { id: string; gstin: string; branchName?: string | null; legalName?: string | null } | null;
+  opportunityId?: string | null;
+  actorId?: string | null;
+  actor?: { id: string; fullName?: string | null } | null;
+  occurredAt: string;
+  createdAt: string;
+}
+
+export function mapCustomerEvent(raw: BackendCustomerEvent): CustomerEvent {
+  return {
+    id: raw.id,
+    customerId: raw.customerId,
+    action: raw.action,
+    fromStatus: raw.fromStatus ?? undefined,
+    toStatus: raw.toStatus ?? undefined,
+    remarks: raw.remarks ?? undefined,
+    changes: raw.changes ?? undefined,
+    gstRegistration: raw.gstRegistration
+      ? {
+          id: raw.gstRegistration.id,
+          gstin: raw.gstRegistration.gstin,
+          branchName: raw.gstRegistration.branchName ?? undefined,
+          legalName: raw.gstRegistration.legalName ?? undefined,
+        }
+      : undefined,
+    opportunityId: raw.opportunityId ?? undefined,
+    actorName: raw.actor?.fullName ?? "",
+    actorId: raw.actorId ?? undefined,
+    occurredAt: raw.occurredAt,
+  };
+}
+
+export interface BackendDuplicateMatch {
+  id: string;
+  customerCode: string;
+  customerName: string;
+  isActive: boolean;
+  reasons: string[];
+}
+
+export function mapDuplicateCheck(raw: { blocking: BackendDuplicateMatch[]; warnings: BackendDuplicateMatch[] }): CustomerDuplicateCheck {
+  const one = (m: BackendDuplicateMatch) => ({
+    id: m.id,
+    customerCode: m.customerCode,
+    customerName: m.customerName,
+    isActive: m.isActive,
+    reasons: m.reasons.filter((r): r is CustomerMatchReason => r === "PAN" || r === "NAME" || r === "PHONE" || r === "EMAIL"),
+  });
+  return { blocking: raw.blocking.map(one), warnings: raw.warnings.map(one) };
+}
+
+export interface BackendCustomerOverview {
+  customer: BackendCustomer;
+  quotingReadiness: { ready: boolean; reasons: string[] };
+  opportunities: Array<{
+    id: string;
+    opportunityCode?: string | null;
+    title: string;
+    status: string;
+    expectedValue: number;
+    probability: number;
+    expectedCloseDate: string;
+    createdAt: string;
+    lead?: { id: string; customerName: string; companyName?: string | null } | null;
+  }>;
+  quotations: Array<{
+    id: string;
+    quotationCode?: string | null;
+    opportunityId: string;
+    quoteDate: string;
+    status: string;
+    taxableAmount: number;
+    gstAmount: number;
+    totalAmount: number;
+    buyerGstId?: string | null;
+    createdAt: string;
+  }>;
+  proformas: Array<{
+    id: string;
+    proformaNumber?: string | null;
+    quotationId: string;
+    issueDate: string;
+    customerStatus: string;
+    totalAmount: number;
+    validityDate?: string | null;
+    isExpired: boolean;
+    createdAt: string;
+  }>;
+  salesOrders: Array<{
+    id: string;
+    salesOrderCode?: string | null;
+    orderDate: string;
+    status: string;
+    totalAmount: number;
+    quotationId?: string | null;
+    proformaInvoiceId?: string | null;
+    createdAt: string;
+  }>;
+  invoices: Array<{
+    id: string;
+    invoiceNumber?: string | null;
+    salesOrderId: string;
+    invoiceDate: string;
+    status: string;
+    paymentStatus: string;
+    totalAmount: number;
+    receivables: Array<{ id: string; dueDate: string; outstandingAmount: number; paidAmount: number; balanceAmount: number; paymentStatus: string }>;
+  }>;
+  totals: CustomerTotals;
+  legacyMatches: Array<{
+    id: string;
+    title: string;
+    status: string;
+    leadName: string;
+    leadCompany?: string | null;
+    quotationCount: number;
+    matchedBy: string;
+  }>;
+}
+
+export function mapCustomerOverview(raw: BackendCustomerOverview): CustomerOverview {
+  const blockers = raw.quotingReadiness.reasons.filter((r): r is QuotingBlocker => r === "CUSTOMER_INACTIVE" || r === "NO_ACTIVE_GST");
+  return {
+    customer: mapCustomer(raw.customer),
+    quotingReadiness: { ready: raw.quotingReadiness.ready, reasons: blockers },
+    opportunities: raw.opportunities.map((o) => ({
+      id: o.id,
+      opportunityCode: o.opportunityCode ?? undefined,
+      title: o.title,
+      stage: o.status,
+      expectedValue: o.expectedValue,
+      probability: o.probability,
+      expectedCloseDate: o.expectedCloseDate,
+      createdAt: o.createdAt,
+      leadId: o.lead?.id ?? "",
+      leadName: o.lead?.customerName ?? "—",
+    })),
+    quotations: raw.quotations.map((q) => ({
+      id: q.id,
+      quotationCode: q.quotationCode ?? undefined,
+      opportunityId: q.opportunityId,
+      quoteDate: q.quoteDate,
+      status: q.status,
+      taxableAmount: q.taxableAmount,
+      gstAmount: q.gstAmount,
+      totalAmount: q.totalAmount,
+      buyerGstId: q.buyerGstId ?? undefined,
+      createdAt: q.createdAt,
+    })),
+    proformas: raw.proformas.map((p) => ({
+      id: p.id,
+      proformaNumber: p.proformaNumber ?? undefined,
+      quotationId: p.quotationId,
+      issueDate: p.issueDate,
+      status: p.customerStatus,
+      totalAmount: p.totalAmount,
+      validityDate: p.validityDate ?? null,
+      isExpired: p.isExpired,
+      createdAt: p.createdAt,
+    })),
+    salesOrders: raw.salesOrders.map((o) => ({
+      id: o.id,
+      salesOrderCode: o.salesOrderCode ?? undefined,
+      orderDate: o.orderDate,
+      status: o.status,
+      totalAmount: o.totalAmount,
+      quotationId: o.quotationId ?? undefined,
+      proformaInvoiceId: o.proformaInvoiceId ?? undefined,
+      createdAt: o.createdAt,
+    })),
+    invoices: raw.invoices.map((i) => ({
+      id: i.id,
+      invoiceNumber: i.invoiceNumber ?? undefined,
+      salesOrderId: i.salesOrderId,
+      invoiceDate: i.invoiceDate,
+      status: i.status,
+      paymentStatus: i.paymentStatus,
+      totalAmount: i.totalAmount,
+      receivables: i.receivables,
+    })),
+    totals: raw.totals,
+    legacyMatches: raw.legacyMatches.map((m) => ({
+      id: m.id,
+      title: m.title,
+      stage: m.status,
+      leadName: m.leadName,
+      leadCompany: m.leadCompany ?? undefined,
+      quotationCount: m.quotationCount,
+      matchedBy: m.matchedBy === "LEAD_COMPANY" ? "LEAD_COMPANY" : "LEAD_NAME",
+    })),
   };
 }
 

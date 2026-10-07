@@ -21,6 +21,7 @@ import { RealInventoryItemRepository } from "./realInventoryItemRepository";
 import { RealSellerGstRepository } from "./realSellerGstRepository";
 import { RealBuyerGstRepository } from "./realBuyerGstRepository";
 import { RealCustomerRepository } from "./realCustomerRepository";
+import { RealCustomerGstRepository } from "./realCustomerGstRepository";
 import { RealSearchRepository } from "./realSearchRepository";
 import { RealNotificationRepository } from "./realNotificationRepository";
 import { MockContactRepository } from "../mock/mockContactRepository";
@@ -31,9 +32,9 @@ import { MockNoteRepository } from "../mock/mockNoteRepository";
 /**
  * Stage 2A wired up Leads and Opportunities; Stage 2C adds Quotations
  * (+ their supporting Inventory Item / Seller GST / Buyer GST master-data
- * lookups); Stage 2H adds Customer Master (GET/create — create is verified
- * but currently broken backend-side, see RealCustomerRepository) against
- * the real backend. Search aggregates the same already-real list() calls
+ * lookups); Stage 2H added the Customer Master read; Customer Management V1
+ * adds the governed Customer and GST registration writes, the customer overview
+ * and the opportunity link (see RealCustomerRepository) against the real backend. Search aggregates the same already-real list() calls
  * (no dedicated backend search endpoint exists — see RealSearchRepository).
  * Notifications is a real, fully wired backend module too (see
  * RealNotificationRepository) — it was left on the mock implementation here
@@ -75,6 +76,7 @@ export function createRealRepository(): RevenueOSRepository {
     sellerGstRegistrations: new RealSellerGstRepository(),
     buyerGstRegistrations: new RealBuyerGstRepository(),
     customers,
+    customerGst: new RealCustomerGstRepository(),
     contacts: new MockContactRepository(),
     activities: new MockActivityRepository(),
     tasks: new MockTaskRepository(),

@@ -1,60 +1,124 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Modal } from "../ui/Modal";
 import { TextField, FieldRow } from "../ui/FormField";
 import { Button } from "../ui/Button";
 import { useToast } from "../ui/Toast";
-import { CreateCustomerInput } from "../../lib/repository/interfaces";
+import { CreateCustomerInput, UpdateCustomerInput } from "../../lib/repository/interfaces";
+import { Customer, CustomerDuplicateMatch } from "../../lib/types/domain";
+import { useCustomerDuplicateCheck } from "../../lib/hooks/useCustomers";
+import {
+  CUSTOMER_TYPE_SUGGESTIONS,
+  CustomerConflictError,
+  MATCH_REASON_LABEL,
+  normalizeEmail,
+  normalizePan,
+  validateCustomerFields,
+} from "../../lib/repository/shared/customerLifecycle";
+
+type Prefill = { customerName?: string; email?: string; phone?: string };
+
+const same = (a: string | undefined, b: string | undefined) => (a ?? "").trim() === (b ?? "").trim();
+
+function MatchList({ matches }: { matches: CustomerDuplicateMatch[] }) {
+  return (
+    <ul>
+      {matches.map((m) => (
+        <li key={m.id}>
+          <Link href={`/customers/${m.id}`}>
+            {m.customerName} ({m.customerCode})
+          </Link>
+          {!m.isActive && " · inactive"} — {m.reasons.map((r) => MATCH_REASON_LABEL[r]).join(", ")}
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 /**
- * Field-for-field mirror of the VERIFIED CreateCustomerDto: customerCode,
- * customerName, panNumber?, email?, phone?, customerType?. Account-profile
- * fields the prototype used to collect here (industry, city, owner, lifetime
- * value) aren't part of this DTO — they're defaulted by the repository
- * instead (see MockCustomerRepository.create()), not collected from the user.
+ * Create or edit a customer. The code is not typed: the server assigns it when
+ * the customer is saved and it never changes. While you type, the form asks the
+ * backend whether a customer with the same PAN or name already exists (the
+ * backend refuses a second one, so Save is held back and the existing customer is
+ * offered instead: another site of the same business is a GST registration of
+ * that customer) and warns about the same phone or email. The backend checks
+ * again on save. Editing only sends what changed.
  */
-export function CustomerForm({
-  onClose,
-  onSubmit,
-}: {
+export type CustomerFormProps = {
+  /** Starting values for a new customer, e.g. from a lead. */
+  prefill?: Prefill;
   onClose: () => void;
-  onSubmit: (input: CreateCustomerInput) => Promise<unknown>;
-}) {
+} & (
+  | { mode?: "create"; customer?: undefined; onSubmit: (input: CreateCustomerInput) => Promise<unknown> }
+  | { mode: "edit"; customer: Customer; onSubmit: (input: UpdateCustomerInput) => Promise<unknown> }
+);
+
+export function CustomerForm(props: CustomerFormProps) {
+  const { customer, prefill, onClose } = props;
   const toast = useToast();
-  const [customerName, setCustomerName] = useState("");
-  const [customerCode, setCustomerCode] = useState("");
-  const [panNumber, setPanNumber] = useState("");
-  const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
-  const [customerType, setCustomerType] = useState("");
+  const editing = props.mode === "edit" && !!customer;
+
+  const [customerName, setCustomerName] = useState(customer?.customerName ?? prefill?.customerName ?? "");
+  const [customerType, setCustomerType] = useState(customer?.customerType ?? "");
+  const [panNumber, setPanNumber] = useState(customer?.panNumber ?? "");
+  const [email, setEmail] = useState(customer?.email ?? prefill?.email ?? "");
+  const [phone, setPhone] = useState(customer?.phone ?? prefill?.phone ?? "");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
+  const [conflict, setConflict] = useState<CustomerConflictError | null>(null);
+
+  // When editing, only a field that was changed is checked: a lookalike that was
+  // already there must not hold the form back, because the backend only checks what changes.
+  const nameChanged = !editing || !same(customerName, customer?.customerName);
+  const panChanged = !editing || normalizePan(panNumber) !== (customer?.panNumber ?? "");
+  const phoneChanged = !editing || !same(phone, customer?.phone);
+  const emailChanged = !editing || normalizeEmail(email) !== (customer?.email ?? "");
+  const dup = useCustomerDuplicateCheck({
+    customerName: nameChanged ? customerName : undefined,
+    panNumber: panChanged ? panNumber : undefined,
+    phone: phoneChanged ? phone : undefined,
+    email: emailChanged ? email : undefined,
+    excludeCustomerId: customer?.id,
+  });
+  const blocked = dup.blocking.length > 0;
 
   function validate(): boolean {
-    const e: Record<string, string> = {};
-    if (!customerName.trim()) e.customerName = "Customer name is required";
-    if (!customerCode.trim()) e.customerCode = "Customer code is required";
+    const e = validateCustomerFields({ customerName, customerType, panNumber, email, phone });
     setErrors(e);
     return Object.keys(e).length === 0;
   }
 
   async function handleSubmit() {
+    setConflict(null);
     if (!validate()) return;
     setSubmitting(true);
     try {
-      await onSubmit({
-        customerCode: customerCode.trim(),
-        customerName: customerName.trim(),
-        panNumber: panNumber.trim() || undefined,
-        email: email.trim() || undefined,
-        phone: phone.trim() || undefined,
-        customerType: customerType.trim() || undefined,
-      });
-      toast.show(`Customer "${customerName.trim()}" created`, "check");
+      if (editing && customer) {
+        // Only what changed; an optional field that was emptied is cleared with null.
+        const input: UpdateCustomerInput = {};
+        if (!same(customerName, customer.customerName)) input.customerName = customerName.trim();
+        if (!same(customerType, customer.customerType)) input.customerType = customerType.trim() || null;
+        if (normalizePan(panNumber) !== (customer.panNumber ?? "")) input.panNumber = panNumber.trim() ? normalizePan(panNumber) : null;
+        if (!same(email, customer.email)) input.email = email.trim() || null;
+        if (!same(phone, customer.phone)) input.phone = phone.trim() || null;
+        await (props as Extract<CustomerFormProps, { mode: "edit" }>).onSubmit(input);
+        toast.show(Object.keys(input).length ? "Customer updated" : "Nothing changed", "check");
+      } else {
+        await (props as Extract<CustomerFormProps, { mode?: "create" }>).onSubmit({
+          customerName: customerName.trim(),
+          customerType: customerType.trim() || undefined,
+          panNumber: panNumber.trim() ? normalizePan(panNumber) : undefined,
+          email: email.trim() || undefined,
+          phone: phone.trim() || undefined,
+        });
+        toast.show(`Customer "${customerName.trim()}" created`, "check");
+      }
       onClose();
-    } catch {
-      setErrors({ form: "Something went wrong creating the customer. Please try again." });
+    } catch (err) {
+      if (err instanceof CustomerConflictError) setConflict(err);
+      setErrors({ form: err instanceof Error ? err.message : "Something went wrong saving the customer. Please try again." });
     } finally {
       setSubmitting(false);
     }
@@ -62,30 +126,76 @@ export function CustomerForm({
 
   return (
     <Modal
-      title="New Customer"
+      title={editing ? `Edit ${customer!.customerName}` : "New Customer"}
       onClose={onClose}
       footer={
         <>
-          <Button variant="ghost" onClick={onClose} disabled={submitting}>Cancel</Button>
-          <Button variant="primary" onClick={handleSubmit} disabled={submitting}>
-            {submitting ? "Creating…" : "Create Customer"}
+          <Button variant="ghost" onClick={onClose} disabled={submitting}>
+            Cancel
+          </Button>
+          <Button variant="primary" onClick={handleSubmit} disabled={submitting || blocked}>
+            {submitting ? "Saving…" : editing ? "Save changes" : "Create Customer"}
           </Button>
         </>
       }
     >
+      <p style={{ fontSize: 12.5, color: "var(--muted)", margin: "0 0 16px" }} data-testid="code-note">
+        {editing ? (
+          <>
+            Customer code <b style={{ color: "var(--text)" }}>{customer!.customerCode}</b> · assigned by the system and never changes.
+          </>
+        ) : (
+          "The customer code is assigned automatically when you save."
+        )}
+      </p>
+
+      {blocked && (
+        <div className="dup block" role="alert" data-testid="dup-block">
+          <b>This customer already exists.</b> The system keeps one customer per PAN and per name. Use the existing one — another site of the same business is added as a GST registration of that customer.
+          <MatchList matches={dup.blocking} />
+        </div>
+      )}
+      {!blocked && dup.warnings.length > 0 && (
+        <div className="dup warn" role="status" data-testid="dup-warn">
+          <b>Check this isn&apos;t the same business.</b> It shares a phone number or email with:
+          <MatchList matches={dup.warnings} />
+        </div>
+      )}
+
+      <TextField label="Customer name" required value={customerName} onChange={(e) => setCustomerName(e.target.value)} error={errors.customerName} placeholder="e.g. GreenVolt Energy Pvt Ltd" autoComplete="organization" />
       <FieldRow>
-        <TextField label="Customer Name" required value={customerName} onChange={(e) => setCustomerName(e.target.value)} error={errors.customerName} placeholder="e.g. GreenVolt Energy" />
-        <TextField label="Customer Code" required value={customerCode} onChange={(e) => setCustomerCode(e.target.value)} error={errors.customerCode} placeholder="e.g. CUST-1009" />
+        <TextField
+          label="PAN"
+          value={panNumber}
+          onChange={(e) => setPanNumber(e.target.value.toUpperCase())}
+          error={errors.panNumber}
+          hint="Optional. For example ABCDE1234F. GST registrations must carry this PAN."
+          maxLength={10}
+          autoCapitalize="characters"
+          spellCheck={false}
+        />
+        <TextField label="Type" value={customerType} onChange={(e) => setCustomerType(e.target.value)} error={errors.customerType} list="customer-type-options" hint="Optional. B2B, B2C, Government…" />
       </FieldRow>
+      <datalist id="customer-type-options">
+        {CUSTOMER_TYPE_SUGGESTIONS.map((t) => (
+          <option key={t} value={t} />
+        ))}
+      </datalist>
       <FieldRow>
-        <TextField label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Optional" />
-        <TextField label="Phone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Optional" />
+        <TextField label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} error={errors.email} placeholder="Optional" autoComplete="email" />
+        <TextField label="Phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} error={errors.phone} placeholder="Optional" autoComplete="tel" />
       </FieldRow>
-      <FieldRow>
-        <TextField label="PAN Number" value={panNumber} onChange={(e) => setPanNumber(e.target.value)} placeholder="Optional" />
-        <TextField label="Customer Type" value={customerType} onChange={(e) => setCustomerType(e.target.value)} placeholder="Optional" />
-      </FieldRow>
-      {errors.form && <p style={{ color: "var(--bad)", fontSize: 12.5 }}>{errors.form}</p>}
+      {errors.form && (
+        <p style={{ color: "var(--bad)", fontSize: 12.5 }} role="alert">
+          {errors.form}
+          {conflict?.existing?.id && conflict.code?.startsWith("DUPLICATE") && (
+            <>
+              {" "}
+              <Link href={`/customers/${conflict.existing.id}`}>Open it</Link>
+            </>
+          )}
+        </p>
+      )}
     </Modal>
   );
 }

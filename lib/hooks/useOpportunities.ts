@@ -7,6 +7,7 @@ import { CreateOpportunityInput, OpportunitySortField } from "../repository/inte
 import { Opportunity, OpportunityStage } from "../types/domain";
 import { OpportunityStageConflictError } from "../repository/shared/opportunityStage";
 import { SortState } from "../types/common";
+import { CustomerConflictError } from "../repository/shared/customerLifecycle";
 
 const NOT_LOADED_MESSAGE = "This opportunity isn't loaded any more. Reload and try again.";
 
@@ -102,6 +103,25 @@ export function useOpportunityDetail(id: string | undefined) {
     [id, repo, refetch, opportunity]
   );
 
+  // Links, changes or removes the opportunity's customer. The backend decides
+  // (the customer and the lead must be active; the customer is locked once a
+  // quotation exists): after success or a refusal because the record moved on,
+  // the screen is reloaded so it shows the truth. A 403 reloads nothing.
+  const linkCustomer = useCallback(
+    async (customerId: string | null) => {
+      if (!id) throw new Error(NOT_LOADED_MESSAGE);
+      try {
+        const updated = await repo.opportunities.linkCustomer(id, customerId);
+        refetch();
+        return updated;
+      } catch (err) {
+        if (err instanceof CustomerConflictError) refetch();
+        throw err;
+      }
+    },
+    [id, repo, refetch]
+  );
+
   return {
     opportunity,
     lead,
@@ -109,6 +129,7 @@ export function useOpportunityDetail(id: string | undefined) {
     loading,
     error,
     updateStage,
+    linkCustomer,
     refetch,
   };
 }

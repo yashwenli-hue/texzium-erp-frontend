@@ -6,6 +6,7 @@ import {
   SalesOrderSortField,
 } from "../interfaces";
 import { db } from "./db";
+import { CustomerConflictError, customerInactiveForMessage } from "../shared/customerLifecycle";
 import { delay, applyListQuery } from "./queryUtils";
 import { mockId } from "./entityStore";
 import {
@@ -61,6 +62,11 @@ export class MockSalesOrderRepository implements ISalesOrderRepository {
     }
     if (quotation && Math.abs(proforma.totalAmount - (quotation.totalAmount ?? quotation.amount)) > QUOTATION_AMOUNT_TOLERANCE + 1e-6) {
       throw new SalesOrderConflictError(proformaTotalsDifferMessage(proforma.totalAmount, quotation.totalAmount ?? quotation.amount));
+    }
+    // An opportunity with an inactive customer gets no new order (legacy, unlinked ones are unaffected).
+    const owner = proforma.opportunityId ? db.opportunities.getById(proforma.opportunityId)?.customerId : undefined;
+    if (owner && db.customers.getById(owner)?.isActive === false) {
+      throw new CustomerConflictError(customerInactiveForMessage("Sales Order"), "CUSTOMER_INACTIVE");
     }
     // One NON-cancelled order per Proforma: a cancelled order stays in history but no longer blocks a replacement.
     if (db.salesOrders.getAll().some((o) => o.proformaInvoiceId === proforma.id && isLiveSalesOrder(o.status))) {

@@ -7,14 +7,19 @@ import { Button } from "../ui/Button";
 import { useToast } from "../ui/Toast";
 import { CreateOpportunityInput } from "../../lib/repository/interfaces";
 import { useLeads } from "../../lib/hooks/useLeads";
+import { useCustomers } from "../../lib/hooks/useCustomers";
 import { isQualifiedLeadStatus } from "../../lib/types/domain";
 
 /**
  * Field-for-field mirror of the VERIFIED CreateOpportunityDto: leadId,
  * title, expectedValue, probability, expectedCloseDate. No free-text
- * customer name and no stage input — customer is derived from the selected
- * lead, and every new opportunity starts at "Qualified" (a lead must
+ * customer name and no stage input — the displayed name comes from the
+ * selected lead, and every new opportunity starts at "Qualified" (a lead must
  * already be qualified before it can become one). See contract §7.
+ *
+ * The customer the deal is for (customerId, optional) is chosen from the
+ * existing customers, and can also be linked later from the opportunity. A
+ * quotation needs it.
  */
 export function OpportunityForm({
   onClose,
@@ -34,6 +39,9 @@ export function OpportunityForm({
   const [expectedValue, setExpectedValue] = useState("");
   const [probability, setProbability] = useState("35");
   const [expectedCloseDate, setExpectedCloseDate] = useState("");
+  const [customerId, setCustomerId] = useState("");
+  const { customers } = useCustomers();
+  const activeCustomers = useMemo(() => customers.filter((c) => c.isActive).sort((a, b) => a.customerName.localeCompare(b.customerName)), [customers]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
 
@@ -62,6 +70,7 @@ export function OpportunityForm({
         expectedValue: Number(expectedValue),
         probability: Number(probability),
         expectedCloseDate: new Date(expectedCloseDate).toISOString(),
+        ...(customerId ? { customerId } : {}),
       });
       toast.show(`Opportunity "${title.trim()}" created`, "check");
       onClose();
@@ -106,6 +115,13 @@ export function OpportunityForm({
             <TextField label="Probability (%)" required type="number" min={0} max={100} value={probability} onChange={(e) => setProbability(e.target.value)} error={errors.probability} />
           </FieldRow>
           <TextField label="Expected Close Date" required type="date" value={expectedCloseDate} onChange={(e) => setExpectedCloseDate(e.target.value)} error={errors.expectedCloseDate} />
+          <SelectField
+            label="Customer"
+            value={customerId}
+            onChange={(e) => setCustomerId(e.target.value)}
+            hint="Optional. Who the deal is for. You can link it later, but a quotation needs a customer."
+            options={[{ value: "", label: "Link a customer later" }, ...activeCustomers.map((c) => ({ value: c.id, label: `${c.customerName} (${c.customerCode})` }))]}
+          />
         </>
       )}
       {errors.form && <p style={{ color: "var(--bad)", fontSize: 12.5 }}>{errors.form}</p>}

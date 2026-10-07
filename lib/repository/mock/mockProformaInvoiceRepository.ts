@@ -2,6 +2,7 @@ import { ID, ListQuery, Page } from "../../types/common";
 import { ProformaEvent, ProformaInvoice } from "../../types/domain";
 import { CreateProformaInvoiceInput, IProformaInvoiceRepository, ProformaInvoiceSortField } from "../interfaces";
 import { db } from "./db";
+import { CustomerConflictError, customerInactiveForMessage } from "../shared/customerLifecycle";
 import { delay, applyListQuery } from "./queryUtils";
 import { mockId } from "./entityStore";
 import {
@@ -72,6 +73,11 @@ export class MockProformaInvoiceRepository implements IProformaInvoiceRepository
     const quotation = db.quotations.getById(input.quotationId);
     if (!quotation) throw new Error("Quotation not found.");
     if (quotation.status !== "APPROVED") throw new ProformaConflictError(proformaQuotationNotApprovedMessage(quotation.status));
+    // A quotation whose opportunity has an inactive customer gets no new Proforma (legacy, unlinked ones are unaffected).
+    const owner = quotation.opportunityId ? db.opportunities.getById(quotation.opportunityId)?.customerId : undefined;
+    if (owner && db.customers.getById(owner)?.isActive === false) {
+      throw new CustomerConflictError(customerInactiveForMessage("Proforma Invoice"), "CUSTOMER_INACTIVE");
+    }
     if (db.proformaInvoices.getAll().some((p) => p.quotationId === quotation.id && isActiveProforma(p))) {
       throw new ProformaConflictError(PROFORMA_ACTIVE_EXISTS_MESSAGE);
     }

@@ -2,90 +2,154 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { PageHeader, DesignNote } from "../../components/ui/PageHeader";
+import { PageHeader } from "../../components/ui/PageHeader";
 import { Panel } from "../../components/ui/Card";
-import { Button, EmptyState } from "../../components/ui/Button";
+import { Button, EmptyState, Pagination, paginate } from "../../components/ui/Button";
+import { Icon } from "../../components/ui/Icon";
 import { Who } from "../../components/ui/Who";
-import { StatusTag, ChipGroup, Chip, Tag } from "../../components/ui/Tag";
-import { DataTable, Column } from "../../components/ui/DataTable";
-import { Pagination, paginate } from "../../components/ui/Button";
+import { Chip, ChipGroup, CustomerStatusTag, Tag } from "../../components/ui/Tag";
+import { ResponsiveList, ResponsiveColumn } from "../../components/ui/ResponsiveList";
 import { CustomerForm } from "../../components/forms/CustomerForm";
 import { useCustomers } from "../../lib/hooks/useCustomers";
-import { useRepository } from "../../lib/repository/RepositoryProvider";
-import { Customer, CustomerStatus } from "../../lib/types/domain";
-import { formatInr, formatDate } from "../../lib/format";
+import { useAuth } from "../../lib/auth/AuthContext";
+import { Customer } from "../../lib/types/domain";
+import { CUSTOMER_PERMISSIONS, normalizeCustomerName, quotingBlockers } from "../../lib/repository/shared/customerLifecycle";
+import { formatDate } from "../../lib/format";
 
-const PAGE_SIZE = 6;
-const STATUSES: CustomerStatus[] = ["Active", "At Risk", "New", "Churned"];
+const PAGE_SIZE = 10;
+type Filter = "all" | "active" | "inactive" | "needsGst";
+
+const activeRegistrations = (c: Customer) => c.gstRegistrations.filter((g) => g.isActive);
+const needsGst = (c: Customer) => quotingBlockers(c).includes("NO_ACTIVE_GST") && c.isActive;
+
+function matches(c: Customer, term: string): boolean {
+  const q = normalizeCustomerName(term);
+  if (!q) return true;
+  const fields = [c.customerName, c.customerCode, c.panNumber ?? "", c.email ?? "", c.phone ?? "", ...c.gstRegistrations.map((g) => g.gstin)];
+  return fields.some((f) => f.toLowerCase().includes(q));
+}
+
+function gstSummary(c: Customer): string {
+  const active = activeRegistrations(c);
+  if (active.length === 0) return c.gstRegistrations.length ? "None active" : "None";
+  const def = active.find((g) => g.isDefault) ?? active[0];
+  return `${active.length} active · ${def.stateName}`;
+}
 
 export default function CustomersPage() {
   const router = useRouter();
-  const repo = useRepository();
-  const isReal = repo.kind === "real";
-  const { customers: allCustomers, loading, error, createCustomer, refetch } = useCustomers();
+  const { hasPermission } = useAuth();
+  const canCreate = hasPermission(CUSTOMER_PERMISSIONS.create);
+  const { customers, loading, error, createCustomer, refetch } = useCustomers();
   const [showForm, setShowForm] = useState(false);
-  const [statusChip, setStatusChip] = useState("All");
+  const [filter, setFilter] = useState<Filter>("all");
+  const [term, setTerm] = useState("");
   const [page, setPage] = useState(1);
 
-  // Mock-only presentation status (see CustomerStatus in lib/types/domain.ts)
-  // — never populated for a real customer, so this filter only applies in
-  // mock mode. Real mode filters by the real isActive field instead.
-  const statusCounts = useMemo(() => {
-    const map: Record<string, number> = {};
-    allCustomers.forEach((c) => { if (c.status) map[c.status] = (map[c.status] ?? 0) + 1; });
-    return map;
-  }, [allCustomers]);
-  const activeCount = allCustomers.filter((c) => c.isActive).length;
-  const inactiveCount = allCustomers.length - activeCount;
+  const counts = useMemo(
+    () => ({
+      all: customers.length,
+      active: customers.filter((c) => c.isActive).length,
+      inactive: customers.filter((c) => !c.isActive).length,
+      needsGst: customers.filter(needsGst).length,
+    }),
+    [customers]
+  );
 
-  const filtered = isReal
-    ? statusChip === "All"
-      ? allCustomers
-      : allCustomers.filter((c) => (statusChip === "Active" ? c.isActive : !c.isActive))
-    : statusChip === "All"
-    ? allCustomers
-    : allCustomers.filter((c) => c.status === statusChip);
-  const pageRows = paginate(filtered, page, PAGE_SIZE);
+  const filtered = useMemo(
+    () =>
+      customers.filter((c) => {
+        if (!matches(c, term)) return false;
+        if (filter === "active") return c.isActive;
+        if (filter === "inactive") return !c.isActive;
+        if (filter === "needsGst") return needsGst(c);
+        return true;
+      }),
+    [customers, filter, term]
+  );
+  const rows = paginate(filtered, page, PAGE_SIZE);
 
-  const realColumns: Column<Customer>[] = [
-    { key: "customerName", header: "Account", render: (c) => <Who name={c.customerName} sub={c.customerCode} /> },
-    { key: "customerType", header: "Type", render: (c) => c.customerType ?? "—" },
-    { key: "contact", header: "Contact", render: (c) => `${c.email ?? "—"} · ${c.phone ?? "—"}` },
-    { key: "gstRegistrations", header: "GST Registrations", render: (c) => String(c.gstRegistrations.length) },
-    { key: "isActive", header: "Status", render: (c) => <Tag color={c.isActive ? "g" : "b"}>{c.isActive ? "Active" : "Inactive"}</Tag> },
-    { key: "createdAt", header: "Created", render: (c) => formatDate(c.createdAt) },
+  const choose = (f: Filter) => {
+    setFilter(f);
+    setPage(1);
+  };
+
+  const columns: ResponsiveColumn<Customer>[] = [
+    { key: "account", header: "Account", primary: true, render: (c) => <Who name={c.customerName} sub={c.customerCode + (c.customerType ? ` · ${c.customerType}` : "")} /> },
+    { key: "contact", header: "Contact", render: (c) => (c.email || c.phone ? [c.email, c.phone].filter(Boolean).join(" · ") : "—") },
+    { key: "gst", header: "GST registrations", render: (c) => gstSummary(c) },
+    {
+      key: "status",
+      header: "Status",
+      render: (c) => (
+        <span style={{ display: "inline-flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+          <CustomerStatusTag isActive={c.isActive} />
+          {needsGst(c) && <Tag color="w">Can&apos;t be quoted yet</Tag>}
+        </span>
+      ),
+    },
+    { key: "created", header: "Created", render: (c) => formatDate(c.createdAt) },
   ];
 
-  const mockColumns: Column<Customer>[] = [
-    { key: "customerName", header: "Account", render: (c) => <Who name={c.customerName} sub={`${c.industry ?? "—"} · ${c.city ?? "—"}`} /> },
-    { key: "ownerName", header: "Owner", render: (c) => c.ownerName ?? "—" },
-    { key: "openOrders", header: "Open Orders", render: (c) => String(c.openOrders ?? 0) },
-    { key: "lifetimeValue", header: "Lifetime Value", render: (c) => formatInr(c.lifetimeValue ?? 0) },
-    { key: "status", header: "Status", render: (c) => (c.status ? <StatusTag status={c.status} /> : "—") },
-    { key: "customerSince", header: "Customer Since", render: (c) => (c.customerSince ? formatDate(c.customerSince) : "—") },
-  ];
+  const card = (c: Customer) => (
+    <>
+      <div className="rl-top">
+        <div style={{ minWidth: 0 }}>
+          <div className="rl-title">{c.customerName}</div>
+          <div className="rl-sub">{c.customerCode}{c.customerType ? ` · ${c.customerType}` : ""}</div>
+        </div>
+        <CustomerStatusTag isActive={c.isActive} />
+      </div>
+      <div className="rl-meta">
+        <span>GST: {gstSummary(c)}</span>
+        {c.phone && <span>{c.phone}</span>}
+        {c.email && <span>{c.email}</span>}
+      </div>
+      {needsGst(c) && <div className="rl-hint">Can&apos;t be quoted yet: no active GST registration</div>}
+    </>
+  );
 
-  if (loading && allCustomers.length === 0) {
+  const header = (
+    <PageHeader
+      eyebrow="RevenueOS · Customers"
+      title="Customers"
+      subtitle="Who you sell to: their identity, GST registrations and everything quoted, ordered and billed."
+      cta={
+        <Button variant="primary" icon="plus" onClick={() => setShowForm(true)} disabled={!canCreate} title={canCreate ? undefined : "You don't have permission to create customers."}>
+          New Customer
+        </Button>
+      }
+    />
+  );
+
+  if (loading && customers.length === 0) {
     return (
       <div className="page">
-        <div className="skeleton" style={{ height: 220, marginBottom: 16 }} />
-        <div className="skeleton" style={{ height: 300 }} />
+        {header}
+        <div className="skeleton" style={{ height: 44, marginBottom: 14 }} />
+        <div className="skeleton" style={{ height: 320 }} />
       </div>
     );
   }
 
-  // A failed fetch must not read as "zero customers" — that's the
-  // DataTable's own empty state below, reserved for a genuine zero-result response.
-  if (error && allCustomers.length === 0) {
+  // A failed fetch must not read as "zero customers".
+  if (error && customers.length === 0) {
+    const forbidden = (error as { status?: number }).status === 403;
     return (
       <div className="page">
-        <PageHeader eyebrow="RevenueOS · Customers" title="Customers" subtitle="Real customer accounts and their GST registrations." />
+        {header}
         <Panel title="Customers">
           <EmptyState
             icon="alert"
-            title="Couldn't load customers"
-            body={error.message || "Something went wrong reaching the RevenueOS backend. Please try again."}
-            action={<Button variant="ghost" onClick={refetch}>Retry</Button>}
+            title={forbidden ? "You don't have access to customers" : "Couldn't load customers"}
+            body={forbidden ? "Viewing customers needs the customers.view permission. Ask an administrator to grant it, then sign in again." : error.message || "Something went wrong reaching the RevenueOS backend. Please try again."}
+            action={
+              !forbidden ? (
+                <Button variant="ghost" onClick={refetch}>
+                  Retry
+                </Button>
+              ) : undefined
+            }
           />
         </Panel>
       </div>
@@ -94,74 +158,63 @@ export default function CustomersPage() {
 
   return (
     <div className="page">
-      <PageHeader
-        eyebrow="RevenueOS · Customers"
-        title="Customers"
-        subtitle={isReal ? "Real customer accounts and their GST registrations." : "Converted accounts — lifetime value, order history and account health."}
-        cta={
-          <Button variant="primary" icon="plus" onClick={() => setShowForm(true)} disabled={isReal}>
-            New Customer
-          </Button>
-        }
-      />
+      {header}
 
-      {isReal && (
-        <p style={{ fontSize: 12.5, color: "var(--muted)", margin: "-8px 0 14px" }}>
-          Customer creation is unavailable in connected mode because the current backend endpoint is
-          rejecting valid customer payloads. Existing customers can still be viewed and searched.
-        </p>
-      )}
-
-      <ChipGroup>
-        {isReal ? (
-          <>
-            <Chip label={`All ${allCustomers.length}`} active={statusChip === "All"} onClick={() => { setStatusChip("All"); setPage(1); }} />
-            {activeCount > 0 && <Chip label={`Active ${activeCount}`} active={statusChip === "Active"} onClick={() => { setStatusChip("Active"); setPage(1); }} />}
-            {inactiveCount > 0 && <Chip label={`Inactive ${inactiveCount}`} active={statusChip === "Inactive"} onClick={() => { setStatusChip("Inactive"); setPage(1); }} />}
-          </>
-        ) : (
-          <>
-            <Chip label={`All ${allCustomers.length}`} active={statusChip === "All"} onClick={() => { setStatusChip("All"); setPage(1); }} />
-            {STATUSES.filter((s) => statusCounts[s]).map((s) => (
-              <Chip key={s} label={`${s} ${statusCounts[s]}`} active={statusChip === s} onClick={() => { setStatusChip(s); setPage(1); }} />
-            ))}
-          </>
-        )}
-      </ChipGroup>
-
-      <div style={{ marginTop: 14 }}>
-        <Panel title="Customer Accounts" flush>
-          <DataTable
-            columns={isReal ? realColumns : mockColumns}
-            rows={pageRows}
-            onRowClick={(c) => router.push(`/customers/${c.id}`)}
-            emptyTitle="No customers match this filter"
+      <div className="cust-toolbar">
+        <label className="cust-search">
+          <Icon name="search" size={16} />
+          <span className="sr-only">Search customers</span>
+          <input
+            type="search"
+            value={term}
+            onChange={(e) => {
+              setTerm(e.target.value);
+              setPage(1);
+            }}
+            placeholder="Search by name, code, PAN, GSTIN, phone or email"
           />
-          <Pagination page={page} pageSize={PAGE_SIZE} total={filtered.length} onPageChange={setPage} />
-        </Panel>
+        </label>
+        <ChipGroup>
+          <Chip label={`All ${counts.all}`} active={filter === "all"} onClick={() => choose("all")} />
+          <Chip label={`Active ${counts.active}`} active={filter === "active"} onClick={() => choose("active")} />
+          {counts.inactive > 0 && <Chip label={`Inactive ${counts.inactive}`} active={filter === "inactive"} onClick={() => choose("inactive")} />}
+          {counts.needsGst > 0 && <Chip label={`Can't be quoted yet ${counts.needsGst}`} active={filter === "needsGst"} onClick={() => choose("needsGst")} />}
+        </ChipGroup>
       </div>
 
-      <DesignNote>
-        {isReal ? (
-          <>
-            <b>Design note.</b> Customer, GST registration count and status all come from the VERIFIED{" "}
-            <code>GET /customers</code> route (which nests <code>gstRegistrations</code>). There is no
-            search/filter/sort query parameter on this endpoint — filtering above happens entirely against
-            the already-fetched list, not on the server. The backend has no query for filtering by GST
-            registration count, so that column is display-only.
-          </>
-        ) : (
-          <>
-            <b>Design note.</b> Customers is where a lead lands after Won. Status uses the same muted tag
-            system as everywhere else in RevenueOS — each color always means the same thing (green =
-            healthy, amber = at risk, red = churned, blue = new). These four statuses are frontend-only
-            presentation labels — the verified Customer master contract has no status field yet (see
-            CustomerStatus in lib/types/domain.ts).
-          </>
-        )}
-      </DesignNote>
+      <Panel title="Customer accounts" flush>
+        <ResponsiveList
+          rows={rows}
+          columns={columns}
+          getHref={(c) => `/customers/${c.id}`}
+          getLabel={(c) => `Open ${c.customerName}`}
+          card={card}
+          caption="Customers"
+          testId="customer-list"
+          emptyIcon="building"
+          emptyTitle={customers.length === 0 ? "No customers yet" : "No customers match"}
+          emptyBody={customers.length === 0 ? "Create the first customer to start quoting. A customer needs a GST registration before it can be quoted." : "Try a different search or filter."}
+          emptyAction={
+            customers.length === 0 && canCreate ? (
+              <Button variant="primary" icon="plus" onClick={() => setShowForm(true)}>
+                New Customer
+              </Button>
+            ) : undefined
+          }
+        />
+        <Pagination page={page} pageSize={PAGE_SIZE} total={filtered.length} onPageChange={setPage} />
+      </Panel>
 
-      {showForm && <CustomerForm onClose={() => setShowForm(false)} onSubmit={createCustomer} />}
+      {showForm && (
+        <CustomerForm
+          onClose={() => setShowForm(false)}
+          onSubmit={async (input) => {
+            const created = await createCustomer(input);
+            router.push(`/customers/${created.id}`);
+            return created;
+          }}
+        />
+      )}
     </div>
   );
 }

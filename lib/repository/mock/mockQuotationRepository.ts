@@ -6,6 +6,13 @@ import {
   QuotationSortField,
 } from "../interfaces";
 import { db } from "./db";
+import {
+  BUYER_GST_NOT_CUSTOMERS_MESSAGE,
+  CUSTOMER_NOT_FOUND_MESSAGE,
+  CustomerConflictError,
+  OPPORTUNITY_NOT_LINKED_MESSAGE,
+  customerInactiveForMessage,
+} from "../shared/customerLifecycle";
 import { delay, applyListQuery } from "./queryUtils";
 import { mockId } from "./entityStore";
 import {
@@ -73,7 +80,17 @@ export class MockQuotationRepository implements IQuotationRepository {
 
   async create(input: CreateQuotationInput): Promise<Quotation> {
     const opportunity = db.opportunities.getById(input.opportunityId);
-    if (!opportunity) throw new Error(`Opportunity ${input.opportunityId} not found`);
+    if (!opportunity) throw new Error("Opportunity not found");
+    // The same rules as the backend (quotations.service.ts create): the opportunity
+    // has a customer, who is active, and the buyer registration is that customer's own and active.
+    if (!opportunity.customerId) throw new CustomerConflictError(OPPORTUNITY_NOT_LINKED_MESSAGE, "OPPORTUNITY_NOT_LINKED");
+    const customer = db.customers.getById(opportunity.customerId);
+    if (!customer) throw new Error(CUSTOMER_NOT_FOUND_MESSAGE);
+    if (!customer.isActive) throw new CustomerConflictError(customerInactiveForMessage("quotation"), "CUSTOMER_INACTIVE");
+    const buyer = db.customers.getAll().flatMap((c) => c.gstRegistrations).find((g) => g.id === input.buyerGstId);
+    if (!buyer) throw new Error("Buyer GST not found");
+    if (buyer.customerId !== customer.id) throw new Error(BUYER_GST_NOT_CUSTOMERS_MESSAGE);
+    if (!buyer.isActive) throw new CustomerConflictError("The buyer GST registration is inactive. Choose an active one.", "GST_INACTIVE");
     quoteCounter += 1;
     const now = new Date().toISOString();
     const amounts = computeQuotationAmounts(input.quantity * input.unitPrice, MOCK_GST_PERCENT);
@@ -94,6 +111,9 @@ export class MockQuotationRepository implements IQuotationRepository {
       quoteDate: input.quoteDate,
       quantity: input.quantity,
       unitPrice: input.unitPrice,
+      buyerGstId: input.buyerGstId,
+      sellerGstId: input.sellerGstId,
+      placeOfSupply: buyer.stateName,
     };
     db.quotations.add(quotation);
     this.record({

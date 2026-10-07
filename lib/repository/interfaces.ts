@@ -41,6 +41,10 @@ import {
   CollectionsEfficiency,
   CollectionsRecoveryRate,
   AppNotification,
+  CustomerEvent,
+  CustomerGstRegistration,
+  CustomerDuplicateCheck,
+  CustomerOverview,
 } from "../types/domain";
 
 /**
@@ -171,20 +175,104 @@ export interface IUserRepository {
   listAssignable(): Promise<AssignableUser[]>;
 }
 
-// Mirrors the VERIFIED CreateCustomerDto for Customer Master.
+// Mirrors the VERIFIED CreateCustomerDto (backend bb9f81f). The customer code is
+// not an input: the server assigns it (CUST-000001, ...) and it never changes.
+// A new customer is always active.
 export interface CreateCustomerInput {
-  customerCode: string;
   customerName: string;
+  customerType?: string;
   panNumber?: string;
   email?: string;
   phone?: string;
-  customerType?: string;
 }
 
+// Mirrors the VERIFIED UpdateCustomerDto: a field that is left out is unchanged,
+// and an optional one sent as null is cleared. The name cannot be cleared, and
+// the code, the active flag and the vendor link cannot be edited.
+export interface UpdateCustomerInput {
+  customerName?: string;
+  customerType?: string | null;
+  panNumber?: string | null;
+  email?: string | null;
+  phone?: string | null;
+}
+
+export interface CustomerDuplicateQuery {
+  customerName?: string;
+  panNumber?: string;
+  phone?: string;
+  email?: string;
+  /** The customer being edited, so it is not reported as its own duplicate. */
+  excludeCustomerId?: ID;
+}
+
+/**
+ * VERIFIED routes (backend bb9f81f, 7c10ab0): GET /customers, GET /customers/:id,
+ * POST /customers (customers.create), PATCH /customers/:id (customers.edit),
+ * PATCH /customers/:id/deactivate and /reactivate (customers.deactivate),
+ * GET /customers/duplicate-check, GET /customers/:id/events and
+ * GET /customers/:id/overview (customers.view).
+ *
+ * Failures: a 409 is a CustomerConflictError (a duplicate PAN or name, an
+ * inactive customer, a stale state); a 403 stays an ApiError(403).
+ */
 export interface ICustomerRepository {
   list(query?: ListQuery<CustomerSortField>): Promise<Page<Customer>>;
   getById(id: ID): Promise<Customer | null>;
   create(input: CreateCustomerInput): Promise<Customer>;
+  /** Writes only what changed; an edit that changes nothing records nothing. An inactive customer cannot be edited. */
+  update(id: ID, input: UpdateCustomerInput): Promise<Customer>;
+  /** ACTIVE -> INACTIVE. The reason is mandatory. Nothing the customer has is touched. */
+  deactivate(id: ID, reason: string): Promise<Customer>;
+  reactivate(id: ID, remarks?: string): Promise<Customer>;
+  /** Newest first. */
+  listEvents(id: ID): Promise<CustomerEvent[]>;
+  /** The customer's quote-to-cash chain, followed by id, in one read. */
+  getOverview(id: ID): Promise<CustomerOverview>;
+  /** Customers that look like the one described; nothing is written. At least one field is needed. */
+  duplicateCheck(query: CustomerDuplicateQuery): Promise<CustomerDuplicateCheck>;
+}
+
+// Mirrors the VERIFIED CreateCustomerGstDto (backend 70a8609). The state is not an
+// input: the server reads it from the GSTIN. The first registration of a
+// customer is its default whatever is sent.
+export interface CreateGstRegistrationInput {
+  customerId: ID;
+  gstin: string;
+  legalName: string;
+  tradeName?: string;
+  branchName?: string;
+  addressLine1: string;
+  addressLine2?: string;
+  city: string;
+  pincode: string;
+  isDefault?: boolean;
+}
+
+// Mirrors the VERIFIED UpdateCustomerGstDto. The GSTIN and the state cannot change.
+export interface UpdateGstRegistrationInput {
+  legalName?: string;
+  tradeName?: string | null;
+  branchName?: string | null;
+  addressLine1?: string;
+  addressLine2?: string | null;
+  city?: string;
+  pincode?: string;
+}
+
+/**
+ * VERIFIED routes (backend 70a8609): POST /customer-gst, PATCH /customer-gst/:id,
+ * PATCH /customer-gst/:id/deactivate, /reactivate and /default, all
+ * customers.gst.manage. Registrations are never deleted. Reading them is part of
+ * reading the customer (customers.view).
+ */
+export interface IGstRegistrationRepository {
+  create(input: CreateGstRegistrationInput): Promise<CustomerGstRegistration>;
+  update(id: ID, input: UpdateGstRegistrationInput): Promise<CustomerGstRegistration>;
+  /** The reason is mandatory. The default cannot be deactivated while another registration is active. */
+  deactivate(id: ID, reason: string): Promise<CustomerGstRegistration>;
+  reactivate(id: ID, remarks?: string): Promise<CustomerGstRegistration>;
+  setDefault(id: ID): Promise<CustomerGstRegistration>;
 }
 
 export interface CreateContactInput {
@@ -265,6 +353,8 @@ export interface CreateOpportunityInput {
   expectedValue: number;
   probability: number;
   expectedCloseDate: string;
+  /** The customer the deal is for. Optional: it can be linked later. */
+  customerId?: ID;
 }
 
 export interface IOpportunityRepository {
@@ -280,6 +370,15 @@ export interface IOpportunityRepository {
    * OpportunityStageConflictError when the stage has changed in the meantime.
    */
   updateStage(id: ID, fromStage: OpportunityStage, toStage: OpportunityStage): Promise<Opportunity>;
+  /**
+   * Links the opportunity to a customer, changes it, or (null) removes it
+   * (PATCH /opportunities/:id/customer, permission opportunities.edit). The
+   * customer and the lead must be active. An opportunity with a customer and a
+   * quotation keeps its customer; one without a customer can be given one even
+   * if it already has documents, as long as none uses another customer's GST
+   * registration. Throws CustomerConflictError on a refusal.
+   */
+  linkCustomer(id: ID, customerId: ID | null): Promise<Opportunity>;
 }
 
 // Mirrors the VERIFIED CreateQuotationDto exactly: opportunityId, quoteDate,
@@ -623,6 +722,7 @@ export interface RevenueOSRepository {
   leadFollowups: ILeadFollowupRepository;
   users: IUserRepository;
   customers: ICustomerRepository;
+  customerGst: IGstRegistrationRepository;
   contacts: IContactRepository;
   activities: IActivityRepository;
   tasks: ITaskRepository;

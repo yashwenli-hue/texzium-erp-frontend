@@ -1,0 +1,478 @@
+import { ID } from "./common";
+
+/**
+ * ============================================================================
+ * DOMAIN TYPES — RevenueOS
+ * ============================================================================
+ * These types describe the shape the UI needs. They are NOT confirmed against
+ * the real backend schema yet. Every field with an open question is flagged
+ * inline with `// @backend-verify:` and mirrored in docs/backend-ui-contract.md.
+ * Do not treat these as a source of truth for Prisma models or API contracts —
+ * they are a frontend-side working assumption only.
+ * ============================================================================
+ */
+
+// VERIFIED: the deployed Prisma `LeadStatus` enum (prisma/schema.prisma on
+// the backend). These are the exact values the API accepts/returns — not the
+// prototype's invented New/Contacted/Qualified/Proposal/Negotiation/Won/Lost
+// labels. LEAD_QUALIFIED and LEAD_REJECTED remain distinct, permission-gated
+// events (leads.qualify / leads.reject) reachable only through the dedicated
+// Qualify/Reject actions, never a casual drag on the pipeline board — the
+// real qualify() action sets status to SALES_ASSIGNED (not "QUALIFIED"),
+// confirmed in lead-assignments.service.ts. See docs/backend-ui-contract.md §3.
+export type LeadStatus =
+  | "NEW"
+  | "ASSIGNED"
+  | "CONTACTED"
+  | "QUALIFIED"
+  | "PROPOSAL_SENT"
+  | "NEGOTIATION"
+  | "WON"
+  | "LOST"
+  | "PRE_SALES_ASSIGNED"
+  | "SALES_ASSIGNED"
+  | "REJECTED";
+
+export const LEAD_STATUSES: LeadStatus[] = [
+  "NEW",
+  "ASSIGNED",
+  "CONTACTED",
+  "QUALIFIED",
+  "PROPOSAL_SENT",
+  "NEGOTIATION",
+  "WON",
+  "LOST",
+  "PRE_SALES_ASSIGNED",
+  "SALES_ASSIGNED",
+  "REJECTED",
+];
+
+/** Freely draggable on the Lead Pipeline board — Qualify/Reject are gated actions, not drag targets. */
+export const LEAD_BOARD_STATUSES: LeadStatus[] = ["NEW", "CONTACTED"];
+
+/** "PRE_SALES_ASSIGNED" -> "Pre Sales Assigned". Shared by status badges and timeline action labels. */
+export function titleCaseFromConstant(value: string): string {
+  return value
+    .toLowerCase()
+    .split("_")
+    .map((w) => (w ? w.charAt(0).toUpperCase() + w.slice(1) : w))
+    .join(" ");
+}
+
+/** Presentation label for a raw backend status value, e.g. "PRE_SALES_ASSIGNED" -> "Pre Sales Assigned". */
+export function formatLeadStatus(status: string): string {
+  return titleCaseFromConstant(status);
+}
+
+/** The real qualify() action sets status to SALES_ASSIGNED, not the enum's own QUALIFIED value — both read as "qualified" for UI gating (e.g. eligible to become an Opportunity). */
+export function isQualifiedLeadStatus(status: LeadStatus): boolean {
+  return status === "QUALIFIED" || status === "SALES_ASSIGNED";
+}
+
+// Frontend-only lead-scoring heuristic for presentation/prioritization.
+// No backend equivalent — never treat as authoritative.
+export type LeadScore = "Hot" | "Warm" | "Cold";
+
+// VERIFIED: lead creation requires a valid sourceId referencing an existing
+// LeadSource record (name, description?). Mirrors the lead-sources module.
+//
+// `category` is MOCK/UI-ONLY: the verified LeadSource model exposes only
+// name/description — there is no confirmed source-type/category field.
+// It exists here purely to power source-type filtering and visual grouping
+// in the UI; do not treat it as a backend field until confirmed.
+export interface LeadSourceRecord {
+  id: ID;
+  name: string;
+  description?: string;
+  category?: string;
+}
+
+// MOCK/UI-ONLY presentation context requested for the Lead workspace
+// (product interest, free-text remarks, city). None of these exist on the
+// verified CreateLeadDto/UpdateLeadDto (docs/backend-ui-contract.md §3).
+// They are kept in this separate, clearly-named block — never flattened
+// into the DTO-mirroring fields below — so Phase B integration cannot
+// silently start sending them to a real endpoint. If Phase B needs to
+// persist them, that requires a confirmed backend field/endpoint first;
+// until then, values entered here are local-only and will not survive a
+// switch to the real repository.
+export interface LeadUIContext {
+  productInterest?: string;
+  remarks?: string;
+  city?: string;
+}
+
+// VERIFIED: LeadFollowup { id, leadId, followupDate, remarks?, status,
+// completedAt?, completedById?, createdAt, updatedAt }. completedByName is
+// denormalized for display — the real complete/reschedule/cancel/list
+// responses include a selected `completedBy` user, not a raw scalar field.
+// See docs/backend-ui-contract.md §5.
+export type LeadFollowupStatus = "PENDING" | "COMPLETED" | "CANCELLED";
+
+export interface LeadFollowup {
+  id: ID;
+  leadId: ID;
+  followupDate: string; // ISO 8601
+  remarks?: string;
+  status: LeadFollowupStatus;
+  completedAt?: string | null;
+  completedByName?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Minimal real-user shape needed to populate the Assign/Qualify dropdowns —
+// see AssignLeadDialog/QualifyLeadDialog. Sourced from GET /users (outside
+// the RevenueOS module; no RevenueOS-scoped assignable-user lookup is
+// confirmed — see docs/backend-ui-contract.md §21 and the Stage 2A report).
+export interface AssignableUser {
+  id: ID;
+  name: string;
+}
+
+// Minimal option shapes needed to populate the real Quotation creation form's
+// Inventory Item / Seller GST / Buyer GST pickers — CreateQuotationDto
+// requires all three ids, and none have a RevenueOS-scoped lookup, so these
+// are sourced from GET /inventory (OperationsOS), GET /company-gst and
+// GET /customer-gst (ComplianceOS/RevenueOS) respectively — same "least
+// invasive real option" precedent as AssignableUser/GET /users. See
+// docs/backend-ui-contract.md §8, §21 and the Stage 2C report.
+export interface InventoryItemOption {
+  id: ID;
+  name: string;
+}
+
+export interface GstRegistrationOption {
+  id: ID;
+  label: string;
+  stateCode: string;
+}
+
+// VERIFIED CreateLeadDto: leadCode?, customerName, companyName?, email?,
+// phone, alternatePhone?, sourceId. See docs/backend-ui-contract.md §3.
+export interface Lead {
+  id: ID;
+  customerName: string;
+  companyName?: string;
+  email?: string;
+  phone: string;
+  alternatePhone?: string;
+  sourceId: ID;
+  sourceName: string; // denormalized — VERIFIED: lead list/detail includes the source relation
+  status: LeadStatus;
+  /** Frontend-only heuristic with no backend basis at all — leave unset for real leads rather than fabricate it. */
+  score?: LeadScore;
+  // Unset until the dedicated Assign action fires (AssignLeadDto / PRE_SALES_ASSIGNED).
+  assignedToId?: ID;
+  assignedToName?: string;
+  createdAt: string; // ISO 8601
+  updatedAt: string; // ISO 8601
+  lastActivityAt: string; // ISO 8601
+  /** MOCK/UI-ONLY — see LeadUIContext. Not part of the verified Lead contract. */
+  uiContext?: LeadUIContext;
+  /** VERIFIED: both lead list and lead detail embed the followups relation. */
+  followups?: LeadFollowup[];
+  /** VERIFIED: lead detail (not list) embeds the LeadNote relation; there is no create endpoint for it yet. */
+  notes?: LeadNoteEntry[];
+}
+
+// VERIFIED: LeadNote { id, leadId, note, createdAt } — Lead-scoped only, and
+// read-only from the frontend: no backend endpoint creates one. See
+// docs/backend-ui-contract.md §20.
+export interface LeadNoteEntry {
+  id: ID;
+  leadId: ID;
+  note: string;
+  createdAt: string;
+}
+
+export interface LeadTimelineEntry {
+  id: ID;
+  leadId: ID;
+  icon: string; // maps to an icon key in the icon set
+  title: string;
+  detail: string;
+  actorName: string;
+  occurredAt: string; // ISO 8601
+}
+
+// UI ASSUMPTION — carried over from the prototype. The VERIFIED
+// CreateCustomerDto (customerCode, customerName, panNumber?, email?,
+// phone?, customerType?) has no status field at all, so this is not a
+// case of "unconfirmed enum values" like Lead/Opportunity/Quotation —
+// there is currently no backend account-health concept to mirror. Kept as
+// a frontend-only presentation label until a real field is confirmed; do
+// not treat these four values as backend-verified. See
+// docs/backend-ui-contract.md §6.
+
+
+
+export type ContactType = "Decision Maker" | "Champion" | "Influencer";
+
+export interface Contact {
+  id: ID;
+  name: string;
+  title: string;
+  companyName: string; // denormalized for display
+  companyId?: ID; // links to Customer or Lead — @backend-verify: relationship model
+  type: ContactType;
+  email: string;
+  phone: string;
+  lastContactedAt: string | null; // ISO 8601
+  ownerId: ID;
+  ownerName: string;
+}
+
+export type ActivityType =
+  | "Call"
+  | "Email"
+  | "Meeting"
+  | "WhatsApp"
+  | "Quotation"
+  | "Stage Change"
+  | "Note";
+
+// VERIFIED: the backend confirms LeadNote (leadId, note, createdAt) —
+// Lead-scoped only. "Customer" and "Opportunity" as linkable record types
+// are UI ASSUMPTIONS carried over from the prototype / added for this
+// refinement; no generic polymorphic note/activity relation is confirmed
+// for Customer or Opportunity yet. See docs/backend-ui-contract.md §20.
+export type RelatedRecordType = "Lead" | "Customer" | "Opportunity";
+
+export interface Activity {
+  id: ID;
+  type: ActivityType;
+  relatedType: RelatedRecordType;
+  relatedId: ID;
+  relatedName: string; // denormalized for display
+  ownerName: string;
+  occurredAt: string; // ISO 8601
+  note: string;
+}
+
+export type TaskPriority = "High" | "Medium" | "Low";
+
+export interface Task {
+  id: ID;
+  title: string;
+  dueAt: string | null; // ISO 8601, null = no due date
+  priority: TaskPriority;
+  linkedType: RelatedRecordType;
+  linkedId: ID;
+  linkedName: string;
+  assigneeName: string;
+  done: boolean;
+  createdAt: string;
+}
+
+export interface Note {
+  id: ID;
+  text: string;
+  linkedType: RelatedRecordType;
+  linkedId: ID;
+  linkedName: string;
+  authorName: string;
+  createdAt: string;
+  pinned: boolean;
+}
+
+// VERIFIED: the backend's own Opportunity.status is a plain String
+// defaulting to "OPEN", with no enum and no mutation endpoint anywhere in
+// the codebase — it never changes. `stage` below is therefore a client-side
+// pipeline concept only, held in the browser (see realOpportunityRepository),
+// not a projection of that backend field. See docs/backend-ui-contract.md §7, §17.
+export type OpportunityStage =
+  | "Qualified"
+  | "Proposal"
+  | "Negotiation"
+  | "Won"
+  | "Lost";
+
+export const OPPORTUNITY_STAGES: OpportunityStage[] = [
+  "Qualified",
+  "Proposal",
+  "Negotiation",
+  "Won",
+  "Lost",
+];
+
+/** Linear happy-path order for the lifecycle stepper — "Lost" is a terminal flag, not a step. */
+export const OPPORTUNITY_STEPS: OpportunityStage[] = ["Qualified", "Proposal", "Negotiation", "Won"];
+
+// VERIFIED CreateOpportunityDto: leadId, title, expectedValue, probability,
+// expectedCloseDate. Creation writes OPPORTUNITY_CREATED to the lead
+// timeline. See docs/backend-ui-contract.md §7.
+export interface Opportunity {
+  id: ID;
+  leadId: ID;
+  title: string;
+  customerName: string; // denormalized from the linked lead, for display/grouping only
+  stage: OpportunityStage;
+  expectedValue: number; // INR. @backend-verify: currency + unit.
+  probability: number; // 0-100
+  expectedCloseDate: string; // ISO 8601
+  ownerName: string;
+  createdAt: string; // ISO 8601
+}
+
+// VERIFIED: Quotation.status is a plain backend String (@default("DRAFT")),
+// no Prisma enum. create() sets DRAFT, revise() sets REVISED, approve() sets
+// APPROVED — confirmed by reading quotations.service.ts directly. convert()
+// (POST /:id/convert) creates a SalesOrder record but never writes CONVERTED
+// (or any other value) back onto the Quotation itself — that status value is
+// never actually reachable through any real backend code path, even though
+// it's part of the master plan's documented workflow terminology. See
+// docs/backend-ui-contract.md §8, Stage 2C report.
+export type QuotationStatus = "DRAFT" | "REVISED" | "APPROVED" | "CONVERTED";
+
+export const QUOTATION_STATUSES: QuotationStatus[] = ["DRAFT", "REVISED", "APPROVED", "CONVERTED"];
+
+export function formatQuotationStatus(status: string): string {
+  return titleCaseFromConstant(status);
+}
+
+// MOCK/UI-ONLY: the backend confirms a `revise` operation exists, but no
+// persisted multi-version history is confirmed — this models a V1/V2/V3
+// revision trail for the UI only. A real integration may return a single
+// current amount with no history, or a differently-shaped history; treat
+// this shape as presentation-only until a real endpoint is confirmed.
+export interface QuotationRevision {
+  version: number;
+  amount: number;
+  createdAt: string;
+  note?: string;
+}
+
+export interface Quotation {
+  id: ID;
+  /** quotationCode from the backend, which no verified code path ever sets — falls back to a short id reference (`#XXXXXXXX`), never a fabricated sequential number. */
+  quoteNo: string;
+  customerId?: ID;
+  customerName: string;
+  opportunityId?: ID;
+  opportunityName: string;
+  /** Canonical headline amount — totalAmount for a real quotation, the user-entered estimate for mock. */
+  amount: number;
+  status: QuotationStatus;
+  /** MOCK/UI-ONLY — no backend field. Always null for a real quotation. */
+  validUntil: string | null; // ISO 8601
+  ownerName: string;
+  createdAt: string;
+  /** MOCK/UI-ONLY current revision number — see QuotationRevision. Always 1 for a real quotation (no persisted version history). */
+  version: number;
+  /** MOCK/UI-ONLY revision trail — see QuotationRevision. Always empty for a real quotation. */
+  revisions: QuotationRevision[];
+  /** VERIFIED real fields below — backend-computed, undefined for mock quotations. See docs/backend-ui-contract.md §8. */
+  quoteDate?: string;
+  quantity?: number;
+  unitPrice?: number;
+  taxableAmount?: number;
+  gstPercent?: number;
+  gstAmount?: number;
+  totalAmount?: number;
+  taxType?: string;
+  placeOfSupply?: string;
+}
+
+// VERIFIED: ProformaInvoice.customerStatus is a plain backend String
+// (@default("PENDING")), no Prisma enum. create() leaves it at PENDING;
+// approve() (PATCH /:id/approve) is the only mutation and sets APPROVED.
+// No other status value is ever written by any backend code path — see
+// proforma-invoices.service.ts.
+export type ProformaInvoiceStatus = "PENDING" | "APPROVED";
+
+export const PROFORMA_INVOICE_STATUSES: ProformaInvoiceStatus[] = ["PENDING", "APPROVED"];
+
+export function formatProformaInvoiceStatus(status: string): string {
+  return titleCaseFromConstant(status);
+}
+
+// VERIFIED CreateProformaInvoiceDto: quotationId, issueDate, totalAmount,
+// validityDate?, remarks?. totalAmount is NOT backend-computed here (unlike
+// Quotation, which derives it from HSN/GST) — the backend stores exactly
+// whatever number is sent. See docs/backend-ui-contract.md §9.
+export interface ProformaInvoice {
+  id: ID;
+  /** proformaNumber from the backend, never set by any verified code path — falls back to a short id reference, never a fabricated sequential number. */
+  proformaNumber: string;
+  quotationId: ID;
+  quoteNo: string; // denormalized from the linked quotation, for display
+  customerName: string; // denormalized via quotation -> opportunity -> lead
+  opportunityId?: ID;
+  opportunityName: string;
+  issueDate: string;
+  totalAmount: number;
+  status: ProformaInvoiceStatus;
+  validityDate: string | null;
+  remarks?: string;
+  ownerName: string;
+  createdAt: string;
+}
+
+// VERIFIED: SalesOrder.status is a plain backend String (@default("OPEN")),
+// no Prisma enum — same pattern as Quotation/ProformaInvoice. The RevenueOS
+// Sales Orders controller (sales-orders.controller.ts) only ever writes two
+// values: "OPEN" (via quotations.service.ts convertToSalesOrder(), and the
+// AdminOS Workflow Executor's unrelated QUOTATION_APPROVED trigger) and
+// "PENDING_STORE_APPROVAL" (via sales-orders.service.ts create(), the direct
+// POST /sales-orders path from an approved Proforma Invoice). Other values
+// observed in real data (e.g. "READY_FOR_INVOICING") are written exclusively
+// by unrelated OperationsOS (Dispatch Orders) and AdminOS (Workflow
+// Executor) modules — there is no RevenueOS-scoped endpoint that transitions
+// a Sales Order's status, so this stays a plain string rather than a closed
+// union, and no frontend action is offered for those other values. See the
+// Stage 2E report.
+export function formatSalesOrderStatus(status: string): string {
+  return titleCaseFromConstant(status);
+}
+
+// VERIFIED CreateSalesOrderDto: proformaInvoiceId, orderDate, totalAmount,
+// inventoryItemId, orderQty, sellerGstId, buyerGstId — see
+// CreateSalesOrderInput. A Sales Order can also be created without any of
+// those fields via POST /quotations/:id/convert (quotationId only) — the
+// two backend creation paths are independent and never cross-reference each
+// other, so a given Sales Order carries either quotationId or
+// proformaInvoiceId (rarely both meaningfully linked at once). customerName/
+// opportunityName/ownerName/quoteNo/proformaNumber are always denormalized
+// from whichever linked Quotation/Proforma Invoice is resolvable. See the
+// Stage 2E report.
+export interface SalesOrder {
+  id: ID;
+  /** salesOrderCode from the backend — null for both verified RevenueOS creation paths; falls back to a short id reference, never a fabricated sequence number. */
+  salesOrderCode: string;
+  orderDate: string;
+  totalAmount: number;
+  status: string;
+  quotationId?: ID;
+  quoteNo?: string;
+  proformaInvoiceId?: ID;
+  proformaNumber?: string;
+  opportunityId?: ID;
+  opportunityName?: string;
+  customerName: string;
+  ownerName: string;
+  sellerGstId?: ID;
+  buyerGstId?: ID;
+  placeOfSupply?: string;
+  taxType?: string;
+  inventoryItemId?: ID;
+  createdAt: string;
+}
+
+export type NotificationIcon =
+  | "funnel"
+  | "file"
+  | "checksq"
+  | "user"
+  | "cash"
+  | "alert"
+  | "check"
+  | "cal";
+
+export interface AppNotification {
+  id: ID;
+  icon: NotificationIcon;
+  text: string;
+  occurredAt: string; // ISO 8601
+  unread: boolean;
+}

@@ -1,11 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { Icon } from "../../../components/ui/Icon";
 import { LeadHistoryTimeline } from "../../../components/ui/LeadHistoryTimeline";
 import { Panel } from "../../../components/ui/Card";
-import { OpportunityStageTag, QuotationStatusTag, Tag } from "../../../components/ui/Tag";
+import { CustomerStatusTag, OpportunityStageTag, QuotationStatusTag, Tag } from "../../../components/ui/Tag";
+import { DocumentActions, DocumentAction } from "../../../components/ui/DocumentActions";
+import { LinkCustomerDialog } from "../../../components/forms/LinkCustomerDialog";
 import { Button, EmptyState } from "../../../components/ui/Button";
 import { DocumentTrail } from "../../../components/ui/DocumentTrail";
 import { LifecycleStepper } from "../../../components/ui/LifecycleStepper";
@@ -22,6 +25,7 @@ import { formatInr, formatDate } from "../../../lib/format";
 import { OPPORTUNITY_STEPS, OpportunityStage, Quotation, formatOpportunityStage } from "../../../lib/types/domain";
 import { canMoveOpportunityStage, isOpportunityStageFinal } from "../../../lib/repository/shared/opportunityStage";
 import { QUOTATION_PERMISSIONS } from "../../../lib/repository/shared/quotationLifecycle";
+import { OPPORTUNITY_EDIT_PERMISSION, opportunityCustomerActions } from "../../../lib/repository/shared/customerLifecycle";
 
 function goBackOrTo(router: ReturnType<typeof useRouter>, fallback: string) {
   if (typeof window !== "undefined" && window.history.length > 1) {
@@ -40,10 +44,11 @@ export default function OpportunityDetailPage() {
   const { hasPermission } = useAuth();
   const canEditStage = hasPermission("opportunities.edit");
   const id = params?.id;
-  const { opportunity, lead, timeline, loading, error, updateStage, refetch } = useOpportunityDetail(id);
+  const { opportunity, lead, timeline, loading, error, updateStage, linkCustomer, refetch } = useOpportunityDetail(id);
   const { quotations, createQuotation, refetch: refetchQuotations } = useQuotations();
   const [pendingAction, setPendingAction] = useState<StageAction | null>(null);
   const [showQuotationForm, setShowQuotationForm] = useState(false);
+  const [customerDialog, setCustomerDialog] = useState<null | "link" | "remove">(null);
 
   if (loading && !opportunity) {
     return (
@@ -96,6 +101,18 @@ export default function OpportunityDetailPage() {
   }
 
   const relatedQuotes = quotations.filter((q) => q.opportunityId === opportunity.id);
+  const customerActions = opportunityCustomerActions({
+    hasCustomer: !!opportunity.customerId,
+    hasQuotation: relatedQuotes.length > 0,
+    mayEdit: hasPermission(OPPORTUNITY_EDIT_PERMISSION),
+    leadActive: lead ? lead.isActive : true,
+  });
+  const customerActionList: DocumentAction[] = opportunity.customerId
+    ? [
+        { key: "change", label: "Change customer", icon: "edit", state: customerActions.change, onClick: () => setCustomerDialog("link") },
+        { key: "remove", label: "Remove customer", icon: "close", className: "danger-ghost", state: customerActions.remove, onClick: () => setCustomerDialog("remove") },
+      ]
+    : [{ key: "link", label: "Link a customer", icon: "target", variant: "primary", state: customerActions.link, onClick: () => setCustomerDialog("link") }];
   const stepIdx = OPPORTUNITY_STEPS.indexOf(opportunity.stage);
   const isTerminal = isOpportunityStageFinal(opportunity.stage);
   const stageLabel = formatOpportunityStage(opportunity.stage);
@@ -141,7 +158,7 @@ export default function OpportunityDetailPage() {
               <div className="av-lg">{initials(opportunity.customerName)}</div>
               <div>
                 <h3>{opportunity.title}</h3>
-                <div className="co">{opportunity.customerName} · Owner: {opportunity.ownerName}</div>
+                <div className="co">{opportunity.customer?.customerName ?? opportunity.customerName} · Owner: {opportunity.ownerName}</div>
               </div>
             </div>
             <div className="tagrow">
@@ -244,6 +261,33 @@ export default function OpportunityDetailPage() {
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <div className="card panel" data-testid="customer-panel">
+            <div className="panel-head">
+              <h3>Customer</h3>
+            </div>
+            <div style={{ padding: "4px 19px 0" }}>
+              {opportunity.customer ? (
+                <>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                    <Link href={`/customers/${opportunity.customer.id}`} style={{ fontWeight: 700, color: "var(--ink)" }}>
+                      {opportunity.customer.customerName}
+                    </Link>
+                    <small style={{ color: "var(--muted)" }}>{opportunity.customer.customerCode}</small>
+                    <CustomerStatusTag isActive={opportunity.customer.isActive} />
+                  </div>
+                  <p style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 6 }}>
+                    Every quotation, Proforma Invoice and Sales Order under this opportunity belongs to this customer.
+                  </p>
+                </>
+              ) : (
+                <p style={{ fontSize: 13, color: "var(--muted)" }} data-testid="no-customer">
+                  <b style={{ color: "var(--text)" }}>No customer linked yet.</b> A quotation is made for a customer, with that customer&apos;s GST registration, so link one before quoting.
+                  {relatedQuotes.length > 0 && " This opportunity already has quotations; they will belong to the customer you link."}
+                </p>
+              )}
+            </div>
+            <DocumentActions actions={customerActionList} testId="customer-actions" />
+          </div>
           <Panel
             title="Related Quotations"
             flush
@@ -296,6 +340,32 @@ export default function OpportunityDetailPage() {
           destructive={pendingAction.kind === "lost"}
           onClose={() => setPendingAction(null)}
           onConfirm={runAction}
+        />
+      )}
+
+      {customerDialog === "link" && (
+        <LinkCustomerDialog
+          opportunityTitle={opportunity.title}
+          leadName={lead?.customerName ?? opportunity.customerName}
+          leadCompany={lead?.companyName}
+          leadEmail={lead?.email}
+          leadPhone={lead?.phone}
+          currentCustomerId={opportunity.customerId}
+          onClose={() => setCustomerDialog(null)}
+          onSubmit={(customerId) => linkCustomer(customerId)}
+        />
+      )}
+      {customerDialog === "remove" && (
+        <ConfirmDialog
+          title="Remove the customer"
+          body={`Remove ${opportunity.customer?.customerName ?? "the customer"} from "${opportunity.title}"? You can link a customer again until the first quotation is made.`}
+          confirmLabel="Remove customer"
+          destructive
+          onClose={() => setCustomerDialog(null)}
+          onConfirm={async () => {
+            await linkCustomer(null);
+            toast.show("Customer removed", "check");
+          }}
         />
       )}
 

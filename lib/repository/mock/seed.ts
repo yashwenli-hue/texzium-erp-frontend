@@ -18,6 +18,8 @@ import {
   AccountsReceivable,
   CustomerStatementEntry,
   AppNotification,
+  CustomerEvent,
+  CustomerGstRegistration,
 } from "../../types/domain";
 
 /**
@@ -96,15 +98,33 @@ export const SEED_LEAD_TIMELINE: LeadTimelineEntry[] = [
 // ---------------------------------------------------------------------------
 // CUSTOMERS
 // ---------------------------------------------------------------------------
+// Customers follow the real contract: a server-style code, PAN and contact
+// details, GST registrations (the default first) and a history. C6 has no GST
+// registration, so it can't be quoted yet; C7 is inactive (with its reason); C3's
+// second registration is inactive. Customers C2-C8 predate the history (they
+// have no events) except where a change since is recorded, like the real
+// customers that existed before it.
+const reg = (id: string, customerId: string, gstin: string, legalName: string, stateCode: string, stateName: string, city: string, pincode: string, over: Partial<CustomerGstRegistration> = {}): CustomerGstRegistration => ({
+  id, customerId, gstin, legalName, stateCode, stateName, addressLine1: "Plot 12, Industrial Estate", city, pincode, isDefault: false, isActive: true, createdAt: monthsAgo(20), updatedAt: monthsAgo(20), ...over,
+});
 export const SEED_CUSTOMERS: Customer[] = [
-  { id: "C1", customerCode: "CUST-1001", customerName: "GreenVolt Energy", isActive: true, isVendor: false, gstRegistrations: [], industry: "Solar EPC", city: "Jaipur", ownerId: "U1", ownerName: "Anita S.", lifetimeValue: 24_000_000, openOrders: 3, status: "Active", customerSince: monthsAgo(28), createdAt: monthsAgo(28), updatedAt: monthsAgo(28) },
-  { id: "C2", customerCode: "CUST-1002", customerName: "JSW Steel", isActive: true, isVendor: false, gstRegistrations: [], industry: "Manufacturing", city: "Bellary", ownerId: "U2", ownerName: "Rohit M.", lifetimeValue: 41_000_000, openOrders: 6, status: "Active", customerSince: monthsAgo(42), createdAt: monthsAgo(42), updatedAt: monthsAgo(42) },
-  { id: "C3", customerCode: "CUST-1003", customerName: "Havells India", isActive: true, isVendor: false, gstRegistrations: [], industry: "Electricals", city: "Noida", ownerId: "U4", ownerName: "Priya N.", lifetimeValue: 9_600_000, openOrders: 2, status: "Active", customerSince: monthsAgo(14), createdAt: monthsAgo(14), updatedAt: monthsAgo(14), originLeadId: "L5" },
-  { id: "C4", customerCode: "CUST-1004", customerName: "Sterling Pumps", isActive: true, isVendor: false, gstRegistrations: [], industry: "Manufacturing", city: "Pune", ownerId: "U2", ownerName: "Rohit M.", lifetimeValue: 12_000_000, openOrders: 4, status: "At Risk", customerSince: monthsAgo(34), createdAt: monthsAgo(34), updatedAt: monthsAgo(34) },
-  { id: "C5", customerCode: "CUST-1005", customerName: "L&T Infra", isActive: true, isVendor: false, gstRegistrations: [], industry: "Infrastructure", city: "Chennai", ownerId: "U1", ownerName: "Anita S.", lifetimeValue: 36_000_000, openOrders: 5, status: "Active", customerSince: monthsAgo(45), createdAt: monthsAgo(45), updatedAt: monthsAgo(45) },
-  { id: "C6", customerCode: "CUST-1006", customerName: "Apex Controls", isActive: true, isVendor: false, gstRegistrations: [], industry: "Trading", city: "Delhi", ownerId: "U3", ownerName: "Vikram J.", lifetimeValue: 1_800_000, openOrders: 1, status: "New", customerSince: monthsAgo(1), createdAt: monthsAgo(1), updatedAt: monthsAgo(1) },
-  { id: "C7", customerCode: "CUST-1007", customerName: "Nimbus Cold Chain", isActive: false, isVendor: false, gstRegistrations: [], industry: "Cold Storage", city: "Surat", ownerId: "U4", ownerName: "Priya N.", lifetimeValue: 0, openOrders: 0, status: "Churned", customerSince: monthsAgo(18), createdAt: monthsAgo(18), updatedAt: monthsAgo(18) },
-  { id: "C8", customerCode: "CUST-1008", customerName: "Reliance Industries", isActive: true, isVendor: false, gstRegistrations: [], industry: "Petrochemicals", city: "Mumbai", ownerId: "U1", ownerName: "Anita S.", lifetimeValue: 68_000_000, openOrders: 9, status: "Active", customerSince: monthsAgo(64), createdAt: monthsAgo(64), updatedAt: monthsAgo(64) },
+  { id: "C1", customerCode: "CUST-000001", customerName: "GreenVolt Energy", panNumber: "AABCG1234A", email: "accounts@greenvolt.in", phone: "+91 98110 22341", customerType: "B2B", isActive: true, isVendor: false, gstRegistrations: [reg("G1", "C1", "08AABCG1234A1Z5", "GreenVolt Energy Pvt Ltd", "08", "Rajasthan", "Jaipur", "302001", { isDefault: true, branchName: "Jaipur HQ" })], createdAt: monthsAgo(6), updatedAt: monthsAgo(6) },
+  { id: "C2", customerCode: "CUST-1002", customerName: "JSW Steel", panNumber: "AAACJ4323K", email: "sourcing@jsw.in", phone: "+91 94220 10981", customerType: "B2B", isActive: true, isVendor: false, gstRegistrations: [reg("G2", "C2", "29AAACJ4323K1Z7", "JSW Steel Ltd", "29", "Karnataka", "Bellary", "583275", { isDefault: true, branchName: "Vijayanagar Works" }), reg("G3", "C2", "27AAACJ4323K1Z2", "JSW Steel Ltd", "27", "Maharashtra", "Mumbai", "400051", { branchName: "Mumbai Office" })], createdAt: monthsAgo(42), updatedAt: monthsAgo(42) },
+  { id: "C3", customerCode: "CUST-1003", customerName: "Havells India", panNumber: "AAACH0897M", email: "vendor.relations@havells.com", phone: "+91 98200 55672", customerType: "B2B", isActive: true, isVendor: false, gstRegistrations: [reg("G4", "C3", "09AAACH0897M1Z6", "Havells India Ltd", "09", "Uttar Pradesh", "Noida", "201301", { isDefault: true }), reg("G5", "C3", "07AAACH0897M1Z0", "Havells India Ltd", "07", "Delhi", "New Delhi", "110001", { isActive: false, branchName: "Delhi (closed)" })], createdAt: monthsAgo(14), updatedAt: monthsAgo(14) },
+  { id: "C4", customerCode: "CUST-1004", customerName: "Sterling Pumps", panNumber: "AAFCS5521D", email: "procurement@sterlingpumps.in", phone: "+91 98220 41120", customerType: "B2B", isActive: true, isVendor: false, gstRegistrations: [reg("G6", "C4", "27AAFCS5521D1ZX", "Sterling Pumps Pvt Ltd", "27", "Maharashtra", "Pune", "411019", { isDefault: true })], createdAt: monthsAgo(34), updatedAt: monthsAgo(34) },
+  { id: "C5", customerCode: "CUST-1005", customerName: "L&T Infra", panNumber: "AAACL0140P", email: "procure@lninfra.com", phone: "+91 93450 12210", customerType: "B2B", isActive: true, isVendor: false, gstRegistrations: [reg("G7", "C5", "33AAACL0140P1ZM", "Larsen & Toubro Infra", "33", "Tamil Nadu", "Chennai", "600089", { isDefault: true })], createdAt: monthsAgo(45), updatedAt: monthsAgo(45) },
+  { id: "C6", customerCode: "CUST-1006", customerName: "Apex Controls", panNumber: "AAHFA7788C", email: "info@apexcontrols.com", phone: "+91 90210 88213", customerType: "B2B", isActive: true, isVendor: false, gstRegistrations: [], createdAt: monthsAgo(1), updatedAt: monthsAgo(1) },
+  { id: "C7", customerCode: "CUST-1007", customerName: "Nimbus Cold Chain", panNumber: "AAECN3344B", email: "purchase@nimbuscc.in", phone: "+91 99870 45210", customerType: "B2B", isActive: false, isVendor: false, gstRegistrations: [reg("G8", "C7", "24AAECN3344B1Z9", "Nimbus Cold Chain LLP", "24", "Gujarat", "Surat", "395003", { isActive: false })], deactivatedAt: daysAgo(30), deactivatedById: "U1", deactivatedByName: "Anita S.", deactivationReason: "Ceased trading; account closed.", createdAt: monthsAgo(18), updatedAt: daysAgo(30) },
+  { id: "C8", customerCode: "CUST-1008", customerName: "Reliance Industries", panNumber: "AAACR5055K", email: "vendor.dev@ril.com", phone: "+91 98200 11223", customerType: "B2B", isActive: true, isVendor: true, linkedVendorId: "V1", gstRegistrations: [reg("G9", "C8", "27AAACR5055K1Z8", "Reliance Industries Ltd", "27", "Maharashtra", "Mumbai", "400021", { isDefault: true })], createdAt: monthsAgo(64), updatedAt: monthsAgo(64) },
+];
+
+// History as the backend would hold it: only C1 was created after the history
+// existed, and C7's deactivation was recorded.
+export const SEED_CUSTOMER_EVENTS: CustomerEvent[] = [
+  { id: "CE1", customerId: "C1", action: "CUSTOMER_CREATED", toStatus: "ACTIVE", actorName: "Anita S.", occurredAt: monthsAgo(6) },
+  { id: "CE2", customerId: "C1", action: "GST_ADDED", toStatus: "ACTIVE", gstRegistration: { id: "G1", gstin: "08AABCG1234A1Z5", branchName: "Jaipur HQ", legalName: "GreenVolt Energy Pvt Ltd" }, actorName: "Anita S.", occurredAt: monthsAgo(6) },
+  { id: "CE3", customerId: "C1", action: "OPPORTUNITY_LINKED", opportunityId: "O1", remarks: "5MW Rooftop EPC — GreenVolt", actorName: "Anita S.", occurredAt: daysAgo(5) },
+  { id: "CE4", customerId: "C7", action: "CUSTOMER_DEACTIVATED", fromStatus: "ACTIVE", toStatus: "INACTIVE", remarks: "Ceased trading; account closed.", actorName: "Anita S.", occurredAt: daysAgo(30) },
 ];
 
 // ---------------------------------------------------------------------------
@@ -172,14 +192,14 @@ export const SEED_NOTES: Note[] = [
 // already be Qualified before an opportunity is created from it.
 // ---------------------------------------------------------------------------
 export const SEED_OPPORTUNITIES: Opportunity[] = [
-  { id: "O1", leadId: "L2", title: "5MW Rooftop EPC — GreenVolt", customerName: "GreenVolt Energy", stage: "PROPOSAL", expectedValue: 6_400_000, probability: 60, expectedCloseDate: daysFromNow(20), ownerName: "Anita S.", createdAt: daysAgo(5) },
-  { id: "O2", leadId: "L1", title: "Hydraulic Systems Upgrade", customerName: "Sterling Pumps", stage: "NEGOTIATION", expectedValue: 1_840_000, probability: 75, expectedCloseDate: daysFromNow(10), ownerName: "Rohit M.", createdAt: daysAgo(8) },
-  { id: "O3", leadId: "L6", title: "Factory Automation Retrofit", customerName: "JSW Steel", stage: "NEGOTIATION", expectedValue: 8_800_000, probability: 70, expectedCloseDate: daysFromNow(15), ownerName: "Rohit M.", createdAt: daysAgo(7) },
+  { id: "O1", leadId: "L2", title: "5MW Rooftop EPC — GreenVolt", customerName: "GreenVolt Energy", stage: "PROPOSAL", expectedValue: 6_400_000, probability: 60, expectedCloseDate: daysFromNow(20), ownerName: "Anita S.", createdAt: daysAgo(5), customerId: "C1", customer: { id: "C1", customerCode: "CUST-000001", customerName: "GreenVolt Energy", isActive: true } },
+  { id: "O2", leadId: "L1", title: "Hydraulic Systems Upgrade", customerName: "Sterling Pumps", stage: "NEGOTIATION", expectedValue: 1_840_000, probability: 75, expectedCloseDate: daysFromNow(10), ownerName: "Rohit M.", createdAt: daysAgo(8), customerId: "C4", customer: { id: "C4", customerCode: "CUST-1004", customerName: "Sterling Pumps", isActive: true } },
+  { id: "O3", leadId: "L6", title: "Factory Automation Retrofit", customerName: "JSW Steel", stage: "NEGOTIATION", expectedValue: 8_800_000, probability: 70, expectedCloseDate: daysFromNow(15), ownerName: "Rohit M.", createdAt: daysAgo(7), customerId: "C2", customer: { id: "C2", customerCode: "CUST-1002", customerName: "JSW Steel", isActive: true } },
   { id: "O4", leadId: "L7", title: "Control Room Equipment", customerName: "L&T Infra", stage: "PROPOSAL", expectedValue: 3_600_000, probability: 50, expectedCloseDate: daysFromNow(25), ownerName: "Anita S.", createdAt: daysAgo(6) },
   { id: "O5", leadId: "L8", title: "Rooftop Solar — Phase 1", customerName: "Adani Green", stage: "PROPOSAL", expectedValue: 11_000_000, probability: 55, expectedCloseDate: daysFromNow(30), ownerName: "Vikram J.", createdAt: daysAgo(8) },
-  { id: "O6", leadId: "L9", title: "Bulk Procurement Contract", customerName: "Reliance Industries", stage: "QUALIFIED", expectedValue: 4_200_000, probability: 35, expectedCloseDate: daysFromNow(35), ownerName: "Anita S.", createdAt: daysAgo(9) },
+  { id: "O6", leadId: "L9", title: "Bulk Procurement Contract", customerName: "Reliance Industries", stage: "QUALIFIED", expectedValue: 4_200_000, probability: 35, expectedCloseDate: daysFromNow(35), ownerName: "Anita S.", createdAt: daysAgo(9), customerId: "C8", customer: { id: "C8", customerCode: "CUST-1008", customerName: "Reliance Industries", isActive: true } },
   { id: "O7", leadId: "L10", title: "Warehouse Automation", customerName: "Tata Projects", stage: "QUALIFIED", expectedValue: 2_850_000, probability: 35, expectedCloseDate: daysFromNow(38), ownerName: "Rohit M.", createdAt: daysAgo(10) },
-  { id: "O8", leadId: "L5", title: "Switchgear Replacement Order", customerName: "Havells India", stage: "WON", expectedValue: 5_200_000, probability: 100, expectedCloseDate: daysAgo(6), ownerName: "Priya N.", createdAt: daysAgo(13) },
+  { id: "O8", leadId: "L5", title: "Switchgear Replacement Order", customerName: "Havells India", stage: "WON", expectedValue: 5_200_000, probability: 100, expectedCloseDate: daysAgo(6), ownerName: "Priya N.", createdAt: daysAgo(13), customerId: "C3", customer: { id: "C3", customerCode: "CUST-1003", customerName: "Havells India", isActive: true } },
 ];
 
 // ---------------------------------------------------------------------------

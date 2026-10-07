@@ -116,9 +116,7 @@ function SearchInner() {
                   <div className="body">
                     <b>{highlight(c.customerName, term)}</b>
                     <small>
-                      {repo.kind === "real"
-                        ? `${c.customerCode} · ${c.isActive ? "Active" : "Inactive"}${c.email ? ` · ${c.email}` : ""}`
-                        : `${c.industry ?? "—"} · ${c.city ?? "—"} · ${c.status ?? "—"} · LTV ${formatInr(c.lifetimeValue ?? 0)}`}
+                      {`${c.customerCode} · ${c.isActive ? "Active" : "Inactive"}${c.email ? ` · ${c.email}` : ""}`}
                     </small>
                   </div>
                 </div>

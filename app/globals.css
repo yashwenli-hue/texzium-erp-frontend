@@ -894,3 +894,82 @@ a.doc-trail-node:hover{border-color:var(--m);background:var(--m-soft)}
   .rl-table{display:none}
   .rl-cards{display:flex}
 }
+
+/* ============================================================
+   Customer V1
+   ============================================================ */
+.hist-detail{font-size:12px;color:var(--muted);margin-top:3px;overflow-wrap:anywhere}
+
+/* "Ready to quote?" checklist */
+.readiness{list-style:none;margin:0;padding:6px 19px 16px;display:grid;gap:10px}
+.readiness li{display:flex;gap:10px;align-items:flex-start;font-size:13px}
+.readiness .mark{flex:none;width:22px;height:22px;border-radius:50%;display:grid;place-items:center;background:var(--line-2);color:var(--muted);margin-top:1px}
+.readiness li.ok .mark{background:var(--good-bg);color:var(--good)}
+.readiness li.no .mark{background:var(--warn-bg);color:var(--warn)}
+.readiness b{display:block;color:var(--ink);font-weight:600}
+.readiness span.why{display:block;color:var(--muted);font-size:12px;margin-top:1px}
+
+/* GST registrations: a row on a wide screen, a card on a phone */
+.reg-list{list-style:none;margin:0;padding:0}
+.reg{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) auto;gap:10px 18px;align-items:start;padding:15px 21px;border-top:1px solid var(--line-2)}
+.reg:first-child{border-top:0}
+.reg .gstin{font-family:var(--display);font-weight:700;color:var(--ink);letter-spacing:.2px;overflow-wrap:anywhere}
+.reg .sub{font-size:12px;color:var(--muted);margin-top:2px;overflow-wrap:anywhere}
+.reg .tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px}
+.reg .acts{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.reg.inactive .gstin{color:var(--muted)}
+@media(max-width:720px){
+  .reg{grid-template-columns:1fr;padding:14px 16px}
+  .reg .acts{justify-content:flex-start}
+  .reg .acts .btn{min-height:44px}
+}
+
+/* Totals strip on the customer cockpit */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;background:var(--line-2);border-top:1px solid var(--line-2)}
+.kpis > div{background:var(--surface);padding:13px 19px}
+.kpis .k{font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);font-weight:700}
+.kpis .v{font-family:var(--display);font-size:17px;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums;margin-top:2px}
+.kpis .n{font-size:11.5px;color:var(--muted);margin-top:1px}
+
+/* Deal groups: an opportunity with the documents under it */
+.deal{padding:15px 21px;border-top:1px solid var(--line-2)}
+.deal:first-child{border-top:0}
+.deal .deal-head{display:flex;gap:10px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap}
+.deal .deal-title{font-weight:700;color:var(--ink);overflow-wrap:anywhere}
+.deal .deal-title a:hover{color:var(--m)}
+.deal .deal-sub{font-size:12px;color:var(--muted);margin-top:2px}
+.deal-docs{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:6px}
+.deal-docs li{display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:12.5px;padding:7px 10px;border:1px solid var(--line);border-radius:9px;background:var(--surface)}
+.deal-docs .kind{font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);font-weight:700;min-width:70px}
+.deal-docs .amt{margin-left:auto;font-variant-numeric:tabular-nums;font-weight:600}
+.deal-docs a{color:inherit;font-weight:600}
+.deal-docs a:hover{color:var(--m)}
+.fin-note{font-size:11.5px;color:var(--muted);padding:10px 21px 14px}
+
+/* Possible legacy matches */
+.match{display:flex;gap:12px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;padding:13px 21px;border-top:1px solid var(--line-2)}
+.match:first-child{border-top:0}
+.match .t{font-weight:600;color:var(--ink);overflow-wrap:anywhere}
+.match .s{font-size:12px;color:var(--muted);margin-top:2px}
+@media(max-width:720px){.match .btn{min-height:44px}.deal,.match{padding-left:16px;padding-right:16px}}
+
+/* Duplicate / lookalike notices inside forms */
+.dup{border:1px solid var(--line);border-left-width:4px;border-radius:10px;padding:10px 12px;margin:0 0 14px;font-size:12.5px;background:var(--surface)}
+.dup.block{border-left-color:var(--bad);background:var(--bad-bg)}
+.dup.warn{border-left-color:var(--warn);background:var(--warn-bg)}
+.dup b{color:var(--ink)}
+.dup ul{margin:6px 0 0;padding-left:18px}
+.dup a{text-decoration:underline;text-underline-offset:2px}
+
+/* Customer filter bar */
+.cust-toolbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+.cust-search{flex:1 1 260px;min-width:0;display:flex;align-items:center;gap:9px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:0 13px;color:var(--muted)}
+.cust-search:focus-within{border-color:var(--m);box-shadow:var(--focus-ring, 0 0 0 3px var(--m-soft))}
+.cust-search input{border:none;background:none;outline:none;flex:1;min-width:0;font-family:inherit;font-size:13.5px;color:var(--text);padding:10px 0}
+@media(max-width:720px){.cust-search input{min-height:24px;font-size:16px}.chips{flex-wrap:wrap}}
+.doc-head .ident h1{font-family:var(--display);font-size:18px;font-weight:700;color:var(--ink);overflow-wrap:anywhere}
+.reg .why-not{font-size:11.5px;color:var(--muted);margin-top:6px;flex-basis:100%}
+.panel-head .panel-act{margin-left:auto}
+.indent-1{padding-left:18px}
+.indent-2{padding-left:36px}
+@media(max-width:720px){.indent-1{padding-left:10px}.indent-2{padding-left:20px}.kpis{grid-template-columns:1fr 1fr}.panel-head .panel-act .btn{min-height:44px}}
