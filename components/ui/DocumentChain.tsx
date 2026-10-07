@@ -2,7 +2,13 @@ import Link from "next/link";
 import { ReactNode } from "react";
 import { Icon } from "./Icon";
 
-export type ChainStageState = "normal" | "current" | "upcoming" | "closed" | "attention";
+/**
+ * The state of a stage of a chain. The same words are used by StageChain (the compact
+ * chain of a deal): "normal" and "done" are an ordinary stage that exists, "current"
+ * the one the work is at, "attention" one that needs someone, "upcoming" one not yet
+ * reached, "closed" one that ended without leading on.
+ */
+export type ChainStageState = "normal" | "done" | "current" | "upcoming" | "closed" | "attention";
 
 export interface ChainStage {
   key: string;
@@ -34,7 +40,7 @@ export function DocumentChain({ stages }: { stages: ChainStage[] }) {
       {stages.map((s) => (
         <li
           key={s.key}
-          className={`dc-stage ${s.state === "normal" ? "" : `dc-${s.state}`}`}
+          className={`dc-stage ${s.state === "normal" || s.state === "done" ? "" : `dc-${s.state}`}`}
           aria-current={s.state === "current" ? "step" : undefined}
           data-stage={s.key}
         >

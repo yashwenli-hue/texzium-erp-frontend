@@ -48,6 +48,9 @@ function EntryList({
   noun,
   creationAction,
   testId,
+  limit,
+  startsAtCreation: startsAtCreationProp,
+  showFoot = true,
 }: {
   entries: Entry[];
   loading?: boolean;
@@ -56,6 +59,11 @@ function EntryList({
   noun: string;
   creationAction: string;
   testId: string;
+  /** Show only the first `limit` entries (the rest are kept; the "earlier history" note still looks at all of them). */
+  limit?: number;
+  /** Whether the history reaches back to the creation event, when the caller knows better than the entries passed in (a filtered list). */
+  startsAtCreation?: boolean;
+  showFoot?: boolean;
 }) {
   if (error) {
     return (
@@ -79,7 +87,8 @@ function EntryList({
   }
 
   // Nothing is ever invented: an empty list means the backend recorded nothing.
-  const startsAtCreation = entries.some((e) => e.action === creationAction);
+  const startsAtCreation = startsAtCreationProp ?? entries.some((e) => e.action === creationAction);
+  const visible = limit === undefined ? entries : entries.slice(0, limit);
 
   return (
     <div className="tl" data-testid={testId}>
@@ -89,7 +98,7 @@ function EntryList({
           happened earlier isn&apos;t available. Anything done from now on is recorded here.
         </p>
       )}
-      {entries.map((e) => (
+      {visible.map((e) => (
         <div className="tl-item" key={e.id}>
           <div className="dot">
             <Icon name={e.icon} size={14} />
@@ -142,7 +151,7 @@ function EntryList({
           </div>
         </div>
       ))}
-      {entries.length > 0 && !startsAtCreation && (
+      {showFoot && entries.length > 0 && !startsAtCreation && (
         <p className="hist-foot" data-testid={`${testId}-foot`}>
           Earlier history isn&apos;t available: this {noun} was created before lifecycle tracking began.
         </p>
@@ -284,11 +293,17 @@ export function CustomerHistory({
   loading,
   error,
   onRetry,
+  limit,
+  startsAtCreation,
+  showFoot,
 }: {
   events: CustomerEvent[];
   loading?: boolean;
   error?: Error | null;
   onRetry?: () => void;
+  limit?: number;
+  startsAtCreation?: boolean;
+  showFoot?: boolean;
 }) {
   const entries: Entry[] = events.map((e) => {
     const reg = e.gstRegistration;
@@ -310,5 +325,5 @@ export function CustomerHistory({
       textChanges: e.changes ? Object.entries(e.changes).map(([key, c]) => ({ label: CUSTOMER_FIELD_LABEL[key] ?? key, from: c.from, to: c.to })) : undefined,
     };
   });
-  return <EntryList entries={entries} loading={loading} error={error} onRetry={onRetry} noun="customer" creationAction="CUSTOMER_CREATED" testId="customer-history" />;
+  return <EntryList entries={entries} loading={loading} error={error} onRetry={onRetry} noun="customer" creationAction="CUSTOMER_CREATED" testId="customer-history" limit={limit} startsAtCreation={startsAtCreation} showFoot={showFoot} />;
 }

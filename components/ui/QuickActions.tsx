@@ -16,10 +16,13 @@ export function QuickActions({
   phone,
   email,
   contactName,
+  include = ["call", "email", "meet", "whatsapp"],
 }: {
   phone?: string;
   email?: string;
   contactName: string;
+  /** Which actions to offer. A customer has no calendar to schedule against, so its row leaves "meet" out. */
+  include?: Array<"call" | "email" | "meet" | "whatsapp">;
 }) {
   const toast = useToast();
 
@@ -57,22 +60,30 @@ export function QuickActions({
 
   return (
     <div className="qa-row">
-      <button className="qa" onClick={call} aria-label={`Call ${contactName}`}>
-        <Icon name="phone" size={16} />
-        Call
-      </button>
-      <button className="qa" onClick={sendEmail} aria-label={`Email ${contactName}`}>
-        <Icon name="mail" size={16} />
-        Email
-      </button>
-      <button className="qa" onClick={scheduleMeeting} aria-label={`Schedule meeting with ${contactName}`}>
-        <Icon name="cal" size={16} />
-        Meet
-      </button>
-      <button className="qa" onClick={whatsapp} aria-label={`WhatsApp ${contactName}`}>
-        <Icon name="wa" size={16} />
-        WhatsApp
-      </button>
+      {include.includes("call") && (
+        <button className="qa" onClick={call} aria-label={`Call ${contactName}`}>
+          <Icon name="phone" size={16} />
+          Call
+        </button>
+      )}
+      {include.includes("email") && (
+        <button className="qa" onClick={sendEmail} aria-label={`Email ${contactName}`}>
+          <Icon name="mail" size={16} />
+          Email
+        </button>
+      )}
+      {include.includes("meet") && (
+        <button className="qa" onClick={scheduleMeeting} aria-label={`Schedule meeting with ${contactName}`}>
+          <Icon name="cal" size={16} />
+          Meet
+        </button>
+      )}
+      {include.includes("whatsapp") && (
+        <button className="qa" onClick={whatsapp} aria-label={`WhatsApp ${contactName}`}>
+          <Icon name="wa" size={16} />
+          WhatsApp
+        </button>
+      )}
     </div>
   );
 }

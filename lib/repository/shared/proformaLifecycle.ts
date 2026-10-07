@@ -87,7 +87,7 @@ export function proformaDisplayState(p: Pick<ProformaInvoice, "status" | "isExpi
 }
 
 /** A Proforma still in play for its quotation (the backend's definition of active: not cancelled). */
-export function isActiveProforma(p: Pick<ProformaInvoice, "status">): boolean {
+export function isActiveProforma(p: { status: string }): boolean {
   return p.status !== "CANCELLED";
 }
 

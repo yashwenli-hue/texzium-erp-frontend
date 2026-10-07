@@ -9,18 +9,37 @@ import { isLiveSalesOrder } from "./salesOrderLifecycle";
  * is one that is not cancelled and was created directly from the quotation or
  * through one of its Proformas.
  */
-export interface CommercialChain {
+/**
+ * The least a Proforma / Sales Order has to carry for the chain to be read from it.
+ * The full documents have these, and so do the lighter rows of a customer's overview,
+ * so one definition of "the chain of a quotation" serves both.
+ */
+export interface ChainProforma {
+  id: string;
+  quotationId: string;
+  status: string;
+  createdAt: string;
+}
+export interface ChainOrder {
+  id: string;
+  quotationId?: string | null;
+  proformaInvoiceId?: string | null;
+  status: string;
+  createdAt: string;
+}
+
+export interface CommercialChain<P extends ChainProforma = ProformaInvoice, O extends ChainOrder = SalesOrder> {
   /** Every Proforma of the quotation, newest first (cancelled ones are history). */
-  proformas: ProformaInvoice[];
-  activeProforma?: ProformaInvoice;
+  proformas: P[];
+  activeProforma?: P;
   /** Every Sales Order reachable from the quotation, newest first. */
-  orders: SalesOrder[];
-  liveOrders: SalesOrder[];
+  orders: O[];
+  liveOrders: O[];
 }
 
 const newestFirst = <T extends { createdAt: string }>(a: T, b: T) => +new Date(b.createdAt) - +new Date(a.createdAt);
 
-export function buildCommercialChain(quotationId: string, proformas: ProformaInvoice[], orders: SalesOrder[]): CommercialChain {
+export function buildCommercialChain<P extends ChainProforma = ProformaInvoice, O extends ChainOrder = SalesOrder>(quotationId: string, proformas: P[], orders: O[]): CommercialChain<P, O> {
   const mine = proformas.filter((p) => p.quotationId === quotationId).sort(newestFirst);
   const mineIds = new Set(mine.map((p) => p.id));
   const reachable = orders
@@ -42,7 +61,10 @@ export interface NextStep {
 }
 
 /** The one-line "what happens next" shown in the quotations list. */
-export function quotationNextStep(q: Pick<Quotation, "status">, chain: CommercialChain): NextStep {
+export function quotationNextStep(
+  q: Pick<Quotation, "status">,
+  chain: { liveOrders: Array<{ id: string; salesOrderCode?: string | null }>; activeProforma?: { status: string; isExpired?: boolean } }
+): NextStep {
   switch (q.status) {
     case "DRAFT":
       return { label: "Needs approval", tone: "action" };
@@ -51,7 +73,7 @@ export function quotationNextStep(q: Pick<Quotation, "status">, chain: Commercia
     case "REJECTED":
       return { label: "Closed — rejected", tone: "neutral" };
     case "APPROVED": {
-      if (chain.liveOrders.length > 0) return { label: `Sales Order ${chain.liveOrders[0].salesOrderCode}`, tone: "good" };
+      if (chain.liveOrders.length > 0) return { label: `Sales Order ${chain.liveOrders[0].salesOrderCode || `#${chain.liveOrders[0].id.slice(0, 8).toUpperCase()}`}`, tone: "good" };
       if (chain.activeProforma) {
         const p = chain.activeProforma;
         if (p.isExpired) return { label: "Proforma expired", tone: "bad" };

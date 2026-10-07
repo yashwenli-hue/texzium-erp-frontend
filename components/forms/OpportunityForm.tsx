@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { Modal } from "../ui/Modal";
 import { TextField, SelectField, FieldRow } from "../ui/FormField";
 import { Button } from "../ui/Button";
@@ -9,6 +10,7 @@ import { CreateOpportunityInput } from "../../lib/repository/interfaces";
 import { useLeads } from "../../lib/hooks/useLeads";
 import { useCustomers } from "../../lib/hooks/useCustomers";
 import { isQualifiedLeadStatus } from "../../lib/types/domain";
+import { normalizeCustomerName } from "../../lib/repository/shared/customerLifecycle";
 
 /**
  * Field-for-field mirror of the VERIFIED CreateOpportunityDto: leadId,
@@ -20,26 +22,41 @@ import { isQualifiedLeadStatus } from "../../lib/types/domain";
  * The customer the deal is for (customerId, optional) is chosen from the
  * existing customers, and can also be linked later from the opportunity. A
  * quotation needs it.
+ *
+ * Opened from a customer (`forCustomer`) the customer is fixed and shown, not
+ * chosen, and the leads whose name or company is the customer's come first and say
+ * so: the deal is almost always for one of them. An opportunity still needs a
+ * qualified lead (the backend's rule), so with none the form says so.
  */
 export function OpportunityForm({
   onClose,
   onSubmit,
   defaultLeadId,
+  forCustomer,
 }: {
   onClose: () => void;
   onSubmit: (input: CreateOpportunityInput) => Promise<unknown>;
   defaultLeadId?: string;
+  forCustomer?: { id: string; customerName: string; customerCode: string };
 }) {
   const toast = useToast();
   const { leads, loading: leadsLoading } = useLeads();
-  const qualifiedLeads = useMemo(() => leads.filter((l) => isQualifiedLeadStatus(l.status)), [leads]);
+  const sameName = useMemo(() => {
+    const key = forCustomer ? normalizeCustomerName(forCustomer.customerName) : "";
+    return (l: { customerName: string; companyName?: string }) => !!key && [l.customerName, l.companyName].some((n) => !!n && normalizeCustomerName(n) === key);
+  }, [forCustomer]);
+  // Qualified leads only; for a customer, the ones named like it first.
+  const qualifiedLeads = useMemo(
+    () => leads.filter((l) => isQualifiedLeadStatus(l.status)).sort((a, b) => Number(sameName(b)) - Number(sameName(a))),
+    [leads, sameName]
+  );
 
   const [leadId, setLeadId] = useState(defaultLeadId ?? "");
   const [title, setTitle] = useState("");
   const [expectedValue, setExpectedValue] = useState("");
   const [probability, setProbability] = useState("35");
   const [expectedCloseDate, setExpectedCloseDate] = useState("");
-  const [customerId, setCustomerId] = useState("");
+  const [customerId, setCustomerId] = useState(forCustomer?.id ?? "");
   const { customers } = useCustomers();
   const activeCustomers = useMemo(() => customers.filter((c) => c.isActive).sort((a, b) => a.customerName.localeCompare(b.customerName)), [customers]);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -70,7 +87,7 @@ export function OpportunityForm({
         expectedValue: Number(expectedValue),
         probability: Number(probability),
         expectedCloseDate: new Date(expectedCloseDate).toISOString(),
-        ...(customerId ? { customerId } : {}),
+        ...(forCustomer ? { customerId: forCustomer.id } : customerId ? { customerId } : {}),
       });
       toast.show(`Opportunity "${title.trim()}" created`, "check");
       onClose();
@@ -95,11 +112,22 @@ export function OpportunityForm({
       }
     >
       {!leadsLoading && qualifiedLeads.length === 0 ? (
-        <p style={{ fontSize: 13.5, color: "var(--muted)" }}>
-          No qualified leads yet. Qualify a lead first — an opportunity can only be created from one.
-        </p>
+        <div data-testid="no-qualified-lead">
+          <p style={{ fontSize: 13.5, color: "var(--muted)", margin: "0 0 10px" }}>
+            <b style={{ color: "var(--text)" }}>No qualified lead yet.</b> An opportunity is created from a qualified lead, and qualifying a lead is done in Lead Management.
+            {forCustomer && " Qualify the lead this deal came from (or create one), then come back: the deal will be for this customer."}
+          </p>
+          <Link href="/leads" className="btn ghost" onClick={onClose}>
+            Go to Leads
+          </Link>
+        </div>
       ) : (
         <>
+          {forCustomer && (
+            <p className="of-for" data-testid="deal-for">
+              <span className="k">For</span> <b>{forCustomer.customerName}</b> <small>{forCustomer.customerCode}</small>
+            </p>
+          )}
           <SelectField
             label="Qualified Lead"
             required
@@ -107,7 +135,8 @@ export function OpportunityForm({
             onChange={(e) => setLeadId(e.target.value)}
             error={errors.leadId}
             disabled={!!defaultLeadId || leadsLoading}
-            options={qualifiedLeads.map((l) => ({ value: l.id, label: l.companyName ? `${l.customerName} (${l.companyName})` : l.customerName }))}
+            hint={forCustomer && qualifiedLeads.some(sameName) ? "Leads with this customer's name are listed first." : undefined}
+            options={qualifiedLeads.map((l) => ({ value: l.id, label: `${l.companyName ? `${l.customerName} (${l.companyName})` : l.customerName}${sameName(l) ? " · same name" : ""}` }))}
           />
           <TextField label="Opportunity Title" required value={title} onChange={(e) => setTitle(e.target.value)} error={errors.title} placeholder="e.g. Hydraulic Systems Upgrade" />
           <FieldRow>
@@ -115,6 +144,7 @@ export function OpportunityForm({
             <TextField label="Probability (%)" required type="number" min={0} max={100} value={probability} onChange={(e) => setProbability(e.target.value)} error={errors.probability} />
           </FieldRow>
           <TextField label="Expected Close Date" required type="date" value={expectedCloseDate} onChange={(e) => setExpectedCloseDate(e.target.value)} error={errors.expectedCloseDate} />
+          {!forCustomer && (
           <SelectField
             label="Customer"
             value={customerId}
@@ -122,6 +152,7 @@ export function OpportunityForm({
             hint="Optional. Who the deal is for. You can link it later, but a quotation needs a customer."
             options={[{ value: "", label: "Link a customer later" }, ...activeCustomers.map((c) => ({ value: c.id, label: `${c.customerName} (${c.customerCode})` }))]}
           />
+          )}
         </>
       )}
       {errors.form && <p style={{ color: "var(--bad)", fontSize: 12.5 }}>{errors.form}</p>}
