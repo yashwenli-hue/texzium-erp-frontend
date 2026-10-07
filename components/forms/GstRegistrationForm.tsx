@@ -18,6 +18,98 @@ import {
 
 const same = (a: string | undefined, b: string | undefined) => (a ?? "").trim() === (b ?? "").trim();
 
+
+export interface GstFieldValues {
+  gstin: string;
+  legalName: string;
+  tradeName: string;
+  branchName: string;
+  addressLine1: string;
+  addressLine2: string;
+  city: string;
+  pincode: string;
+}
+
+/**
+ * The fields of a GST registration, with the state read from the GSTIN as soon as it is
+ * complete: shared by the dialog that adds or edits a registration and by the optional
+ * second step of creating a customer. The GSTIN is only ever format-checked here (and by
+ * the backend), never verified with the tax authority, and the screen never says it is.
+ * Presentational: the owner holds the values and validates.
+ */
+export function GstFields({
+  values,
+  onChange,
+  errors,
+  customer,
+  registration,
+  makeDefault = false,
+  onMakeDefault,
+}: {
+  values: GstFieldValues;
+  onChange: (field: keyof GstFieldValues, value: string) => void;
+  errors: Record<string, string>;
+  customer: Pick<Customer, "panNumber" | "gstRegistrations">;
+  /** Present when editing. */
+  registration?: CustomerGstRegistration;
+  makeDefault?: boolean;
+  onMakeDefault?: (v: boolean) => void;
+}) {
+  const editing = !!registration;
+  const hasActive = customer.gstRegistrations.some((g) => g.isActive);
+  const { gstin, legalName, tradeName, branchName, addressLine1, addressLine2, city, pincode } = values;
+  const normalized = normalizeGstin(gstin);
+  const complete = !editing && normalized.length === 15 && GSTIN_PATTERN.test(normalized);
+  const state = complete ? gstinState(normalized) : null;
+  const panOk = complete ? gstinMatchesPan(normalized, customer.panNumber) : true;
+  const gstinHint = editing
+    ? "The GSTIN and its state can't be changed. To use a different GSTIN, add another registration."
+    : complete && state && panOk
+    ? `${state.stateName} (${state.stateCode}) · PAN ${gstinPan(normalized)}`
+    : customer.panNumber
+    ? `15 characters. It must carry this customer's PAN (${customer.panNumber}).`
+    : "15 characters, for example 27ABCDE1234F1Z5.";
+  return (
+    <>
+      <TextField
+        label="GSTIN"
+        required={!editing}
+        value={editing ? registration!.gstin : gstin}
+        onChange={(e) => onChange("gstin", e.target.value.toUpperCase())}
+        error={errors.gstin}
+        hint={gstinHint}
+        maxLength={15}
+        disabled={editing}
+        autoCapitalize="characters"
+        spellCheck={false}
+      />
+      <FieldRow>
+        <TextField label="Legal name" required value={legalName} onChange={(e) => onChange("legalName", e.target.value)} error={errors.legalName} />
+        <TextField label="Trade name" value={tradeName} onChange={(e) => onChange("tradeName", e.target.value)} error={errors.tradeName} placeholder="Optional" />
+      </FieldRow>
+      <TextField label="Branch / site name" value={branchName} onChange={(e) => onChange("branchName", e.target.value)} error={errors.branchName} placeholder="Optional, e.g. Mumbai Office" />
+      <TextField label="Address" required value={addressLine1} onChange={(e) => onChange("addressLine1", e.target.value)} error={errors.addressLine1} autoComplete="address-line1" />
+      <TextField label="Address line 2" value={addressLine2} onChange={(e) => onChange("addressLine2", e.target.value)} error={errors.addressLine2} placeholder="Optional" autoComplete="address-line2" />
+      <FieldRow>
+        <TextField label="City" required value={city} onChange={(e) => onChange("city", e.target.value)} error={errors.city} autoComplete="address-level2" />
+        <TextField label="PIN code" required value={pincode} onChange={(e) => onChange("pincode", e.target.value)} error={errors.pincode} inputMode="numeric" maxLength={6} autoComplete="postal-code" />
+      </FieldRow>
+      {!editing && (
+        <p style={{ fontSize: 12.5, color: "var(--muted)", margin: "0 0 4px" }}>
+          {hasActive ? (
+            <label style={{ display: "flex", alignItems: "center", gap: 8, minHeight: 28 }}>
+              <input type="checkbox" checked={makeDefault} onChange={(e) => onMakeDefault?.(e.target.checked)} style={{ width: "auto", accentColor: "var(--control-accent)" }} />
+              Make this the default registration
+            </label>
+          ) : (
+            "This will be the customer's default registration: quotations use it unless another is chosen."
+          )}
+        </p>
+      )}
+    </>
+  );
+}
+
 /**
  * Add or edit a customer's GST registration. The state is not typed: it is read
  * from the GSTIN (and shown as soon as the GSTIN is complete), and the GSTIN has
@@ -53,18 +145,7 @@ export function GstRegistrationForm({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
 
-  // Live feedback once the GSTIN is complete, before the person submits.
   const normalized = normalizeGstin(gstin);
-  const complete = !editing && normalized.length === 15 && GSTIN_PATTERN.test(normalized);
-  const state = complete ? gstinState(normalized) : null;
-  const panOk = complete ? gstinMatchesPan(normalized, customer.panNumber) : true;
-  const gstinHint = editing
-    ? "The GSTIN and its state can't be changed. To use a different GSTIN, add another registration."
-    : complete && state && panOk
-    ? `${state.stateName} (${state.stateCode}) · PAN ${gstinPan(normalized)}`
-    : customer.panNumber
-    ? `15 characters. It must carry this customer's PAN (${customer.panNumber}).`
-    : "15 characters, for example 27ABCDE1234F1Z5.";
 
   function validate(): boolean {
     const e = validateGstFields(
@@ -127,41 +208,15 @@ export function GstRegistrationForm({
         </>
       }
     >
-      <TextField
-        label="GSTIN"
-        required={!editing}
-        value={editing ? registration!.gstin : gstin}
-        onChange={(e) => setGstin(e.target.value.toUpperCase())}
-        error={errors.gstin}
-        hint={gstinHint}
-        maxLength={15}
-        disabled={editing}
-        autoCapitalize="characters"
-        spellCheck={false}
+      <GstFields
+        values={{ gstin, legalName, tradeName, branchName, addressLine1, addressLine2, city, pincode }}
+        onChange={(f, v) => ({ gstin: setGstin, legalName: setLegalName, tradeName: setTradeName, branchName: setBranchName, addressLine1: setAddressLine1, addressLine2: setAddressLine2, city: setCity, pincode: setPincode }[f](v))}
+        errors={errors}
+        customer={customer}
+        registration={registration}
+        makeDefault={makeDefault}
+        onMakeDefault={setMakeDefault}
       />
-      <FieldRow>
-        <TextField label="Legal name" required value={legalName} onChange={(e) => setLegalName(e.target.value)} error={errors.legalName} />
-        <TextField label="Trade name" value={tradeName} onChange={(e) => setTradeName(e.target.value)} error={errors.tradeName} placeholder="Optional" />
-      </FieldRow>
-      <TextField label="Branch / site name" value={branchName} onChange={(e) => setBranchName(e.target.value)} error={errors.branchName} placeholder="Optional, e.g. Mumbai Office" />
-      <TextField label="Address" required value={addressLine1} onChange={(e) => setAddressLine1(e.target.value)} error={errors.addressLine1} autoComplete="address-line1" />
-      <TextField label="Address line 2" value={addressLine2} onChange={(e) => setAddressLine2(e.target.value)} error={errors.addressLine2} placeholder="Optional" autoComplete="address-line2" />
-      <FieldRow>
-        <TextField label="City" required value={city} onChange={(e) => setCity(e.target.value)} error={errors.city} autoComplete="address-level2" />
-        <TextField label="PIN code" required value={pincode} onChange={(e) => setPincode(e.target.value)} error={errors.pincode} inputMode="numeric" maxLength={6} autoComplete="postal-code" />
-      </FieldRow>
-      {!editing && (
-        <p style={{ fontSize: 12.5, color: "var(--muted)", margin: "0 0 4px" }}>
-          {hasActive ? (
-            <label style={{ display: "flex", alignItems: "center", gap: 8, minHeight: 28 }}>
-              <input type="checkbox" checked={makeDefault} onChange={(e) => setMakeDefault(e.target.checked)} style={{ width: "auto", accentColor: "var(--control-accent)" }} />
-              Make this the default registration
-            </label>
-          ) : (
-            "This will be the customer's default registration: quotations use it unless another is chosen."
-          )}
-        </p>
-      )}
       {errors.form && (
         <p style={{ color: "var(--bad)", fontSize: 12.5 }} role="alert">
           {errors.form}

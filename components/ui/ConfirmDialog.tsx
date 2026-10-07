@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { ReactNode, useState } from "react";
 import { Modal } from "./Modal";
 import { Button } from "./Button";
 import { TextAreaField } from "./FormField";
@@ -18,6 +18,7 @@ export function ConfirmDialog({
   destructive,
   noteLabel,
   noteRequired,
+  children,
   onConfirm,
   onClose,
 }: {
@@ -28,6 +29,8 @@ export function ConfirmDialog({
   noteLabel?: string;
   /** When true, `note` is required before onConfirm fires — e.g. the backend requires a rejection reason. */
   noteRequired?: boolean;
+  /** More to read before deciding (what the action touches), shown under the sentence and above the note. */
+  children?: ReactNode;
   onConfirm: (note?: string) => Promise<unknown>;
   onClose: () => void;
 }) {
@@ -72,7 +75,8 @@ export function ConfirmDialog({
         </>
       }
     >
-      <p style={{ fontSize: 13.5, color: "var(--text)", marginBottom: noteLabel ? 14 : 0 }}>{body}</p>
+      <p style={{ fontSize: 13.5, color: "var(--text)", marginBottom: noteLabel || children ? 14 : 0 }}>{body}</p>
+      {children && <div style={{ marginBottom: noteLabel ? 14 : 0 }}>{children}</div>}
       {noteLabel && (
         <TextAreaField
           label={noteLabel}

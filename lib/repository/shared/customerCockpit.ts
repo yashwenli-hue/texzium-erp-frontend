@@ -587,3 +587,135 @@ export function historyFilterCounts(events: Pick<CustomerEvent, "action">[]): Ar
 export function filterCustomerEvents<T extends Pick<CustomerEvent, "action">>(events: T[], filter: HistoryFilter): T[] {
   return filter === "all" ? events : events.filter((e) => customerEventCategory(e.action) === filter);
 }
+
+// ---------------------------------------------------------------------------
+// GST registration usage
+// ---------------------------------------------------------------------------
+
+export interface GstUsage {
+  /** Quotations made with this registration as the buyer's, newest first. */
+  quotations: CustomerOverviewQuotation[];
+  approved: number;
+}
+
+/**
+ * Which quotations used which of the customer's registrations, from the buyer GST each
+ * quotation recorded. Only quotations carry this in the overview (a Proforma and a Sales
+ * Order take theirs from the quotation), so it is a count of quotations, not of every
+ * document. `unrecorded` are older quotations that recorded no registration at all: they
+ * are reported, never attributed to one. This says nothing about whether a GSTIN has been
+ * checked with the tax authority (it has not: the format is checked, nothing more).
+ */
+export function gstUsage(overview: Pick<CustomerOverview, "quotations">): { byRegistration: Map<string, GstUsage>; unrecorded: number } {
+  const byRegistration = new Map<string, GstUsage>();
+  let unrecorded = 0;
+  const newest = [...overview.quotations].sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
+  for (const q of newest) {
+    if (!q.buyerGstId) {
+      unrecorded += 1;
+      continue;
+    }
+    const u = byRegistration.get(q.buyerGstId) ?? { quotations: [], approved: 0 };
+    u.quotations.push(q);
+    if (q.status === "APPROVED") u.approved += 1;
+    byRegistration.set(q.buyerGstId, u);
+  }
+  return { byRegistration, unrecorded };
+}
+
+// ---------------------------------------------------------------------------
+// What deactivating a customer touches
+// ---------------------------------------------------------------------------
+
+export interface ImpactLine {
+  key: string;
+  count: number;
+  /** "approved quotations that still need a Proforma Invoice" */
+  label: string;
+}
+
+export interface DeactivationImpact {
+  /** Nothing in progress and nothing owed: deactivating changes nothing that is under way. */
+  clear: boolean;
+  openDeals: number;
+  /**
+   * What cannot continue while the customer is inactive, because the next step is a new
+   * document and the backend refuses new Proformas and Sales Orders for an inactive customer.
+   */
+  blocked: ImpactLine[];
+  /** What is under way and keeps its own approvals and closing steps: nothing is cancelled. */
+  continues: ImpactLine[];
+  /** FinanceOS figures as recorded. Overdue is part of outstanding, not on top of it. */
+  money: { openInvoices: number; outstanding: number; overdue: number; overdueInvoices: number };
+}
+
+/**
+ * The preview shown before a customer is deactivated, from the overview (nothing is
+ * fetched or written for it). Counts are of documents at each step, each document in
+ * exactly one line, so nothing is counted twice; money is reported as what is outstanding
+ * and, separately, the part of it that is overdue.
+ */
+export function buildDeactivationImpact(overview: CustomerOverview, now: Date): DeactivationImpact {
+  const deals = buildDeals(overview, now);
+  const kinds = new Map<NextKind, number>();
+  for (const d of deals) for (const t of d.trails) kinds.set(t.next.kind, (kinds.get(t.next.kind) ?? 0) + 1);
+  const n = (k: NextKind) => kinds.get(k) ?? 0;
+
+  const line = (key: string, count: number, one: string, many: string): ImpactLine => ({ key, count, label: count === 1 ? one : many });
+  const blocked: ImpactLine[] = [
+    line("proforma", n("PROFORMA_NEEDED"), "approved quotation that still needs a Proforma Invoice", "approved quotations that still need a Proforma Invoice"),
+    line("expired", n("PROFORMA_EXPIRED"), "expired Proforma Invoice that would need a new one", "expired Proforma Invoices that would need a new one"),
+    line("order", n("ORDER_NEEDED"), "approved Proforma Invoice that still needs a Sales Order", "approved Proforma Invoices that still need a Sales Order"),
+  ].filter((l) => l.count > 0);
+
+  const continues: ImpactLine[] = [
+    line("quotation", n("QUOTATION_APPROVAL"), "quotation waiting for approval", "quotations waiting for approval"),
+    line("proformaApproval", n("PROFORMA_APPROVAL"), "Proforma Invoice waiting for approval", "Proforma Invoices waiting for approval"),
+    line("orderApproval", n("ORDER_APPROVAL"), "Sales Order waiting for approval", "Sales Orders waiting for approval"),
+    line("operations", n("WITH_OPERATIONS"), "order already with operations", "orders already with operations"),
+    line("draftInvoice", n("INVOICE_DRAFT"), "invoice in draft", "invoices in draft"),
+  ].filter((l) => l.count > 0);
+
+  const open = deals.flatMap((d) => d.trails.flatMap((t) => t.openReceivables));
+  const overdue = open.filter((r) => isOverdueReceivable(r, now));
+  const openDeals = deals.filter((d) => d.isOpen).length;
+  const money = {
+    openInvoices: new Set(open.map((r) => r.invoiceId)).size,
+    outstanding: sumMoney(open.map((r) => r.balanceAmount)),
+    overdue: sumMoney(overdue.map((r) => r.balanceAmount)),
+    overdueInvoices: new Set(overdue.map((r) => r.invoiceId)).size,
+  };
+  return { clear: openDeals === 0 && blocked.length === 0 && continues.length === 0 && money.outstanding === 0, openDeals, blocked, continues, money };
+}
+
+// ---------------------------------------------------------------------------
+// History grouped by day
+// ---------------------------------------------------------------------------
+
+/** The local calendar day of an ISO time, "2026-10-07". */
+export const dayKey = (iso: string) => {
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+
+/** "Today", "Yesterday", or the date, for the heading of a day of history. */
+export function dayLabel(key: string, now: Date): string {
+  const today = dayKey(now.toISOString());
+  const yesterday = dayKey(new Date(now.getTime() - 86_400_000).toISOString());
+  if (key === today) return "Today";
+  if (key === yesterday) return "Yesterday";
+  const [y, m, d] = key.split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+/** Events (already newest first) in runs of the same day, in the order given. */
+export function groupByDay<T extends { occurredAt: string }>(events: T[]): Array<{ day: string; events: T[] }> {
+  const groups: Array<{ day: string; events: T[] }> = [];
+  for (const e of events) {
+    const day = dayKey(e.occurredAt);
+    const last = groups[groups.length - 1];
+    if (last && last.day === day) last.events.push(e);
+    else groups.push({ day, events: [e] });
+  }
+  return groups;
+}

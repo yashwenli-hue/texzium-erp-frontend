@@ -18,6 +18,7 @@ import { DealCard, SuggestedDealCard } from "../../../components/customers/DealC
 import { GstRegistrationsPanel } from "../../../components/customers/GstRegistrationsPanel";
 import { DetailsPanel } from "../../../components/customers/DetailsPanel";
 import { ActivityPanel } from "../../../components/customers/ActivityPanel";
+import { DeactivationImpact } from "../../../components/customers/DeactivationImpact";
 import { CustomerForm } from "../../../components/forms/CustomerForm";
 import { GstRegistrationForm } from "../../../components/forms/GstRegistrationForm";
 import { OpportunityForm } from "../../../components/forms/OpportunityForm";
@@ -27,7 +28,7 @@ import { useAuth } from "../../../lib/auth/AuthContext";
 import { useRepository } from "../../../lib/repository/RepositoryProvider";
 import { CreateOpportunityInput, CreateQuotationInput } from "../../../lib/repository/interfaces";
 import { CUSTOMER_PERMISSIONS, customerActions, quotingBlockerText, quotingBlockers, sortRegistrations } from "../../../lib/repository/shared/customerLifecycle";
-import { AttentionAction, buildAttention, buildDeals, buildSnapshot } from "../../../lib/repository/shared/customerCockpit";
+import { AttentionAction, buildAttention, buildDeactivationImpact, buildDeals, buildSnapshot, gstUsage } from "../../../lib/repository/shared/customerCockpit";
 import { QUOTATION_PERMISSIONS } from "../../../lib/repository/shared/quotationLifecycle";
 import { CustomerGstRegistration } from "../../../lib/types/domain";
 
@@ -136,6 +137,8 @@ export default function CustomerCockpitPage() {
   });
   const deals = overview ? buildDeals(overview, now) : [];
   const snapshot = overview ? buildSnapshot(overview, now) : null;
+  const usage = overview ? gstUsage(overview) : null;
+  const impact = overview ? buildDeactivationImpact(overview, now) : null;
   const leadByOpportunity = new Map((overview?.opportunities ?? []).map((o) => [o.id, o.leadId ? { id: o.leadId, name: o.leadName } : undefined]));
 
   const quoteBlockedReason = !canQuoteWith ? "You don't have permission to create quotations." : blockers.length ? quotingBlockerText(blockers[0]) : undefined;
@@ -238,6 +241,7 @@ export default function CustomerCockpitPage() {
             registrations={registrations}
             may={may}
             addState={actions.addGst}
+            usage={usage}
             onAdd={() => setDialog({ kind: "gstAdd" })}
             onEdit={(reg) => setDialog({ kind: "gstEdit", reg })}
             onDeactivate={(reg) => setDialog({ kind: "gstDeactivate", reg })}
@@ -267,7 +271,9 @@ export default function CustomerCockpitPage() {
             await d.deactivateCustomer(reason ?? "");
             toast.show(`${customer.customerName} deactivated`, "check");
           }}
-        />
+        >
+          <DeactivationImpact impact={impact} loading={d.overviewLoading} error={d.overviewError} />
+        </ConfirmDialog>
       )}
       {dialog?.kind === "reactivate" && (
         <ConfirmDialog

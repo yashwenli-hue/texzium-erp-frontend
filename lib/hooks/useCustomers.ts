@@ -28,12 +28,23 @@ export function useCustomers() {
     [repo, refetch]
   );
 
+  /** Adds a registration to a customer that already exists (the second half of creating a customer with its first registration). */
+  const addRegistrationTo = useCallback(
+    async (customerId: string, input: Omit<CreateGstRegistrationInput, "customerId">) => {
+      const registration = await repo.customerGst.create({ ...input, customerId });
+      refetch();
+      return registration;
+    },
+    [repo, refetch]
+  );
+
   return {
     customers: data?.items ?? [],
     total: data?.total ?? 0,
     loading,
     error,
     createCustomer,
+    addRegistrationTo,
     refetch,
   };
 }

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ReactNode } from "react";
 import { EmptyState } from "./Button";
+import { Icon } from "./Icon";
 
 export interface ResponsiveColumn<T> {
   key: string;
@@ -8,6 +9,18 @@ export interface ResponsiveColumn<T> {
   render: (row: T) => ReactNode;
   /** The column that carries the row's link on a wide screen (the first by default). */
   primary?: boolean;
+  /** Present when the list can be ordered by this column: its header becomes a sort button. */
+  sortKey?: string;
+}
+
+/** The order the list is in, and the choices. The caller sorts; the list only shows the controls. */
+export interface ListSort {
+  key: string;
+  direction: "asc" | "desc";
+  /** What can be sorted by: the header buttons of the table and the "Sort by" choices of the cards. */
+  options: Array<{ key: string; label: string }>;
+  /** Called with a new key, or with the same key and the opposite direction. The caller applies its own default direction to a new key. */
+  onChange: (key: string, direction?: "asc" | "desc") => void;
 }
 
 /**
@@ -35,6 +48,7 @@ export function ResponsiveList<T extends { id: string }>({
   emptyAction,
   caption,
   testId,
+  sort,
 }: {
   rows: T[];
   columns: ResponsiveColumn<T>[];
@@ -49,6 +63,7 @@ export function ResponsiveList<T extends { id: string }>({
   emptyAction?: ReactNode;
   caption?: string;
   testId?: string;
+  sort?: ListSort;
 }) {
   if (rows.length === 0) {
     return <EmptyState icon={emptyIcon} title={emptyTitle} body={emptyBody} action={emptyAction} />;
@@ -58,14 +73,39 @@ export function ResponsiveList<T extends { id: string }>({
 
   return (
     <div data-testid={testId} className="rl">
+      {sort && (
+        <div className="rl-sort">
+          <label>
+            <span>Sort by</span>
+            <select value={sort.key} onChange={(e) => sort.onChange(e.target.value)} aria-label="Sort by">
+              {sort.options.map((o) => (
+                <option key={o.key} value={o.key}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button type="button" className="btn ghost sm" onClick={() => sort.onChange(sort.key, sort.direction === "asc" ? "desc" : "asc")} aria-label={`Order: ${sort.direction === "asc" ? "ascending" : "descending"}. Press to reverse.`}>
+            <Icon name={sort.direction === "asc" ? "up" : "down"} size={14} />
+            {sort.direction === "asc" ? "Ascending" : "Descending"}
+          </button>
+        </div>
+      )}
       <div className="table-scroll rl-table">
         <table>
           {caption && <caption className="sr-only">{caption}</caption>}
           <thead>
             <tr>
               {columns.map((c) => (
-                <th key={c.key} scope="col">
-                  {c.header}
+                <th key={c.key} scope="col" aria-sort={sort && c.sortKey === sort.key ? (sort.direction === "asc" ? "ascending" : "descending") : undefined}>
+                  {sort && c.sortKey ? (
+                    <button type="button" className="th-sort" onClick={() => sort.onChange(c.sortKey!)}>
+                      {c.header}
+                      {c.sortKey === sort.key && <Icon name={sort.direction === "asc" ? "up" : "down"} size={12} />}
+                    </button>
+                  ) : (
+                    c.header
+                  )}
                 </th>
               ))}
             </tr>

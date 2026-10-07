@@ -1,12 +1,39 @@
+import Link from "next/link";
 import { Button, EmptyState } from "../ui/Button";
+import { Disclosure } from "../ui/Disclosure";
 import { DocumentAction, DocumentActions } from "../ui/DocumentActions";
 import { Icon } from "../ui/Icon";
 import { Tag } from "../ui/Tag";
 import { gstActions } from "../../lib/repository/shared/customerLifecycle";
 import type { ActionState } from "../../lib/repository/shared/quotationLifecycle";
 import type { Customer, CustomerGstRegistration } from "../../lib/types/domain";
+import { GstUsage, documentRef } from "../../lib/repository/shared/customerCockpit";
+import { formatDate } from "../../lib/format";
 
 const LOCK_ID = "gst-lock-note"; // one per page
+
+/**
+ * How much a registration has been used: the quotations that recorded it as the buyer's
+ * registration, listed on request. It is a fact about the customer's own quotations; it
+ * says nothing about the registration having been checked with the tax authority.
+ */
+function RegistrationUsage({ usage }: { usage: GstUsage | null }) {
+  if (!usage || usage.quotations.length === 0) return <p className="reg-usage" data-testid="gst-usage">Not used on any quotation yet</p>;
+  const n = usage.quotations.length;
+  return (
+    <div className="reg-usage" data-testid="gst-usage">
+      <Disclosure summary={`Used on ${n} ${n === 1 ? "quotation" : "quotations"}${usage.approved ? ` · ${usage.approved} approved` : ""}`}>
+        <ul className="reg-usage-list">
+          {usage.quotations.map((q) => (
+            <li key={q.id}>
+              <Link href={`/quotations/${q.id}`}>{documentRef(q.id, q.quotationCode)}</Link> <span>{formatDate(q.quoteDate)} · {q.status.charAt(0) + q.status.slice(1).toLowerCase()}</span>
+            </li>
+          ))}
+        </ul>
+      </Disclosure>
+    </div>
+  );
+}
 
 function RegistrationRow({
   reg,
@@ -14,6 +41,7 @@ function RegistrationRow({
   otherActive,
   may,
   lock,
+  usage,
   onEdit,
   onDeactivate,
   onReactivate,
@@ -25,6 +53,8 @@ function RegistrationRow({
   may: { gstManage: boolean };
   /** The reason every row is locked for, written once above the list. */
   lock?: { id: string; text: string };
+  /** Which quotations used it: undefined while that is not known (the overview is loading or could not be read). */
+  usage?: GstUsage | null;
   onEdit: () => void;
   onDeactivate: () => void;
   onReactivate: () => void;
@@ -39,7 +69,7 @@ function RegistrationRow({
       : { key: "reactivate", label: "Reactivate", state: a.reactivate, onClick: onReactivate },
   ];
   return (
-    <li className={`reg ${reg.isActive ? "" : "inactive"}`} data-testid="gst-row" data-gstin={reg.gstin}>
+    <li className={`reg ${reg.isActive ? "" : "inactive"}`} id={`gst-${reg.id}`} data-testid="gst-row" data-gstin={reg.gstin}>
       <div>
         <div className="gstin">{reg.gstin}</div>
         <div className="sub">
@@ -51,6 +81,7 @@ function RegistrationRow({
           <Tag color={reg.isActive ? "n" : "b"}>{reg.isActive ? "Active" : "Inactive"}</Tag>
           <Tag color="i">{reg.stateName}</Tag>
         </div>
+        {usage !== undefined && <RegistrationUsage usage={usage} />}
       </div>
       <div className="sub" style={{ marginTop: 0 }}>
         {reg.addressLine1}
@@ -75,6 +106,7 @@ export function GstRegistrationsPanel({
   registrations,
   may,
   addState,
+  usage,
   onAdd,
   onEdit,
   onDeactivate,
@@ -85,6 +117,8 @@ export function GstRegistrationsPanel({
   registrations: CustomerGstRegistration[];
   may: { gstManage: boolean };
   addState: ActionState;
+  /** From the customer's quotations: null while the overview is not available. */
+  usage?: { byRegistration: Map<string, GstUsage>; unrecorded: number } | null;
   onAdd: () => void;
   onEdit: (reg: CustomerGstRegistration) => void;
   onDeactivate: (reg: CustomerGstRegistration) => void;
@@ -122,6 +156,7 @@ export function GstRegistrationsPanel({
               otherActive={registrations.filter((x) => x.isActive && x.id !== g.id).length}
               may={may}
               lock={lock}
+              usage={usage ? usage.byRegistration.get(g.id) ?? null : undefined}
               onEdit={() => onEdit(g)}
               onDeactivate={() => onDeactivate(g)}
               onReactivate={() => onReactivate(g)}
@@ -129,6 +164,11 @@ export function GstRegistrationsPanel({
             />
           ))}
         </ul>
+      )}
+      {usage && usage.unrecorded > 0 && (
+        <p className="reg-unrecorded" data-testid="gst-unrecorded">
+          {usage.unrecorded} older {usage.unrecorded === 1 ? "quotation recorded" : "quotations recorded"} no GST registration, so {usage.unrecorded === 1 ? "it isn't" : "they aren't"} counted above.
+        </p>
       )}
     </section>
   );

@@ -6,90 +6,78 @@ import { PageHeader } from "../../components/ui/PageHeader";
 import { Panel } from "../../components/ui/Card";
 import { Button, EmptyState, Pagination, paginate } from "../../components/ui/Button";
 import { Icon } from "../../components/ui/Icon";
-import { LoadingRegion } from "../../components/ui/LoadingRegion";
 import { Who } from "../../components/ui/Who";
-import { Chip, ChipGroup, CustomerStatusTag, Tag } from "../../components/ui/Tag";
+import { FilterChips } from "../../components/ui/FilterChips";
+import { Tag } from "../../components/ui/Tag";
+import { LoadingRegion } from "../../components/ui/LoadingRegion";
 import { ResponsiveList, ResponsiveColumn } from "../../components/ui/ResponsiveList";
-import { CustomerForm } from "../../components/forms/CustomerForm";
+import { CustomerCreateFlow } from "../../components/customers/CustomerCreateFlow";
+import { GstStateChips, ReadinessPill } from "../../components/customers/CustomerListParts";
 import { useCustomers } from "../../lib/hooks/useCustomers";
 import { useAuth } from "../../lib/auth/AuthContext";
 import { Customer } from "../../lib/types/domain";
-import { CUSTOMER_PERMISSIONS, normalizeCustomerName, quotingBlockers } from "../../lib/repository/shared/customerLifecycle";
+import { CUSTOMER_PERMISSIONS } from "../../lib/repository/shared/customerLifecycle";
+import {
+  CUSTOMER_FILTER_LABEL,
+  CUSTOMER_SORT_LABEL,
+  CustomerFilter,
+  CustomerSortKey,
+  DEFAULT_SORT_DIRECTION,
+  SortDirection,
+  customerFilterCounts,
+  matchesFilter,
+  searchCustomers,
+  sortCustomers,
+} from "../../lib/repository/shared/customerList";
 import { formatDate } from "../../lib/format";
 
 const PAGE_SIZE = 10;
-type Filter = "all" | "active" | "inactive" | "needsGst";
-
-const activeRegistrations = (c: Customer) => c.gstRegistrations.filter((g) => g.isActive);
-const needsGst = (c: Customer) => quotingBlockers(c).includes("NO_ACTIVE_GST") && c.isActive;
-
-function matches(c: Customer, term: string): boolean {
-  const q = normalizeCustomerName(term);
-  if (!q) return true;
-  const fields = [c.customerName, c.customerCode, c.panNumber ?? "", c.email ?? "", c.phone ?? "", ...c.gstRegistrations.map((g) => g.gstin)];
-  return fields.some((f) => f.toLowerCase().includes(q));
-}
-
-function gstSummary(c: Customer): string {
-  const active = activeRegistrations(c);
-  if (active.length === 0) return c.gstRegistrations.length ? "None active" : "None";
-  const def = active.find((g) => g.isDefault) ?? active[0];
-  return `${active.length} active · ${def.stateName}`;
-}
+const SORT_OPTIONS = (Object.keys(CUSTOMER_SORT_LABEL) as CustomerSortKey[]).map((key) => ({ key, label: CUSTOMER_SORT_LABEL[key] }));
 
 export default function CustomersPage() {
   const router = useRouter();
   const { hasPermission } = useAuth();
   const canCreate = hasPermission(CUSTOMER_PERMISSIONS.create);
-  const { customers, loading, error, createCustomer, refetch } = useCustomers();
+  const { customers, loading, error, createCustomer, addRegistrationTo, refetch } = useCustomers();
   const [showForm, setShowForm] = useState(false);
-  const [filter, setFilter] = useState<Filter>("all");
+  const [filter, setFilter] = useState<CustomerFilter>("all");
   const [term, setTerm] = useState("");
   const [page, setPage] = useState(1);
+  const [sort, setSort] = useState<{ key: CustomerSortKey; direction: SortDirection }>({ key: "name", direction: "asc" });
 
-  const counts = useMemo(
-    () => ({
-      all: customers.length,
-      active: customers.filter((c) => c.isActive).length,
-      inactive: customers.filter((c) => !c.isActive).length,
-      needsGst: customers.filter(needsGst).length,
-    }),
-    [customers]
-  );
+  const counts = useMemo(() => customerFilterCounts(customers), [customers]);
 
-  const filtered = useMemo(
-    () =>
-      customers.filter((c) => {
-        if (!matches(c, term)) return false;
-        if (filter === "active") return c.isActive;
-        if (filter === "inactive") return !c.isActive;
-        if (filter === "needsGst") return needsGst(c);
-        return true;
-      }),
-    [customers, filter, term]
-  );
-  const rows = paginate(filtered, page, PAGE_SIZE);
+  const rows = useMemo(() => {
+    const filtered = searchCustomers(customers, term).filter((c) => matchesFilter(c, filter));
+    return sortCustomers(filtered, sort.key, sort.direction);
+  }, [customers, term, filter, sort]);
+  const pageRows = paginate(rows, page, PAGE_SIZE);
 
-  const choose = (f: Filter) => {
+  const choose = (f: CustomerFilter) => {
     setFilter(f);
     setPage(1);
   };
 
+  const onSort = (key: string, direction?: SortDirection) => {
+    const k = key as CustomerSortKey;
+    setSort((cur) => (direction ? { key: k, direction } : k === cur.key ? { key: k, direction: cur.direction === "asc" ? "desc" : "asc" } : { key: k, direction: DEFAULT_SORT_DIRECTION[k] }));
+    setPage(1);
+  };
+
   const columns: ResponsiveColumn<Customer>[] = [
-    { key: "account", header: "Account", primary: true, render: (c) => <Who name={c.customerName} sub={c.customerCode + (c.customerType ? ` · ${c.customerType}` : "")} /> },
-    { key: "contact", header: "Contact", render: (c) => (c.email || c.phone ? [c.email, c.phone].filter(Boolean).join(" · ") : "—") },
-    { key: "gst", header: "GST registrations", render: (c) => gstSummary(c) },
     {
-      key: "status",
-      header: "Status",
+      key: "account",
+      header: "Account",
+      primary: true,
+      sortKey: "name",
       render: (c) => (
-        <span style={{ display: "inline-flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
-          <CustomerStatusTag isActive={c.isActive} />
-          {needsGst(c) && <Tag color="w">Can&apos;t be quoted yet</Tag>}
-        </span>
+        <Who name={c.customerName} sub={`${c.customerCode}${c.customerType ? ` · ${c.customerType}` : ""}${c.linkedVendorId ? " · also a vendor" : ""}`} />
       ),
     },
-    { key: "created", header: "Created", render: (c) => formatDate(c.createdAt) },
+    { key: "contact", header: "Contact", render: (c) => (c.email || c.phone ? [c.email, c.phone].filter(Boolean).join(" · ") : "—") },
+    { key: "gst", header: "GST states", render: (c) => <GstStateChips customer={c} /> },
+    { key: "status", header: "Readiness", sortKey: "status", render: (c) => <ReadinessPill customer={c} /> },
+    { key: "updated", header: "Updated", sortKey: "updated", render: (c) => formatDate(c.updatedAt) },
   ];
 
   const card = (c: Customer) => (
@@ -97,16 +85,22 @@ export default function CustomersPage() {
       <div className="rl-top">
         <div style={{ minWidth: 0 }}>
           <div className="rl-title">{c.customerName}</div>
-          <div className="rl-sub">{c.customerCode}{c.customerType ? ` · ${c.customerType}` : ""}</div>
+          <div className="rl-sub">
+            {c.customerCode}
+            {c.customerType ? ` · ${c.customerType}` : ""}
+          </div>
         </div>
-        <CustomerStatusTag isActive={c.isActive} />
+        <ReadinessPill customer={c} />
       </div>
       <div className="rl-meta">
-        <span>GST: {gstSummary(c)}</span>
+        <GstStateChips customer={c} />
+        {c.linkedVendorId && <Tag color="i">Also a vendor</Tag>}
+      </div>
+      <div className="rl-meta">
         {c.phone && <span>{c.phone}</span>}
         {c.email && <span>{c.email}</span>}
+        <span>Updated {formatDate(c.updatedAt)}</span>
       </div>
-      {needsGst(c) && <div className="rl-hint">Can&apos;t be quoted yet: no active GST registration</div>}
     </>
   );
 
@@ -177,17 +171,12 @@ export default function CustomersPage() {
             placeholder="Search by name, code, PAN, GSTIN, phone or email"
           />
         </label>
-        <ChipGroup>
-          <Chip label={`All ${counts.all}`} active={filter === "all"} onClick={() => choose("all")} />
-          <Chip label={`Active ${counts.active}`} active={filter === "active"} onClick={() => choose("active")} />
-          {counts.inactive > 0 && <Chip label={`Inactive ${counts.inactive}`} active={filter === "inactive"} onClick={() => choose("inactive")} />}
-          {counts.needsGst > 0 && <Chip label={`Can't be quoted yet ${counts.needsGst}`} active={filter === "needsGst"} onClick={() => choose("needsGst")} />}
-        </ChipGroup>
+        <FilterChips label="Filter customers" value={filter} onChange={choose} options={counts.map(({ filter: f, count }) => ({ value: f, label: CUSTOMER_FILTER_LABEL[f], count }))} />
       </div>
 
       <Panel title="Customer accounts" flush>
         <ResponsiveList
-          rows={rows}
+          rows={pageRows}
           columns={columns}
           getHref={(c) => `/customers/${c.id}`}
           getLabel={(c) => `Open ${c.customerName}`}
@@ -204,18 +193,16 @@ export default function CustomersPage() {
               </Button>
             ) : undefined
           }
+          sort={{ key: sort.key, direction: sort.direction, options: SORT_OPTIONS, onChange: onSort }}
         />
-        <Pagination page={page} pageSize={PAGE_SIZE} total={filtered.length} onPageChange={setPage} />
+        <Pagination page={page} pageSize={PAGE_SIZE} total={rows.length} onPageChange={setPage} />
       </Panel>
 
       {showForm && (
-        <CustomerForm
+        <CustomerCreateFlow
+          api={{ createCustomer, addRegistration: addRegistrationTo }}
           onClose={() => setShowForm(false)}
-          onSubmit={async (input) => {
-            const created = await createCustomer(input);
-            router.push(`/customers/${created.id}`);
-            return created;
-          }}
+          onOpenCustomer={(c) => router.push(`/customers/${c.id}`)}
         />
       )}
     </div>

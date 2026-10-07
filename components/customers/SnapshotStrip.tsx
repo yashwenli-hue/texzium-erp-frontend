@@ -43,7 +43,7 @@ export function SnapshotStrip({ snapshot }: { snapshot: Snapshot }) {
           </li>
         ))}
       </ul>
-      <p className="snap-note">Quoted, ordered, invoiced, collected and outstanding are as recorded (invoices and receivables by FinanceOS). Pipeline and overdue are worked out here from recorded values.</p>
+      <p className="snap-note">Quoted, ordered, invoiced, collected and outstanding are as recorded (invoices and receivables by FinanceOS). Pipeline and overdue are worked out here from recorded values. Each figure counts its own stage: a quotation that became an order is in both, so they are not added together, and overdue is part of outstanding, not on top of it.</p>
     </section>
   );
 }

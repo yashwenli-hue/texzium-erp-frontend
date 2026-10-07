@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Icon } from "./Icon";
 import { Tag } from "./Tag";
 import { Button } from "./Button";
@@ -14,6 +15,7 @@ import {
   formatQuotationStatus,
 } from "../../lib/types/domain";
 import { formatDateTime, formatInrExact } from "../../lib/format";
+import { dayLabel, groupByDay } from "../../lib/repository/shared/customerCockpit";
 
 interface Change {
   label: string;
@@ -38,6 +40,8 @@ interface Entry {
   detail?: string;
   /** Text fields that changed: label, before, after. */
   textChanges?: Array<{ label: string; from: string | null; to: string | null }>;
+  /** Where the thing the event is about can be seen (the opportunity, the registration): `detail` is then a link. */
+  href?: string;
 }
 
 function EntryList({
@@ -51,6 +55,9 @@ function EntryList({
   limit,
   startsAtCreation: startsAtCreationProp,
   showFoot = true,
+  groupDays,
+  emptyText,
+  footText,
 }: {
   entries: Entry[];
   loading?: boolean;
@@ -64,6 +71,11 @@ function EntryList({
   /** Whether the history reaches back to the creation event, when the caller knows better than the entries passed in (a filtered list). */
   startsAtCreation?: boolean;
   showFoot?: boolean;
+  /** Put a heading ("Today", "Yesterday", a date) over each day's entries. */
+  groupDays?: boolean;
+  /** Shorter wording for the two "nothing earlier was recorded" notes. */
+  emptyText?: string;
+  footText?: string;
 }) {
   if (error) {
     return (
@@ -94,66 +106,80 @@ function EntryList({
     <div className="tl" data-testid={testId}>
       {entries.length === 0 && (
         <p style={{ color: "var(--muted)", fontSize: 13 }} data-testid={`${testId}-empty`}>
-          No lifecycle history was recorded for this {noun}. It was created before lifecycle tracking began, so what
-          happened earlier isn&apos;t available. Anything done from now on is recorded here.
+          {emptyText ?? (
+            <>
+              No lifecycle history was recorded for this {noun}. It was created before lifecycle tracking began, so what
+              happened earlier isn&apos;t available. Anything done from now on is recorded here.
+            </>
+          )}
         </p>
       )}
-      {visible.map((e) => (
+      {(() => {
+        const item = (e: Entry) => (
         <div className="tl-item" key={e.id}>
-          <div className="dot">
-            <Icon name={e.icon} size={14} />
-          </div>
-          <div className="body">
-            <div className="r1">
-              <b>{e.title}</b>
-              <span className="when">{formatDateTime(e.occurredAt)}</span>
+            <div className="dot">
+              <Icon name={e.icon} size={14} />
             </div>
-            {e.toLabel && (
-              <div className="trans">
-                {e.fromLabel ? <Tag color="n">{e.fromLabel}</Tag> : <small style={{ color: "var(--muted)", fontSize: 11.5 }}>Started as</small>}
-                {e.fromLabel && <Icon name="arrow" size={12} />}
-                <Tag color="n">{e.toLabel}</Tag>
+            <div className="body">
+              <div className="r1">
+                <b>{e.title}</b>
+                <span className="when">{formatDateTime(e.occurredAt)}</span>
               </div>
-            )}
-            {e.detail && <p className="hist-detail">{e.detail}</p>}
-            {e.textChanges && e.textChanges.length > 0 && (
-              <div className="hist-delta">
-                {e.textChanges.map((c) => (
-                  <span key={c.label}>
-                    {c.label}: {c.from ? c.from : <i>none</i>} → <b>{c.to ? c.to : <i>none</i>}</b>
-                  </span>
-                ))}
-              </div>
-            )}
-            {e.changes.length > 0 && (
-              <div className="hist-delta">
-                {e.changes.map((c) => (
-                  <span key={c.label}>
-                    {c.label}:{" "}
-                    {c.from !== undefined ? (
-                      <>
-                        {formatInrExact(c.from)} → <b>{formatInrExact(c.to)}</b>
-                      </>
-                    ) : (
-                      <b>{formatInrExact(c.to)}</b>
-                    )}
-                  </span>
-                ))}
-              </div>
-            )}
-            {e.remarks && (
-              <p style={{ fontStyle: "italic" }}>
-                {e.isReason && <span style={{ fontStyle: "normal", color: "var(--muted)", fontWeight: 600 }}>Reason: </span>}
-                &ldquo;{e.remarks}&rdquo;
-              </p>
-            )}
-            <small style={{ color: "var(--muted)", fontSize: 11.5 }}>{e.actorName ? `by ${e.actorName}` : "Actor not recorded"}</small>
+              {e.toLabel && (
+                <div className="trans">
+                  {e.fromLabel ? <Tag color="n">{e.fromLabel}</Tag> : <small style={{ color: "var(--muted)", fontSize: 11.5 }}>Started as</small>}
+                  {e.fromLabel && <Icon name="arrow" size={12} />}
+                  <Tag color="n">{e.toLabel}</Tag>
+                </div>
+              )}
+              {e.detail && <p className="hist-detail">{e.href ? e.href.startsWith("#") ? <a href={e.href}>{e.detail}</a> : <Link href={e.href}>{e.detail}</Link> : e.detail}</p>}
+              {e.textChanges && e.textChanges.length > 0 && (
+                <div className="hist-delta">
+                  {e.textChanges.map((c) => (
+                    <span key={c.label}>
+                      {c.label}: {c.from ? c.from : <i>none</i>} → <b>{c.to ? c.to : <i>none</i>}</b>
+                    </span>
+                  ))}
+                </div>
+              )}
+              {e.changes.length > 0 && (
+                <div className="hist-delta">
+                  {e.changes.map((c) => (
+                    <span key={c.label}>
+                      {c.label}:{" "}
+                      {c.from !== undefined ? (
+                        <>
+                          {formatInrExact(c.from)} → <b>{formatInrExact(c.to)}</b>
+                        </>
+                      ) : (
+                        <b>{formatInrExact(c.to)}</b>
+                      )}
+                    </span>
+                  ))}
+                </div>
+              )}
+              {e.remarks && (
+                <p style={{ fontStyle: "italic" }}>
+                  {e.isReason && <span style={{ fontStyle: "normal", color: "var(--muted)", fontWeight: 600 }}>Reason: </span>}
+                  &ldquo;{e.remarks}&rdquo;
+                </p>
+              )}
+              <small style={{ color: "var(--muted)", fontSize: 11.5 }}>{e.actorName ? `by ${e.actorName}` : "Actor not recorded"}</small>
+            </div>
           </div>
-        </div>
-      ))}
+        );
+        if (!groupDays) return visible.map(item);
+        const now = new Date();
+        return groupByDay(visible).map((g) => (
+          <div className="tl-day-group" key={g.day} data-day={g.day}>
+            <h4 className="tl-day">{dayLabel(g.day, now)}</h4>
+            {g.events.map(item)}
+          </div>
+        ));
+      })()}
       {showFoot && entries.length > 0 && !startsAtCreation && (
         <p className="hist-foot" data-testid={`${testId}-foot`}>
-          Earlier history isn&apos;t available: this {noun} was created before lifecycle tracking began.
+          {footText ?? <>Earlier history isn&apos;t available: this {noun} was created before lifecycle tracking began.</>}
         </p>
       )}
     </div>
@@ -322,8 +348,10 @@ export function CustomerHistory({
       occurredAt: e.occurredAt,
       changes: [],
       detail: regLabel ?? (isOpportunity && e.remarks ? e.remarks : undefined),
+      // The thing the event is about can be opened: the opportunity's page, or the registration on this page.
+      href: isOpportunity && e.opportunityId ? `/opportunities/${e.opportunityId}` : reg ? `#gst-${reg.id}` : undefined,
       textChanges: e.changes ? Object.entries(e.changes).map(([key, c]) => ({ label: CUSTOMER_FIELD_LABEL[key] ?? key, from: c.from, to: c.to })) : undefined,
     };
   });
-  return <EntryList entries={entries} loading={loading} error={error} onRetry={onRetry} noun="customer" creationAction="CUSTOMER_CREATED" testId="customer-history" limit={limit} startsAtCreation={startsAtCreation} showFoot={showFoot} />;
+  return <EntryList entries={entries} loading={loading} error={error} onRetry={onRetry} noun="customer" creationAction="CUSTOMER_CREATED" testId="customer-history" limit={limit} startsAtCreation={startsAtCreation} showFoot={showFoot} groupDays emptyText="No history yet. This customer predates history tracking; what happens from now on appears here." footText="Earlier changes weren't recorded." />;
 }
