@@ -37,7 +37,8 @@ function focusableIn(root: HTMLElement): HTMLElement[] {
  * phone without its own mobile layout.
  *
  * Keyboard: focus moves into the dialog when it opens (the first field, or the
- * dialog itself when it has none), Tab stays inside it, Escape closes it, and
+ * dialog itself when it has none), Tab stays inside it, Escape closes it (unless the
+ * focused control has its own popup open, which Escape closes first), and
  * focus returns to what opened it. The page behind does not scroll.
  */
 export function Modal({
@@ -72,6 +73,9 @@ export function Modal({
       if (openDialogs[openDialogs.length - 1] !== me) return;
 
       if (e.key === "Escape") {
+        // A control with its own popup open (a combobox's list) answers Escape first: it
+        // closes the popup, and the dialog closes on the next press.
+        if (e.target instanceof HTMLElement && e.target.getAttribute("aria-expanded") === "true") return;
         e.stopPropagation();
         onCloseRef.current();
         return;

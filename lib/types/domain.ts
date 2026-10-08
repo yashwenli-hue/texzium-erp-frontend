@@ -88,7 +88,7 @@ export interface LeadSourceRecord {
 }
 
 // MOCK/UI-ONLY presentation context requested for the Lead workspace
-// (product interest, free-text remarks, city). None of these exist on the
+// (product interest, free-text remarks). Neither exists on the
 // verified CreateLeadDto/UpdateLeadDto (docs/backend-ui-contract.md §3).
 // They are kept in this separate, clearly-named block — never flattened
 // into the DTO-mirroring fields below — so Phase B integration cannot
@@ -99,7 +99,6 @@ export interface LeadSourceRecord {
 export interface LeadUIContext {
   productInterest?: string;
   remarks?: string;
-  city?: string;
 }
 
 // VERIFIED: LeadFollowup { id, leadId, followupDate, remarks?, status,
@@ -188,6 +187,15 @@ export interface Lead {
   createdAt: string; // ISO 8601
   updatedAt: string; // ISO 8601
   lastActivityAt: string; // ISO 8601
+  /**
+   * VERIFIED (backend CP1): where the lead is. All three are absent for a lead recorded
+   * without a location (every lead that existed before, and those the WhatsApp bot or a
+   * webhook creates). country is ISO 3166-1 alpha-2 ("IN" is domestic); state is a state
+   * or union territory of India and only exists when country is "IN"; city is free text.
+   */
+  country?: string;
+  state?: string;
+  city?: string;
   /** MOCK/UI-ONLY — see LeadUIContext. Not part of the verified Lead contract. */
   uiContext?: LeadUIContext;
   /** VERIFIED: both lead list and lead detail embed the followups relation. */

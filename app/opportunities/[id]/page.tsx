@@ -172,7 +172,7 @@ export default function OpportunityDetailPage() {
                 </a>
               )}
             </div>
-            {lead && <QuickActions phone={lead.phone} email={lead.email} contactName={opportunity.customerName} />}
+            {lead && <QuickActions phone={lead.phone} email={lead.email} contactName={opportunity.customerName} country={lead.country ?? null} />}
           </div>
 
           <div style={{ padding: "16px 19px", borderBottom: "1px solid var(--line-2)" }}>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Modal } from "../ui/Modal";
 import { TextField, TextAreaField, SelectField, FieldRow } from "../ui/FormField";
 import { Button } from "../ui/Button";
@@ -9,11 +9,18 @@ import { UpdateLeadInput } from "../../lib/repository/interfaces";
 import { useLeadSources } from "../../lib/hooks/useLeads";
 import { useRepository } from "../../lib/repository/RepositoryProvider";
 import { Lead } from "../../lib/types/domain";
+import { LeadLocationFields } from "./LeadLocationFields";
+import { DraftErrors, draftFromLead, planLocationEdit, sameDraft } from "../../lib/geo/leadLocation";
 
 /**
  * Mirrors the VERIFIED UpdateLeadDto for the "real" fields; product
- * interest/remarks/city stay in the separate uiContext block (MOCK/UI-ONLY
+ * interest/remarks stay in the separate uiContext block (MOCK/UI-ONLY
  * — see LeadUIContext in lib/types/domain.ts).
+ *
+ * The location is a real field. A lead that has none is saved without one for as
+ * long as the Location section is left alone: nothing is required and nothing is
+ * filled in (see planLocationEdit). Once the section is touched the whole location
+ * is checked like a new lead's.
  */
 export function EditLeadDialog({
   lead,
@@ -37,7 +44,9 @@ export function EditLeadDialog({
   const [alternatePhone, setAlternatePhone] = useState(lead.alternatePhone ?? "");
   const [email, setEmail] = useState(lead.email ?? "");
   const [productInterest, setProductInterest] = useState(lead.uiContext?.productInterest ?? "");
-  const [city, setCity] = useState(lead.uiContext?.city ?? "");
+  const initialLocation = useMemo(() => draftFromLead(lead), [lead]);
+  const [location, setLocation] = useState(initialLocation);
+  const [locationErrors, setLocationErrors] = useState<DraftErrors>({});
   const [remarks, setRemarks] = useState(lead.uiContext?.remarks ?? "");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -51,8 +60,13 @@ export function EditLeadDialog({
     return Object.keys(e).length === 0;
   }
 
+  const hasStoredLocation = !!lead.country;
+
   async function handleSubmit() {
-    if (!validate()) return;
+    const fieldsOk = validate();
+    const edit = planLocationEdit(initialLocation, location);
+    setLocationErrors(edit.kind === "invalid" ? edit.errors : {});
+    if (!fieldsOk || edit.kind === "invalid") return;
     setSubmitting(true);
     try {
       await onSubmit({
@@ -62,9 +76,9 @@ export function EditLeadDialog({
         phone: phone.trim(),
         alternatePhone: alternatePhone.trim() || undefined,
         sourceId,
+        ...(edit.kind === "change" ? edit.fields : {}),
         uiContext: {
           productInterest: productInterest.trim() || undefined,
-          city: city.trim() || undefined,
           remarks: showRemarks ? remarks.trim() || undefined : undefined,
         },
       });
@@ -101,14 +115,23 @@ export function EditLeadDialog({
       </FieldRow>
       <TextField label="Email" value={email} onChange={(e) => setEmail(e.target.value)} error={errors.email} placeholder="Optional" />
 
+      <LeadLocationFields
+        draft={location}
+        onChange={(next) => {
+          setLocation(next);
+          if (Object.keys(locationErrors).length > 0) setLocationErrors({});
+        }}
+        errors={locationErrors}
+        // Optional only while there is nothing recorded and nothing started: once touched, the whole location is required.
+        required={hasStoredLocation || !sameDraft(initialLocation, location)}
+        note={hasStoredLocation ? undefined : "No location is recorded for this lead. Leave this as it is to keep it that way, or choose one to record it."}
+      />
+
       <div className="field-divider">
         <span>Additional context</span>
         <small>Stored locally for this demo — not yet part of the connected backend</small>
       </div>
-      <FieldRow>
-        <TextField label="Product / Interest" value={productInterest} onChange={(e) => setProductInterest(e.target.value)} placeholder="e.g. Hydraulic Pump Systems" />
-        <TextField label="City" value={city} onChange={(e) => setCity(e.target.value)} placeholder="Optional" />
-      </FieldRow>
+      <TextField label="Product / Interest" value={productInterest} onChange={(e) => setProductInterest(e.target.value)} placeholder="e.g. Hydraulic Pump Systems" />
       {showRemarks && (
         <TextAreaField label="Remarks" rows={3} value={remarks} onChange={(e) => setRemarks(e.target.value)} placeholder="Context for the next person who talks to this account…" />
       )}

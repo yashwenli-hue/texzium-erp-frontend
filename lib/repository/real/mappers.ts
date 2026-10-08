@@ -130,6 +130,10 @@ export interface BackendLead {
   /** Selected as { id, fullName } only. */
   deactivatedBy?: { id: string; fullName?: string | null } | null;
   deactivationReason?: string | null;
+  /** Absent on a backend that predates lead location, and null on a lead recorded without one. */
+  country?: string | null;
+  state?: string | null;
+  city?: string | null;
   createdAt: string;
   updatedAt: string;
   notes?: BackendLeadNote[];
@@ -276,6 +280,9 @@ export function mapLead(raw: BackendLead): Lead {
     deactivatedById: raw.deactivatedById ?? undefined,
     deactivatedByName: raw.deactivatedBy?.fullName ?? undefined,
     deactivationReason: raw.deactivationReason ?? undefined,
+    country: raw.country ?? undefined,
+    state: raw.state ?? undefined,
+    city: raw.city ?? undefined,
     createdAt: raw.createdAt,
     updatedAt: raw.updatedAt,
     lastActivityAt: raw.updatedAt,

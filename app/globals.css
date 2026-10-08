@@ -552,6 +552,8 @@ tbody tr.clickable:hover{background:var(--row-hover)}
 /* Forms */
 .field{display:flex;flex-direction:column;gap:6px;margin-bottom:16px}
 .field label{font-size:12.5px;font-weight:600;color:var(--text)}
+.field .flabel{font-size:12.5px;font-weight:600;color:var(--text)}
+.field .flabel .req{color:var(--bad);margin-left:2px}
 .field label .req{color:var(--bad);margin-left:2px}
 .field input,.field select,.field textarea{
   font-family:inherit;font-size:13.5px;color:var(--text);background:var(--surface-inset, var(--surface));
@@ -562,6 +564,32 @@ tbody tr.clickable:hover{background:var(--row-hover)}
 .field textarea{resize:vertical;min-height:80px;font-family:inherit}
 .field .err{color:var(--bad);font-size:11.5px;font-weight:500}
 .field.has-err input,.field.has-err select,.field.has-err textarea{border-color:var(--bad)}
+/* Combobox: a searchable single choice (components/ui/Combobox.tsx). The list is drawn in a portal, so it is styled outside .field. */
+.cbx{position:relative;display:flex;align-items:center}
+.field .cbx-input{padding-right:34px;text-overflow:ellipsis}
+.field .cbx-input[aria-expanded="true"]{border-color:var(--m);box-shadow:var(--focus-ring, 0 0 0 3px var(--m-soft))}
+.cbx-chev{position:absolute;right:0;top:0;bottom:0;width:34px;display:grid;place-items:center;color:var(--muted);cursor:pointer}
+.cbx-input:disabled ~ .cbx-chev{cursor:default;opacity:.5}
+.cbx-list{position:fixed;z-index:120;overflow-y:auto;overscroll-behavior:contain;background:var(--surface-2, var(--surface));border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow-2, 0 24px 60px -20px rgba(10,10,12,.35));padding:4px}
+.cbx-opt{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;font-size:13.5px;color:var(--text);cursor:pointer;scroll-margin:4px}
+.cbx-opt.active{background:var(--row-hover)}
+.cbx-opt.chosen .cbx-label{font-weight:600}
+.cbx-label{flex:1;min-width:0;overflow-wrap:anywhere}
+.cbx-hint{flex:none;font-size:12px;color:var(--text-2);font-variant-numeric:tabular-nums}
+.cbx-tick{flex:none;color:var(--m);display:grid;place-items:center}
+.cbx-none{padding:12px 10px;font-size:13px;color:var(--text-2)}
+@media(max-width:640px){
+  .cbx-opt{min-height:44px;padding:10px 12px;font-size:15px}
+  .cbx-chev{width:44px}
+  .field .cbx-input{padding-right:44px}
+}
+/* Lead location: the India / International choice is a pair of toggle buttons */
+.loc-scope{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.loc-scope button{font-family:inherit;font-size:13.5px;font-weight:600;color:var(--text);background:var(--surface-inset, var(--surface));border:1px solid var(--line);border-radius:10px;padding:10px 12px;cursor:pointer;min-height:40px}
+.loc-scope button[aria-checked="true"]{border-color:var(--m);background:var(--m-soft);color:var(--text)}
+.loc-scope button:focus-visible{outline:2px solid var(--m);outline-offset:2px}
+.field.has-err .loc-scope button{border-color:var(--bad)}
+@media(max-width:640px){.loc-scope button{min-height:44px;font-size:15px}}
 .field-row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 @media(max-width:520px){.field-row{grid-template-columns:1fr}}
 .field-divider{display:flex;flex-direction:column;gap:2px;margin:6px 0 14px;padding-top:14px;border-top:1px solid var(--line-2)}
@@ -873,7 +901,7 @@ a.doc-trail-node:hover{border-color:var(--m);background:var(--m-soft)}
 .modal:focus{outline:none}
 
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
-.field .hint{color:var(--muted);font-size:11.5px}
+.field .hint{color:var(--text-2);font-size:11.5px}
 
 /* Top bar: the breadcrumb and the search give way instead of overflowing */
 .crumb{flex:0 1 auto;min-width:0;overflow:hidden;white-space:nowrap}

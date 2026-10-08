@@ -36,6 +36,7 @@ import { useToast } from "../../../components/ui/Toast";
 import { initials } from "../../../components/ui/Who";
 import { formatInr, formatDateTime } from "../../../lib/format";
 import { nextPendingFollowup } from "../../../lib/followup";
+import { formatLeadLocation, formatLeadLocationShort } from "../../../lib/geo/leadLocation";
 import { isQualifiedLeadStatus, leadActivityMeta, LeadActivityType, LeadFollowup, Quotation, Opportunity, Note } from "../../../lib/types/domain";
 
 const SUMMARY_TYPES: LeadActivityType[] = ["CALL", "MEETING", "EMAIL", "WHATSAPP"];
@@ -214,7 +215,7 @@ export default function LeadDetailPage() {
                     )}
                   </div>
                   <div className="co">
-                    {[lead.companyName, lead.uiContext?.city].filter(Boolean).join(" · ") || "No company on file"}
+                    {[lead.companyName, formatLeadLocationShort(lead)].filter(Boolean).join(" · ") || "No company on file"}
                   </div>
                 </div>
               </div>
@@ -226,7 +227,7 @@ export default function LeadDetailPage() {
                 <Tag color="n">{lead.assignedToName ? `Assigned: ${lead.assignedToName}` : "Unassigned"}</Tag>
                 {lead.score && <LeadScoreTag score={lead.score} suffix="lead" />}
               </div>
-              <QuickActions phone={lead.phone} email={lead.email} contactName={lead.customerName} />
+              <QuickActions phone={lead.phone} email={lead.email} contactName={lead.customerName} country={lead.country ?? null} />
               <div className="lead-action-row">
                 <Button
                   variant="ghost"
@@ -272,6 +273,10 @@ export default function LeadDetailPage() {
             </div>
             <div className="info-grid">
               <div className="f"><label>Phone</label><div>{lead.phone}</div></div>
+              <div className="f" data-testid="lead-location">
+                <label>Location</label>
+                <div>{formatLeadLocation(lead) || <span style={{ color: "var(--text-2)" }}>Not set</span>}</div>
+              </div>
               <div className="f"><label>Email</label><div style={{ wordBreak: "break-all" }}>{lead.email ?? "—"}</div></div>
               <div className="f"><label>Product / Interest</label><div>{lead.uiContext?.productInterest ?? "—"}</div></div>
               <div className="f">

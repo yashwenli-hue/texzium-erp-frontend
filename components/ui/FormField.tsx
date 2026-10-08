@@ -49,8 +49,8 @@ export function FieldWrap({
   );
 }
 
-/** The ids a control needs: its own, and the aria-describedby that points at its message. */
-function controlProps(
+/** The ids a control needs: its own, and the aria-describedby that points at its message. Exported for controls built outside this file (the Combobox). */
+export function controlProps(
   generated: string,
   given: string | undefined,
   describedBy: string | undefined,

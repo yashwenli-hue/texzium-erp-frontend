@@ -73,9 +73,9 @@ export type SalesInvoiceSortField = "totalAmount" | "invoiceDate" | "createdAt";
 export type AccountsReceivableSortField = "balanceAmount" | "dueDate" | "createdAt";
 export type TaskSortField = "dueAt" | "priority" | "createdAt";
 
-// Mirrors the VERIFIED CreateLeadDto field-for-field. No deal value, owner,
-// industry or city here — those either don't exist on Lead (backend) or are
-// set later through a dedicated action (Assign), not at creation.
+// Mirrors the VERIFIED CreateLeadDto field-for-field. No deal value, owner or
+// industry here — those either don't exist on Lead (backend) or are set later
+// through a dedicated action (Assign), not at creation.
 export interface CreateLeadInput {
   customerName: string;
   companyName?: string;
@@ -83,13 +83,21 @@ export interface CreateLeadInput {
   phone: string;
   alternatePhone?: string;
   sourceId: ID;
+  /**
+   * Where the lead is (country is an ISO alpha-2 code; state only for "IN"; see
+   * lib/geo/leadLocation.ts). Optional for the API, which keeps leads that arrive without
+   * one valid; the New Lead form always supplies it.
+   */
+  country?: string;
+  state?: string;
+  city?: string;
   /** MOCK/UI-ONLY extras — kept structurally separate from the DTO fields above. See LeadUIContext. */
   uiContext?: LeadUIContext;
 }
 
 // Mirrors the VERIFIED UpdateLeadDto (customerName?, companyName?, email?,
-// phone?, alternatePhone?, sourceId?), plus the same separated uiContext
-// block used at creation.
+// phone?, alternatePhone?, sourceId?, country?, state?, city?), plus the same
+// separated uiContext block used at creation.
 export interface UpdateLeadInput {
   customerName?: string;
   companyName?: string;
@@ -97,6 +105,13 @@ export interface UpdateLeadInput {
   phone?: string;
   alternatePhone?: string;
   sourceId?: string;
+  /**
+   * A field left out keeps what is stored; null clears it. The location is checked as a
+   * whole after the change, so a lead moved out of India must send state: null with it.
+   */
+  country?: string | null;
+  state?: string | null;
+  city?: string | null;
   uiContext?: LeadUIContext;
 }
 

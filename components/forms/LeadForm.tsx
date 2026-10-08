@@ -7,12 +7,16 @@ import { Button } from "../ui/Button";
 import { useToast } from "../ui/Toast";
 import { CreateLeadInput } from "../../lib/repository/interfaces";
 import { useLeadSources } from "../../lib/hooks/useLeads";
+import { LeadLocationFields } from "./LeadLocationFields";
+import { DraftErrors, EMPTY_LOCATION_DRAFT, LocationDraft, createFieldsFromDraft, draftErrors } from "../../lib/geo/leadLocation";
 
 /**
- * Field-for-field mirror of the VERIFIED CreateLeadDto — no industry/city/
- * deal-value/owner inputs here. Deal value lives on the Opportunity (created
- * later, once the lead is qualified); owner is set via the separate Assign
- * action. See docs/backend-ui-contract.md §3.
+ * Field-for-field mirror of the VERIFIED CreateLeadDto — no industry/deal-value/
+ * owner inputs here. Deal value lives on the Opportunity (created later, once the
+ * lead is qualified); owner is set via the separate Assign action. See
+ * docs/backend-ui-contract.md §3. The location (India or International, a state or
+ * a country, and a city) is a real Lead field and is required for a lead entered
+ * here: nothing is inferred from the phone number, and there is no default.
  */
 export function LeadForm({
   onClose,
@@ -31,6 +35,8 @@ export function LeadForm({
   const [email, setEmail] = useState("");
   const [productInterest, setProductInterest] = useState("");
   const [remarks, setRemarks] = useState("");
+  const [location, setLocation] = useState<LocationDraft>(EMPTY_LOCATION_DRAFT);
+  const [locationErrors, setLocationErrors] = useState<DraftErrors>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
 
@@ -42,8 +48,10 @@ export function LeadForm({
     if (!phone.trim()) e.phone = "Phone number is required";
     if (email.trim() && !/^\S+@\S+\.\S+$/.test(email)) e.email = "Enter a valid email address";
     if (!effectiveSourceId) e.sourceId = "Select a lead source";
+    const le = draftErrors(location);
     setErrors(e);
-    return Object.keys(e).length === 0;
+    setLocationErrors(le);
+    return Object.keys(e).length === 0 && Object.keys(le).length === 0;
   }
 
   async function handleSubmit() {
@@ -57,6 +65,7 @@ export function LeadForm({
         phone: phone.trim(),
         alternatePhone: alternatePhone.trim() || undefined,
         sourceId: effectiveSourceId,
+        ...createFieldsFromDraft(location),
         uiContext: {
           productInterest: productInterest.trim() || undefined,
           remarks: remarks.trim() || undefined,
@@ -116,6 +125,15 @@ export function LeadForm({
         <TextField label="Phone" required value={phone} onChange={(e) => setPhone(e.target.value)} error={errors.phone} placeholder="+91 …" />
         <TextField label="Email" value={email} onChange={(e) => setEmail(e.target.value)} error={errors.email} placeholder="name@company.com (optional)" />
       </FieldRow>
+
+      <LeadLocationFields
+        draft={location}
+        onChange={(next) => {
+          setLocation(next);
+          if (Object.keys(locationErrors).length > 0) setLocationErrors({});
+        }}
+        errors={locationErrors}
+      />
 
       <div className="field-divider">
         <span>Additional context</span>

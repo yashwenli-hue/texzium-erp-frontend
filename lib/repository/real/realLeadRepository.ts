@@ -5,16 +5,35 @@ import { apiFetch, ApiError } from "../../api/httpClient";
 import { applyListQuery } from "../shared/listQuery";
 import { validateLeadActivityInput } from "../shared/leadActivity";
 import { validateDeactivationReason } from "../shared/leadLifecycle";
+import { LeadLocationFields, locationChangeProblems, locationProblems, mergeLocation, EMPTY_STORED_LOCATION, normalizedLocationFields } from "../../geo/leadLocation";
 import { BackendLead, BackendLeadTimeline, mapLead, mapLeadTimeline } from "./mappers";
 
 const SEARCHABLE: (keyof Lead)[] = ["customerName", "companyName", "sourceName", "assignedToName", "email"];
+
+/** On create there is nothing stored to clear: a blank field is simply not sent. */
+function withoutNulls(location: LeadLocationFields): LeadLocationFields {
+  const out: LeadLocationFields = {};
+  for (const k of ["country", "state", "city"] as const) if (typeof location[k] === "string") out[k] = location[k];
+  return out;
+}
+
+/** Only the location fields that were mentioned: undefined stays out of the body (keep), null goes in (clear). */
+function definedLocation(location: LeadLocationFields): LeadLocationFields {
+  const out: LeadLocationFields = {};
+  if (location.country !== undefined) out.country = location.country;
+  if (location.state !== undefined) out.state = location.state;
+  if (location.city !== undefined) out.city = location.city;
+  return out;
+}
 
 /**
  * VERIFIED leads routes: POST/GET /leads, GET/PATCH /leads/:id. The backend
  * returns a bare, unpaginated array for the list — filtering/search/sort
  * below happen client-side over that full array (docs/backend-ui-contract.md §20).
- * uiContext (Product/Interest, Remarks, City) is never sent — it has no
- * backend field (Stage 2A brief §6) and is dropped entirely here.
+ * uiContext (Product/Interest, Remarks) is never sent — it has no backend
+ * field (Stage 2A brief §6) and is dropped entirely here. The location (country,
+ * state, city) is a real field and is sent; it is checked with the backend's rules
+ * first, so a bad location fails here with the backend's own words.
  */
 export class RealLeadRepository implements ILeadRepository {
   async list(query?: ListQuery<LeadSortField>, options?: LeadListOptions): Promise<Page<Lead>> {
@@ -35,6 +54,10 @@ export class RealLeadRepository implements ILeadRepository {
   }
 
   async create(input: CreateLeadInput): Promise<Lead> {
+    // A lead may be created without a location (the API allows it); one that is given is whole and valid.
+    const location = normalizedLocationFields({ country: input.country, state: input.state, city: input.city });
+    const problem = locationProblems(mergeLocation(EMPTY_STORED_LOCATION, location))[0];
+    if (problem) throw new ApiError(problem.message, 400);
     const row = await apiFetch<BackendLead>("/leads", {
       method: "POST",
       body: {
@@ -44,12 +67,17 @@ export class RealLeadRepository implements ILeadRepository {
         phone: input.phone,
         alternatePhone: input.alternatePhone,
         sourceId: input.sourceId,
+        ...withoutNulls(location),
       },
     });
     return mapLead(row);
   }
 
   async update(id: ID, input: UpdateLeadInput): Promise<Lead> {
+    // A field left out keeps what is stored; null clears it. The backend checks the whole location after the change.
+    const location = normalizedLocationFields({ country: input.country, state: input.state, city: input.city });
+    const problem = locationChangeProblems(location)[0];
+    if (problem) throw new ApiError(problem.message, 400);
     const row = await apiFetch<BackendLead>(`/leads/${id}`, {
       method: "PATCH",
       body: {
@@ -59,6 +87,7 @@ export class RealLeadRepository implements ILeadRepository {
         phone: input.phone,
         alternatePhone: input.alternatePhone,
         sourceId: input.sourceId,
+        ...definedLocation(location),
       },
     });
     return mapLead(row);

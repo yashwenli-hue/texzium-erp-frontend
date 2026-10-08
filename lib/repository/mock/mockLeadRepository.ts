@@ -8,6 +8,8 @@ import {
   LeadListOptions,
   LogLeadActivityInput,
 } from "../interfaces";
+import { ApiError } from "../../api/httpClient";
+import { EMPTY_STORED_LOCATION, locationProblems, mergeLocation, normalizedLocationFields, storedLocationOf } from "../../geo/leadLocation";
 import { validateLeadActivityInput } from "../shared/leadActivity";
 import { describeDeactivationBlockers, validateDeactivationReason } from "../shared/leadLifecycle";
 import { assertMockLeadActive } from "./leadGuards";
@@ -30,6 +32,10 @@ export class MockLeadRepository implements ILeadRepository {
   }
 
   async create(input: CreateLeadInput): Promise<Lead> {
+    // Same rules as the backend: a location that is given is whole and valid; none at all is allowed.
+    const location = mergeLocation(EMPTY_STORED_LOCATION, normalizedLocationFields({ country: input.country, state: input.state, city: input.city }));
+    const problem = locationProblems(location)[0];
+    if (problem) throw new ApiError(problem.message, 400);
     const now = new Date().toISOString();
     const source = db.leadSources.getById(input.sourceId);
     const lead: Lead = {
@@ -43,6 +49,9 @@ export class MockLeadRepository implements ILeadRepository {
       sourceName: source?.name ?? "Unknown source",
       status: "NEW",
       isActive: true,
+      ...(location.country ? { country: location.country } : {}),
+      ...(location.state ? { state: location.state } : {}),
+      ...(location.city ? { city: location.city } : {}),
       score: "Warm",
       createdAt: now,
       updatedAt: now,
@@ -67,6 +76,12 @@ export class MockLeadRepository implements ILeadRepository {
     assertMockLeadActive(id);
     const existing = db.leads.getById(id);
     if (!existing) throw new Error(`Lead ${id} not found`);
+    // A location field left out keeps what is stored, null clears it, and the result is checked as a whole.
+    const change = normalizedLocationFields({ country: input.country, state: input.state, city: input.city });
+    const touchesLocation = change.country !== undefined || change.state !== undefined || change.city !== undefined;
+    const location = mergeLocation(storedLocationOf(existing), change);
+    const problem = touchesLocation ? locationProblems(location)[0] : undefined;
+    if (problem) throw new ApiError(problem.message, 400);
     const now = new Date().toISOString();
     const source = input.sourceId ? db.leadSources.getById(input.sourceId) : undefined;
     const patch: Partial<Lead> = {
@@ -76,6 +91,7 @@ export class MockLeadRepository implements ILeadRepository {
       ...(input.phone !== undefined ? { phone: input.phone } : {}),
       ...(input.alternatePhone !== undefined ? { alternatePhone: input.alternatePhone } : {}),
       ...(input.sourceId !== undefined ? { sourceId: input.sourceId, sourceName: source?.name ?? existing.sourceName } : {}),
+      ...(touchesLocation ? { country: location.country ?? undefined, state: location.state ?? undefined, city: location.city ?? undefined } : {}),
       ...(input.uiContext !== undefined ? { uiContext: { ...existing.uiContext, ...input.uiContext } } : {}),
       updatedAt: now,
       lastActivityAt: now,

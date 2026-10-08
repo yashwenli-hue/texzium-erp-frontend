@@ -18,6 +18,8 @@ import { useAuth } from "../../lib/auth/AuthContext";
 import { Lead, formatLeadStatus } from "../../lib/types/domain";
 import { formatRelative, formatDate } from "../../lib/format";
 import { nextPendingFollowup, FollowupInfo } from "../../lib/followup";
+import { countryName } from "../../lib/geo/countries";
+import { formatLeadLocationShort, locationSearchText } from "../../lib/geo/leadLocation";
 import { FilterMap, SortState } from "../../lib/types/common";
 
 const PAGE_SIZE = 8;
@@ -48,8 +50,19 @@ export default function LeadsPage() {
     () => [...new Set(sources.map((s) => s.category).filter((c): c is string => !!c))].sort(),
     [sources]
   );
+  // Location filters offer only what the leads in the list actually have. "Not set" finds the
+  // leads that were recorded without a location (older leads, and those the WhatsApp bot creates).
+  const NOT_SET = "Not set";
+  const countryOptions = useMemo(() => {
+    const names = [...new Set(allLeads.filter((l) => l.country).map((l) => countryName(l.country)))].sort();
+    return allLeads.some((l) => !l.country) ? [...names, NOT_SET] : names;
+  }, [allLeads]);
+  const stateOptions = useMemo(
+    () => [...new Set(allLeads.map((l) => l.state).filter((s): s is string => !!s))].sort(),
+    [allLeads]
+  );
   const cityOptions = useMemo(
-    () => [...new Set(allLeads.map((l) => l.uiContext?.city).filter((c): c is string => !!c))].sort(),
+    () => [...new Set(allLeads.map((l) => l.city).filter((c): c is string => !!c))].sort(),
     [allLeads]
   );
   const statusOptions = useMemo(
@@ -57,14 +70,15 @@ export default function LeadsPage() {
     [allLeads]
   );
 
-  // Groups with zero options (e.g. Source Type/City have no backend basis once
-  // real leads have no uiContext/source-category data) are dropped rather than
-  // shown as a permanently-empty dropdown.
+  // Groups with zero options (e.g. Source Type has no backend basis once real leads
+  // have no source-category data) are dropped rather than shown as a permanently-empty dropdown.
   const filterGroups: FilterGroupConfig[] = [
     { key: "status", label: "Status", options: statusOptions },
     { key: "source", label: "Source", options: sourceOptions },
     { key: "sourceType", label: "Source Type", options: sourceTypeOptions },
     { key: "followup", label: "Follow-up", options: ["Overdue", "Due Today", "Tomorrow", "Scheduled", "None"] },
+    { key: "country", label: "Country", options: countryOptions },
+    { key: "state", label: "State", options: stateOptions },
     { key: "city", label: "City", options: cityOptions },
     { key: "assignment", label: "Assignment", options: ["Unassigned"] },
   ].filter((g) => g.options.length > 0);
@@ -75,6 +89,8 @@ export default function LeadsPage() {
     const sourceF = valuesOf(filters, "source");
     const sourceTypeF = valuesOf(filters, "sourceType");
     const followupF = valuesOf(filters, "followup");
+    const countryF = valuesOf(filters, "country");
+    const stateF = valuesOf(filters, "state");
     const cityF = valuesOf(filters, "city");
     const assignmentF = valuesOf(filters, "assignment");
 
@@ -82,7 +98,9 @@ export default function LeadsPage() {
     if (sourceF.length) rows = rows.filter((l) => sourceF.includes(l.sourceName));
     if (sourceTypeF.length) rows = rows.filter((l) => sourceTypeF.includes(categoryBySourceId.get(l.sourceId) ?? ""));
     if (followupF.length) rows = rows.filter((l) => followupF.includes(followupById.get(l.id)?.urgency ?? "None"));
-    if (cityF.length) rows = rows.filter((l) => cityF.includes(l.uiContext?.city ?? ""));
+    if (countryF.length) rows = rows.filter((l) => countryF.includes(l.country ? countryName(l.country) : NOT_SET));
+    if (stateF.length) rows = rows.filter((l) => stateF.includes(l.state ?? ""));
+    if (cityF.length) rows = rows.filter((l) => cityF.includes(l.city ?? ""));
     if (assignmentF.includes("Unassigned")) rows = rows.filter((l) => !l.assignedToId);
 
     // Filters the same createdAt field that powers the Received column and
@@ -104,6 +122,7 @@ export default function LeadsPage() {
           l.customerName.toLowerCase().includes(q) ||
           (l.companyName ?? "").toLowerCase().includes(q) ||
           (l.uiContext?.productInterest ?? "").toLowerCase().includes(q) ||
+          locationSearchText(l).includes(q) ||
           (l.assignedToName ?? "").toLowerCase().includes(q)
       );
     }
@@ -128,7 +147,7 @@ export default function LeadsPage() {
           <div className="av">{initials(l.customerName)}</div>
           <div className="lead-id">
             <b>{l.customerName}</b>
-            <small>{[l.companyName, l.uiContext?.city].filter(Boolean).join(" · ") || l.sourceName}</small>
+            <small>{[l.companyName, formatLeadLocationShort(l)].filter(Boolean).join(" · ") || l.sourceName}</small>
           </div>
         </div>
       ),
