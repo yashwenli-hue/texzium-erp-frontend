@@ -170,7 +170,8 @@ export function GstRegistrationForm({
         if (!same(city, registration.city)) input.city = city.trim();
         if (!same(pincode, registration.pincode)) input.pincode = pincode.trim();
         await onSubmit(input);
-        toast.show(Object.keys(input).length ? "GST registration updated" : "Nothing changed", "check");
+        if (Object.keys(input).length) toast.success("GST registration updated");
+        else toast.info("Nothing changed");
       } else {
         await onSubmit({
           gstin: normalized,

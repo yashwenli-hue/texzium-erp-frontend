@@ -64,7 +64,7 @@ export function UserMenu() {
 
   function placeholderAction(label: string, icon: string) {
     setOpen(false);
-    toast.show(`${label} isn't connected yet — this is a placeholder for now.`, icon);
+    toast.info(`${label} isn't connected yet — this is a placeholder for now.`, { icon });
   }
 
   function signOut() {

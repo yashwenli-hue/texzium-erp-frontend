@@ -157,8 +157,9 @@ export default function DashboardPage() {
   async function moveOpportunity(id: string, stage: OpportunityStage) {
     try {
       await updateStage(id, stage);
+      toast.success(`Moved to ${formatOpportunityStage(stage)}`);
     } catch (err) {
-      toast.show(err instanceof Error ? err.message : "Could not move this opportunity. Please try again.", "alert");
+      toast.error(err instanceof Error ? err.message : "Could not move this opportunity. Please try again.");
     }
   }
 

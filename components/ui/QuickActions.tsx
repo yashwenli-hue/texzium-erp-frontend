@@ -28,7 +28,7 @@ export function QuickActions({
 
   function call() {
     if (!phone) {
-      toast.show("No phone number on file for this record", "alert");
+      toast.info("No phone number on file for this record");
       return;
     }
     window.location.href = `tel:${phone.replace(/\s+/g, "")}`;
@@ -36,7 +36,7 @@ export function QuickActions({
 
   function sendEmail() {
     if (!email) {
-      toast.show("No email address on file for this record", "alert");
+      toast.info("No email address on file for this record");
       return;
     }
     window.location.href = `mailto:${email}`;
@@ -44,7 +44,7 @@ export function QuickActions({
 
   function whatsapp() {
     if (!phone) {
-      toast.show("No phone number on file for this record", "alert");
+      toast.info("No phone number on file for this record");
       return;
     }
     const digits = phone.replace(/[^\d]/g, "");
@@ -52,10 +52,7 @@ export function QuickActions({
   }
 
   function scheduleMeeting() {
-    toast.show(
-      "Calendar isn't connected yet — this will open your scheduling tool once integrated.",
-      "cal"
-    );
+    toast.info("Calendar isn't connected yet — this will open your scheduling tool once integrated.", { icon: "cal" });
   }
 
   return (

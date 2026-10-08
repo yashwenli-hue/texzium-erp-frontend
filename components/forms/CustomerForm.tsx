@@ -188,7 +188,8 @@ export function CustomerForm(props: CustomerFormProps) {
         if (!same(email, customer.email)) input.email = email.trim() || null;
         if (!same(phone, customer.phone)) input.phone = phone.trim() || null;
         await (props as Extract<CustomerFormProps, { mode: "edit" }>).onSubmit(input);
-        toast.show(Object.keys(input).length ? "Customer updated" : "Nothing changed", "check");
+        if (Object.keys(input).length) toast.success("Customer updated");
+        else toast.info("Nothing changed");
       } else {
         await (props as Extract<CustomerFormProps, { mode?: "create" }>).onSubmit({
           customerName: customerName.trim(),

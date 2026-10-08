@@ -27,8 +27,9 @@ export default function PipelinePage() {
   async function handleMove(id: string, status: LeadStatus) {
     try {
       await updateStatus(id, status);
+      toast.success(`Moved to ${formatLeadStatus(status)}`);
     } catch (err) {
-      toast.show(err instanceof Error ? err.message : "Could not move this lead. Please try again.", "alert");
+      toast.error(err instanceof Error ? err.message : "Could not move this lead. Please try again.");
     }
   }
 
