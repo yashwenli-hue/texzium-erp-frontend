@@ -295,7 +295,7 @@ export default function DashboardPage() {
         </p>
       </Panel>
 
-      <Panel title="Revenue & Collections">
+      <Panel title="Revenue & Collections" more={{ label: "Open Collections", onClick: () => router.push("/payments") }}>
         {financialsLoading && !financials && <div className="skeleton" style={{ height: 120 }} />}
         {financialsError && (
           <div style={{ padding: "4px 19px 12px" }}>

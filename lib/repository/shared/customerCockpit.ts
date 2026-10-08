@@ -15,6 +15,7 @@ import { formatOpportunityStage, formatProformaInvoiceStatus, formatQuotationSta
 import { NextStepTone, buildCommercialChain, quotationNextStep } from "./commercialChain";
 import { canGiveAccountsApproval, canRecordCommercialDocuments, canVerifyAdvanceReceipt } from "./salesOrderLifecycle";
 import { formatCompactInr } from "./money";
+import { daysUntil } from "./collections";
 
 /**
  * What the customer cockpit shows, worked out from the customer and its overview
@@ -29,8 +30,6 @@ import { formatCompactInr } from "./money";
  * None of it is persisted or sent anywhere.
  */
 
-const DAY_MS = 86_400_000;
-
 /** One scale for "how much does this need you": the same five words for steps, items and tags. */
 export type Tone = "bad" | "warn" | "action" | "info" | "good";
 const TONE_RANK: Record<Tone, number> = { bad: 0, warn: 1, action: 2, info: 3, good: 4 };
@@ -42,9 +41,25 @@ export const documentRef = (id: string, code?: string | null) => code || `#${id.
 // Receivables
 // ---------------------------------------------------------------------------
 
-/** Whole days until the due date, negative once it has passed. Same arithmetic as the backend's collection-reminders check. */
-export function daysUntilDue(dueDate: string, now: Date): number {
-  return Math.ceil((new Date(dueDate).getTime() - now.getTime()) / DAY_MS);
+/**
+ * Whole calendar days until the due date, 0 on the day and negative once it has passed. The same
+ * rule as the Collections screens (one time zone, no rounding), so the cockpit and the worklist
+ * never disagree about whether something is overdue.
+ */
+export const daysUntilDue = daysUntil;
+
+/**
+ * What the cockpit may show of a customer's collections to someone who has customers.view but not
+ * collections.view: the receivables and the collected / outstanding totals are taken out, and the
+ * overview says so, so that nothing built from it claims anything is paid or owed.
+ */
+export function withoutCollections(overview: CustomerOverview): CustomerOverview {
+  return {
+    ...overview,
+    invoices: overview.invoices.map((i) => ({ ...i, receivables: [] })),
+    totals: { ...overview.totals, collectedValue: 0, outstandingValue: 0 },
+    collectionsHidden: true,
+  };
 }
 
 /** A receivable that still has something to collect (written-off ones and fully paid ones do not). */
@@ -98,6 +113,8 @@ export interface QuotationTrail {
   liveOrders: CustomerOverviewOrder[];
   invoices: CustomerOverviewInvoice[];
   postedInvoices: CustomerOverviewInvoice[];
+  /** The viewer may not see collections: no receivable is read, and no step says anything about payment. */
+  collectionsHidden: boolean;
   /** Open (still to collect) receivables of the posted invoices. */
   openReceivables: Array<CustomerOverviewReceivable & { invoiceId: string }>;
   /** How far along it is: 0 rejected, 1 draft/revised, 2 approved, +1 for each of Proforma, Order, posted Invoice, fully paid. */
@@ -138,7 +155,7 @@ function nextForTrail(t: Omit<QuotationTrail, "next" | "rank">, now: Date): Next
   if (money) return money;
   const draft = t.invoices.find((i) => i.status === "DRAFT");
   if (draft) return { kind: "INVOICE_DRAFT", tone: "action", label: "Invoice in draft", href: `/sales-invoices/${draft.id}` };
-  if (t.postedInvoices.length > 0) return { kind: "COMPLETE", tone: "good", label: "Invoiced and collected", href: `/sales-invoices/${t.postedInvoices[0].id}` };
+  if (t.postedInvoices.length > 0) return { kind: "COMPLETE", tone: "good", label: t.collectionsHidden ? "Invoiced" : "Invoiced and collected", href: `/sales-invoices/${t.postedInvoices[0].id}` };
 
   if (t.liveOrders.length > 0) {
     const o = t.liveOrders[0];
@@ -165,7 +182,8 @@ function trailFor(q: CustomerOverviewQuotation, overview: CustomerOverview, now:
   const orderIds = new Set(chain.orders.map((o) => o.id));
   const invoices = overview.invoices.filter((i) => orderIds.has(i.salesOrderId));
   const postedInvoices = invoices.filter(isPosted);
-  const openReceivables = postedInvoices.flatMap((i) => i.receivables.filter(isOpenReceivable).map((r) => ({ ...r, invoiceId: i.id })));
+  const collectionsHidden = !!overview.collectionsHidden;
+  const openReceivables = collectionsHidden ? [] : postedInvoices.flatMap((i) => i.receivables.filter(isOpenReceivable).map((r) => ({ ...r, invoiceId: i.id })));
   const base = {
     quotation: q,
     proformas: chain.proformas,
@@ -174,9 +192,10 @@ function trailFor(q: CustomerOverviewQuotation, overview: CustomerOverview, now:
     liveOrders: chain.liveOrders,
     invoices,
     postedInvoices,
+    collectionsHidden,
     openReceivables,
   };
-  const paid = postedInvoices.length > 0 && openReceivables.length === 0;
+  const paid = !collectionsHidden && postedInvoices.length > 0 && openReceivables.length === 0;
   const rank = q.status === "REJECTED" ? 0 : q.status === "APPROVED" ? 2 + (base.activeProforma ? 1 : 0) + (base.liveOrders.length ? 1 : 0) + (postedInvoices.length ? 1 : 0) + (paid ? 1 : 0) : 1;
   return { ...base, rank, next: nextForTrail(base, now) };
 }
@@ -289,7 +308,8 @@ function stepsFor(opp: CustomerOverviewOpportunity, primary: QuotationTrail | un
     ? { key: "payment", label: "Payment", summary: "Overdue", state: "attention", tone: "bad", amount: sumMoney(overdue.map((r) => r.balanceAmount)), href: moneyNext(dealOpen, now)?.href }
     : { key: "payment", label: "Payment", summary: "Due", state: "current", tone: "info", amount: owed };
 
-  return [dealStep, quotation, proforma, order, invoice, payment];
+  // Without collections.view there is no payment step to show: it would say "Paid" about money nobody may see.
+  return primary.collectionsHidden ? [dealStep, quotation, proforma, order, invoice] : [dealStep, quotation, proforma, order, invoice, payment];
 }
 
 export function buildDeals(overview: CustomerOverview, now: Date): Deal[] {
@@ -343,6 +363,8 @@ export interface Snapshot {
   /** Derived: the part of the outstanding amount whose recorded due date has passed. */
   overdue: number;
   overdueCount: number;
+  /** False when the viewer may not see collections: collected, outstanding and overdue are then not figures at all. */
+  collections: boolean;
 }
 
 export function buildSnapshot(overview: CustomerOverview, now: Date): Snapshot {
@@ -362,6 +384,7 @@ export function buildSnapshot(overview: CustomerOverview, now: Date): Snapshot {
     counts: { quotations: t.counts.quotations, salesOrders: t.counts.salesOrders, invoices: t.counts.invoices },
     overdue: sumMoney(overdue.map((r) => r.balanceAmount)),
     overdueCount: overdue.length,
+    collections: !overview.collectionsHidden,
   };
 }
 
@@ -539,7 +562,7 @@ export function buildAttention(ctx: AttentionContext): AttentionItem[] {
   const ordered = items.map((item, index) => ({ item, index })).sort((a, b) => rank(a.item) - rank(b.item) || a.index - b.index).map((x) => x.item);
 
   if (ordered.length === 0) {
-    return [{ key: "all-clear", kind: "ALL_CLEAR", tone: "good", title: "Nothing needs attention", detail: overview && overview.opportunities.length ? "Every deal is moving and nothing is overdue." : undefined }];
+    return [{ key: "all-clear", kind: "ALL_CLEAR", tone: "good", title: "Nothing needs attention", detail: overview && overview.opportunities.length ? (overview.collectionsHidden ? "Every deal is moving." : "Every deal is moving and nothing is overdue.") : undefined }];
   }
   return ordered;
 }
@@ -646,7 +669,7 @@ export interface DeactivationImpact {
   /** What is under way and keeps its own approvals and closing steps: nothing is cancelled. */
   continues: ImpactLine[];
   /** FinanceOS figures as recorded. Overdue is part of outstanding, not on top of it. */
-  money: { openInvoices: number; outstanding: number; overdue: number; overdueInvoices: number };
+  money: { openInvoices: number; outstanding: number; overdue: number; overdueInvoices: number } | null;
 }
 
 /**
@@ -679,13 +702,13 @@ export function buildDeactivationImpact(overview: CustomerOverview, now: Date): 
   const open = deals.flatMap((d) => d.trails.flatMap((t) => t.openReceivables));
   const overdue = open.filter((r) => isOverdueReceivable(r, now));
   const openDeals = deals.filter((d) => d.isOpen).length;
-  const money = {
+  const money = overview.collectionsHidden ? null : {
     openInvoices: new Set(open.map((r) => r.invoiceId)).size,
     outstanding: sumMoney(open.map((r) => r.balanceAmount)),
     overdue: sumMoney(overdue.map((r) => r.balanceAmount)),
     overdueInvoices: new Set(overdue.map((r) => r.invoiceId)).size,
   };
-  return { clear: openDeals === 0 && blocked.length === 0 && continues.length === 0 && money.outstanding === 0, openDeals, blocked, continues, money };
+  return { clear: openDeals === 0 && blocked.length === 0 && continues.length === 0 && (money === null || money.outstanding === 0), openDeals, blocked, continues, money };
 }
 
 // ---------------------------------------------------------------------------

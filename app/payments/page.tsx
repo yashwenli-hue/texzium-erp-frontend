@@ -1,101 +1,162 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { PageHeader, DesignNote } from "../../components/ui/PageHeader";
-import { StatCard, StatRow, Panel } from "../../components/ui/Card";
+import { Suspense, useMemo, useState } from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { PageHeader } from "../../components/ui/PageHeader";
 import { Button, EmptyState } from "../../components/ui/Button";
-import { AccountsReceivableStatusTag } from "../../components/ui/Tag";
-import { DataTable, Column } from "../../components/ui/DataTable";
-import { useAccountsReceivable } from "../../lib/hooks/useAccountsReceivable";
-import { AccountsReceivable } from "../../lib/types/domain";
-import { formatInr, formatDate } from "../../lib/format";
+import { Disclosure } from "../../components/ui/Disclosure";
+import { FilterChips } from "../../components/ui/FilterChips";
+import { LoadingRegion } from "../../components/ui/LoadingRegion";
+import { TextField } from "../../components/ui/FormField";
+import { CollectionGroupView, CollectionRowItem, CollectionsColumnHeads, CollectionsSummaryStrip } from "../../components/collections/CollectionsWorklist";
+import { PaymentTarget, RecordPaymentDialog } from "../../components/collections/RecordPaymentDialog";
+import { CollectionRow, COLLECTION_SORT_LABEL, COLLECTION_VIEW_LABEL, COLLECTION_VIEW_ORDER, CollectionSort, CollectionView, DUE_DATE_DISCLOSURE, groupRows, inView, matchesSearch, sortRows, summarize, viewCounts } from "../../lib/repository/shared/collections";
+import { useCollections } from "../../lib/hooks/useCollections";
+import { useAuth } from "../../lib/auth/AuthContext";
 
-export default function PaymentsPage() {
-  const router = useRouter();
-  const { accountsReceivable, loading, error, refetch } = useAccountsReceivable();
+function CollectionsWorkspace() {
+  const { hasPermission, ready } = useAuth();
+  const may = { view: hasPermission("collections.view"), record: hasPermission("collections.record") };
+  const q = useCollections(may.view);
+  const params = useSearchParams();
+  const customerFilter = params?.get("customer") ?? null;
 
-  const totalOutstanding = accountsReceivable.reduce((s, ar) => s + ar.balanceAmount, 0);
-  const totalCollected = accountsReceivable.reduce((s, ar) => s + ar.paidAmount, 0);
-  const paidCount = accountsReceivable.filter((ar) => ar.paymentStatus === "PAID").length;
+  const [view, setView] = useState<CollectionView>("TO_COLLECT");
+  const [search, setSearch] = useState("");
+  const [sort, setSort] = useState<CollectionSort>("DUE");
+  const [grouped, setGrouped] = useState(true);
+  const [recording, setRecording] = useState<PaymentTarget | null>(null);
 
-  const columns: Column<AccountsReceivable>[] = [
-    { key: "invoiceNumber", header: "Invoice No.", render: (ar) => ar.invoiceNumber ?? "—" },
-    { key: "customerName", header: "Customer", render: (ar) => ar.customerName ?? "—" },
-    { key: "outstandingAmount", header: "Invoiced", render: (ar) => formatInr(ar.outstandingAmount) },
-    { key: "paidAmount", header: "Paid", render: (ar) => formatInr(ar.paidAmount) },
-    { key: "balanceAmount", header: "Balance", render: (ar) => <span style={ar.balanceAmount < 0 ? { color: "var(--bad)" } : undefined}>{formatInr(ar.balanceAmount)}</span> },
-    { key: "paymentStatus", header: "Status", render: (ar) => <AccountsReceivableStatusTag status={ar.paymentStatus} /> },
-    { key: "dueDate", header: "Due Date", render: (ar) => formatDate(ar.dueDate) },
-  ];
+  const scoped = useMemo(() => (customerFilter ? q.rows.filter((r) => r.identity.kind === "linked" && r.identity.customer.id === customerFilter) : q.rows), [q.rows, customerFilter]);
+  const filterName = customerFilter ? scoped.map((r) => (r.identity.kind === "linked" ? r.identity.customer.customerName : "")).find(Boolean) : undefined;
+  const counts = useMemo(() => viewCounts(scoped), [scoped]);
+  const shown = useMemo(() => scoped.filter((r) => inView(r, view) && matchesSearch(r, search)), [scoped, view, search]);
+  const summary = useMemo(() => summarize(scoped, q.collected), [scoped, q.collected]);
+  const groups = useMemo(() => (grouped ? groupRows(shown, sort) : []), [grouped, shown, sort]);
+  const flat = useMemo(() => (grouped ? [] : sortRows(shown, sort)), [grouped, shown, sort]);
 
-  if (loading && accountsReceivable.length === 0) {
+  function record(row: CollectionRow) {
+    setRecording({ salesInvoiceId: row.salesInvoiceId, invoiceNumber: row.invoiceNumber, identity: row.identity, invoiceCustomerName: row.invoiceCustomerName, balance: row.balance, state: row.state, dueDate: row.dueDate });
+  }
+
+  const header = <PageHeader eyebrow="RevenueOS · Quote to Cash · Collections" title="Collections" subtitle="Who owes what, since when, and the payments received." />;
+
+  if (!ready || (may.view && q.loading && q.rows.length === 0 && !q.error)) {
     return (
-      <div className="page">
-        <div className="skeleton" style={{ height: 220, marginBottom: 16 }} />
-        <div className="skeleton" style={{ height: 300 }} />
+      <div className="page collections">
+        {header}
+        <LoadingRegion label="Loading collections">
+          <div className="skeleton" style={{ height: 96, marginBottom: 16 }} />
+          <div className="skeleton" style={{ height: 300 }} />
+        </LoadingRegion>
+      </div>
+    );
+  }
+  if (!may.view) {
+    return (
+      <div className="page collections">
+        {header}
+        <div className="card panel">
+          <EmptyState icon="lock" title="You can't view collections" body="Receivables and payments need the View Payment Collections permission. Ask an administrator if you need it." />
+        </div>
+      </div>
+    );
+  }
+  if (q.error) {
+    return (
+      <div className="page collections">
+        {header}
+        <div className="card panel">
+          <EmptyState icon="alert" title="Couldn't load collections" body={q.error.message || "Something went wrong reaching the RevenueOS backend. Please try again."} action={<Button variant="ghost" onClick={q.refetch}>Retry</Button>} />
+        </div>
       </div>
     );
   }
 
-  // A failed fetch must not read as "zero receivables" — that's the
-  // DataTable's own empty state below, reserved for a genuine zero-result response.
-  if (error && accountsReceivable.length === 0) {
-    return (
-      <div className="page">
-        <PageHeader
-          eyebrow="RevenueOS · Quote to Cash · Payments"
-          title="Payments & Collections"
-          subtitle="Accounts Receivable status per invoice, and recording payments."
-        />
-        <Panel title="Accounts Receivable">
-          <EmptyState
-            icon="alert"
-            title="Couldn't load Accounts Receivable"
-            body={error.message || "Something went wrong reaching the RevenueOS backend. Please try again."}
-            action={
-              <Button variant="ghost" onClick={refetch}>
-                Retry
-              </Button>
-            }
-          />
-        </Panel>
-      </div>
-    );
-  }
+  const options = COLLECTION_VIEW_ORDER.map((v) => ({ value: v, label: COLLECTION_VIEW_LABEL[v], count: counts[v] })).filter((o) => o.value === "TO_COLLECT" || o.value === view || o.count > 0);
 
   return (
-    <div className="page">
-      <PageHeader
-        eyebrow="RevenueOS · Quote to Cash · Payments"
-        title="Payments & Collections"
-        subtitle="Accounts Receivable status per invoice, and recording payments."
-      />
+    <div className="page collections">
+      {header}
+      <CollectionsSummaryStrip summary={summary} />
+      {q.dealsUnavailable && (
+        <p className="col-note warn" role="status">
+          The deals couldn&apos;t be read, so receivables can&apos;t be put under their customers right now. They are listed without one.
+        </p>
+      )}
+      {q.paymentsUnavailable && (
+        <p className="col-note warn" role="status">
+          The payments couldn&apos;t be read: the collected figure is unavailable, and each receivable&apos;s paid amount can&apos;t be checked against its payments.
+        </p>
+      )}
+      <Disclosure summary="Why do many open invoices show as overdue?" testId="due-date-disclosure">
+        <p style={{ fontSize: 12.5, margin: 0 }}>{DUE_DATE_DISCLOSURE}</p>
+      </Disclosure>
 
-      <StatRow>
-        <StatCard label="Receivables" value={String(accountsReceivable.length)} note={`${formatInr(totalOutstanding)} outstanding`} />
-        <StatCard label="Collected" value={formatInr(totalCollected)} note="across all receivables" />
-        <StatCard label="Fully Paid" value={String(paidCount)} note="of the receivables above" />
-      </StatRow>
-
-      <div style={{ marginTop: 14 }}>
-        <Panel title="Accounts Receivable" flush>
-          <DataTable
-            columns={columns}
-            rows={accountsReceivable}
-            onRowClick={(ar) => router.push(`/sales-invoices/${ar.salesInvoiceId}`)}
-            emptyTitle="No receivables yet"
-            emptyBody="Accounts Receivable records are created automatically when a Sales Invoice is raised."
-          />
-        </Panel>
+      <div className="col-toolbar">
+        <FilterChips label="Show receivables" options={options} value={view} onChange={setView} />
       </div>
+      <div className="col-toolbar" style={{ marginTop: 0 }}>
+        <div className="col-search">
+          <TextField label="Search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Invoice or customer" type="search" autoComplete="off" />
+        </div>
+        <label className="col-ctl">
+          <span>Sort</span>
+          <select value={sort} onChange={(e) => setSort(e.target.value as CollectionSort)} aria-label="Sort receivables">
+            {(Object.keys(COLLECTION_SORT_LABEL) as CollectionSort[]).map((s) => (
+              <option key={s} value={s}>
+                {COLLECTION_SORT_LABEL[s]}
+              </option>
+            ))}
+          </select>
+        </label>
+        <Button variant="ghost" className="col-toggle" onClick={() => setGrouped((g) => !g)} aria-pressed={grouped}>
+          {grouped ? "Show as one list" : "Group by customer"}
+        </Button>
+      </div>
+      {customerFilter && (
+        <p className="col-filter-chip">
+          Showing {filterName ?? "one customer"}&apos;s receivables only. <Link href="/payments">Show all</Link>
+        </p>
+      )}
 
-      <DesignNote>
-        <b>Design note.</b> There is no verified endpoint to list individual payments (<code>GET /payment-collections</code>{" "}
-        returns 404) — this shows the real, authoritative Accounts Receivable status per invoice instead (paid
-        amount, balance and status all come from <code>GET /accounts-receivable</code>, never from the
-        invoice&apos;s own stale <code>paymentStatus</code> field). Click a row to open its Sales Invoice,
-        where payments are recorded and collection history is shown.
-      </DesignNote>
+      {shown.length === 0 ? (
+        <div className="card panel" style={{ marginTop: 14 }}>
+          <EmptyState
+            icon="cash"
+            title={scoped.length === 0 ? "No receivables yet" : view === "TO_COLLECT" && search.trim() === "" ? "Nothing to collect" : "Nothing matches"}
+            body={scoped.length === 0 ? "A receivable is created when an invoice is posted." : view === "TO_COLLECT" && search.trim() === "" ? "Every receivable is paid, written off or closed." : "Try another view or a different search."}
+          />
+        </div>
+      ) : grouped ? (
+        <div data-testid="collection-groups">
+          {groups.map((g) => (
+            <CollectionGroupView key={g.key} group={g} may={may} onRecord={record} />
+          ))}
+        </div>
+      ) : (
+        <section className="card panel col-group" data-testid="collection-flat" aria-label="Receivables">
+          <CollectionsColumnHeads showCustomer />
+          <div className="col-rows" role="list">
+            {flat.map((r) => (
+              <div key={r.id} role="listitem">
+                <CollectionRowItem row={r} may={may} showCustomer onRecord={record} />
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {recording && <RecordPaymentDialog target={recording} liveBalance={q.rows.find((r) => r.salesInvoiceId === recording.salesInvoiceId)?.balance} onClose={() => setRecording(null)} onRecorded={() => q.refetch()} onStale={() => q.refetch()} />}
     </div>
+  );
+}
+
+export default function CollectionsPage() {
+  return (
+    <Suspense fallback={<div className="page"><div className="skeleton" style={{ height: 300 }} /></div>}>
+      <CollectionsWorkspace />
+    </Suspense>
   );
 }

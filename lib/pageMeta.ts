@@ -49,7 +49,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { href: "/proforma-invoices", label: "Proforma Invoices", icon: "receipt", countKey: "proformaInvoicesCount" },
       { href: "/sales-orders", label: "Sales Orders", icon: "cart", countKey: "salesOrdersCount" },
       { href: "/sales-invoices", label: "Sales Invoices", icon: "file", countKey: "salesInvoicesCount" },
-      { href: "/payments", label: "Payments", icon: "cash" },
+      { href: "/payments", label: "Collections", icon: "cash" },
     ],
   },
   {
@@ -98,6 +98,6 @@ export const PAGE_META: Record<string, { title: string; subtitle: string }> = {
   "proforma-invoices": { title: "Proforma Invoices", subtitle: "Generated from approved quotations, ahead of a sales order." },
   "sales-orders": { title: "Sales Orders", subtitle: "Multi-gate approval workflow." },
   "sales-invoices": { title: "Sales Invoices", subtitle: "Raised once a sales order is dispatched." },
-  payments: { title: "Payments", subtitle: "Accounts Receivable status per invoice, and recording payments." },
+  payments: { title: "Collections", subtitle: "Who owes what, since when, and the payments received." },
   reports: { title: "Reports", subtitle: "Funnel, revenue, conversion and performance reports." },
 };

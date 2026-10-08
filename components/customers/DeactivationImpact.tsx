@@ -29,7 +29,7 @@ export function DeactivationImpact({ impact, loading, error }: { impact: Impact 
     <div className="impact" data-testid="deactivation-impact">
       <h4>What this touches</h4>
       {impact.clear ? (
-        <p>Nothing is in progress and nothing is owed. Deactivating only stops anything new.</p>
+        <p>{m === null ? "Nothing is in progress." : "Nothing is in progress and nothing is owed."} Deactivating only stops anything new.</p>
       ) : (
         <>
           {impact.blocked.length > 0 && (
@@ -61,7 +61,7 @@ export function DeactivationImpact({ impact, loading, error }: { impact: Impact 
             </div>
           )}
           {impact.openDeals > 0 && <p className="impact-line">{impact.openDeals} open {impact.openDeals === 1 ? "deal" : "deals"}, kept and readable.</p>}
-          {m.outstanding > 0 && (
+          {m !== null && m.outstanding > 0 && (
             <p className="impact-money" data-testid="impact-money">
               <b>FinanceOS, as recorded (read-only):</b> <MoneyText value={m.outstanding} /> outstanding on {m.openInvoices} {m.openInvoices === 1 ? "invoice" : "invoices"}
               {m.overdue > 0 ? (

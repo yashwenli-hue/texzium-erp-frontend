@@ -505,6 +505,12 @@ export interface CustomerOverview {
   invoices: CustomerOverviewInvoice[];
   totals: CustomerTotals;
   legacyMatches: CustomerLegacyMatch[];
+  /**
+   * Set (by withoutCollections) when the signed-in user may see the customer but not its
+   * collections: the receivables and the money figures have been taken out, and nothing
+   * built from this overview may say anything about what was collected or is owed.
+   */
+  collectionsHidden?: boolean;
 }
 
 export type ContactType = "Decision Maker" | "Champion" | "Influencer";

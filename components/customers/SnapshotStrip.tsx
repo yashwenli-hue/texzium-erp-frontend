@@ -14,7 +14,7 @@ const n = (count: number, one: string, many: string) => `${count} ${count === 1 
 export function SnapshotStrip({ snapshot }: { snapshot: Snapshot }) {
   if (!snapshot.hasData) return null;
   const s = snapshot;
-  const tiles = [
+  const allTiles = [
     { key: "pipeline", k: "Open pipeline", v: s.pipelineValue, note: n(s.openDeals, "open deal", "open deals") },
     { key: "quoted", k: "Quoted", v: s.quoted, note: `${n(s.counts.quotations, "quotation", "quotations")}, approved ones` },
     { key: "ordered", k: "Ordered", v: s.ordered, note: n(s.counts.salesOrders, "order", "orders") },
@@ -22,8 +22,10 @@ export function SnapshotStrip({ snapshot }: { snapshot: Snapshot }) {
     { key: "collected", k: "Collected", v: s.collected, note: "received" },
     { key: "outstanding", k: "Outstanding", v: s.outstanding, note: s.overdue > 0 ? `${s.overdueCount} overdue` : "nothing overdue", bad: s.overdue > 0 },
   ];
+  // Collected and outstanding are collections data: without collections.view they are not shown, not shown as zero.
+  const tiles = s.collections ? allTiles : allTiles.filter((t) => t.key !== "collected" && t.key !== "outstanding");
   return (
-    <section className="snapshot" aria-label="Commercial snapshot" data-testid="snapshot">
+    <section className={`snapshot ${tiles.length === 4 ? "snap-4" : ""}`.trim()} aria-label="Commercial snapshot" data-testid="snapshot">
       <ul>
         {tiles.map((t) => (
           <li key={t.key} className={t.bad ? "snap-bad" : undefined} data-tile={t.key}>
@@ -43,7 +45,11 @@ export function SnapshotStrip({ snapshot }: { snapshot: Snapshot }) {
           </li>
         ))}
       </ul>
-      <p className="snap-note">Quoted, ordered, invoiced, collected and outstanding are as recorded (invoices and receivables by FinanceOS). Pipeline and overdue are worked out here from recorded values. Each figure counts its own stage: a quotation that became an order is in both, so they are not added together, and overdue is part of outstanding, not on top of it.</p>
+      <p className="snap-note">
+        {s.collections
+          ? "Quoted, ordered, invoiced, collected and outstanding are as recorded (invoices and receivables by FinanceOS). Pipeline and overdue are worked out here from recorded values. Each figure counts its own stage: a quotation that became an order is in both, so they are not added together, and overdue is part of outstanding, not on top of it."
+          : "Quoted, ordered and invoiced are as recorded. The pipeline is worked out here from recorded values. Each figure counts its own stage: a quotation that became an order is in both, so they are not added together."}
+      </p>
     </section>
   );
 }

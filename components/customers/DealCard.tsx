@@ -12,12 +12,13 @@ import { formatDate } from "../../lib/format";
 
 const NEXT_ICON = { bad: "alert", warn: "alert", action: "arrow", info: "clock", good: "check" } as const;
 
-function invoiceTags(i: CustomerOverviewInvoice) {
+/** The payment tag is collections data: without collections.view only the invoice's own status is shown. */
+function invoiceTags(i: CustomerOverviewInvoice, collectionsHidden: boolean) {
   const pay = i.paymentStatus.charAt(0) + i.paymentStatus.slice(1).toLowerCase().replace("_", " ");
   return (
     <>
       <Tag color={i.status === "DRAFT" ? "n" : "g"}>{i.status === "DRAFT" ? "Draft" : "Posted"}</Tag>
-      <Tag color={i.paymentStatus === "PAID" ? "g" : i.paymentStatus === "PARTIAL" ? "w" : "n"}>{pay}</Tag>
+      {!collectionsHidden && <Tag color={i.paymentStatus === "PAID" ? "g" : i.paymentStatus === "PARTIAL" ? "w" : "n"}>{pay}</Tag>}
     </>
   );
 }
@@ -60,7 +61,7 @@ function TrailRows({ t }: { t: QuotationTrail }) {
           <li key={i.id} className="indent-2">
             <span className="kind">Invoice</span>
             <Link href={`/sales-invoices/${i.id}`}>{documentRef(i.id, i.invoiceNumber)}</Link>
-            {invoiceTags(i)}
+            {invoiceTags(i, t.collectionsHidden)}
             <span className="amt">
               <MoneyText value={i.totalAmount} mode="exact" />
             </span>

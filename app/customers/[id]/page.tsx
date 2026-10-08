@@ -28,7 +28,8 @@ import { useAuth } from "../../../lib/auth/AuthContext";
 import { useRepository } from "../../../lib/repository/RepositoryProvider";
 import { CreateOpportunityInput, CreateQuotationInput } from "../../../lib/repository/interfaces";
 import { CUSTOMER_PERMISSIONS, customerActions, quotingBlockerText, quotingBlockers, sortRegistrations } from "../../../lib/repository/shared/customerLifecycle";
-import { AttentionAction, buildAttention, buildDeactivationImpact, buildDeals, buildSnapshot, gstUsage } from "../../../lib/repository/shared/customerCockpit";
+import { AttentionAction, buildAttention, buildDeactivationImpact, buildDeals, buildSnapshot, gstUsage, withoutCollections } from "../../../lib/repository/shared/customerCockpit";
+import { CollectionsStatementSection } from "../../../components/collections/CollectionsStatementSection";
 import { QUOTATION_PERMISSIONS } from "../../../lib/repository/shared/quotationLifecycle";
 import { CustomerGstRegistration } from "../../../lib/types/domain";
 
@@ -123,11 +124,16 @@ export default function CustomerCockpitPage() {
   const canQuoteWith = hasPermission(QUOTATION_PERMISSIONS.create);
   const canEditOpportunity = hasPermission("opportunities.edit");
   const canCreateOpportunity = hasPermission("opportunities.create");
+  // Collections are their own permission: customers.view alone shows the customer and its deals, never what it owes or has paid.
+  const canViewCollections = hasPermission("collections.view");
+  const canRecordPayment = hasPermission("collections.record");
   const actions = customerActions({ isActive: customer.isActive, may });
   const registrations = sortRegistrations(customer.gstRegistrations);
   const blockers = quotingBlockers(customer);
-  const overview = d.overview;
+  const rawOverview = d.overview;
+  const overview = rawOverview && !canViewCollections ? withoutCollections(rawOverview) : rawOverview;
   const now = new Date();
+  const sections = canViewCollections ? [SECTIONS[0], { id: "collections", label: "Collections" }, ...SECTIONS.slice(1)] : SECTIONS;
 
   const attention = buildAttention({
     customer,
@@ -174,7 +180,7 @@ export default function CustomerCockpitPage() {
 
       {snapshot && <SnapshotStrip snapshot={snapshot} />}
 
-      <SectionNav sections={SECTIONS} />
+      <SectionNav sections={sections} />
 
       <div className="cockpit-grid">
         <div className="cockpit-main">
@@ -229,10 +235,11 @@ export default function CustomerCockpitPage() {
                 {deals.length === 0 && overview.legacyMatches.length === 0 && (
                   <EmptyState icon="target" title="No deals yet" body="A quotation is made from an opportunity linked to this customer. Start a deal from a qualified lead, or link an existing opportunity from its page." />
                 )}
-                <p className="fin-note">Invoices and receivables belong to FinanceOS and are shown as recorded there. Opportunities that are not linked to this customer are never counted.</p>
+                <p className="fin-note">{canViewCollections ? "Invoices and receivables belong to FinanceOS and are shown as recorded there." : "Invoices belong to FinanceOS and are shown as recorded there."} Opportunities that are not linked to this customer are never counted.</p>
               </div>
             )}
           </section>
+          {canViewCollections && rawOverview && <CollectionsStatementSection customer={customer} invoices={rawOverview.invoices} canRecord={canRecordPayment} now={now} onChanged={d.refreshAll} />}
         </div>
 
         <aside className="cockpit-rail" aria-label="Customer details">

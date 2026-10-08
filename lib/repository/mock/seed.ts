@@ -16,6 +16,8 @@ import {
   SalesInvoice,
   DispatchOrderOption,
   AccountsReceivable,
+  PaymentCollectionRecord,
+  PaymentCollectionEvent,
   CustomerStatementEntry,
   AppNotification,
   CustomerEvent,
@@ -422,6 +424,34 @@ export const SEED_SALES_INVOICES: SalesInvoice[] = [
     remarks: "Final invoice after dispatch confirmation.",
     createdAt: daysAgo(4),
   },
+  // DEMO DATA for the Collections screens (mock mode only, clearly not real records). They are
+  // attached to existing mock orders so the cockpit finds them; the amounts are made up.
+  // SI1 above belongs to a deal with no customer linked (the "not linked" case).
+  ...[
+    { id: "SI2", so: "SO2", code: "SO-5288", opp: "O8", oppName: "Switchgear Replacement Order", name: "Havells India", owner: "Priya N.", ago: 45, taxable: 5_200_000 },
+    { id: "SI3", so: "SO1", code: "SO-5276", opp: "O3", oppName: "Factory Automation Retrofit", name: "JSW Steel", owner: "Rohit M.", ago: 1, taxable: 1_000_000 },
+    { id: "SI4", so: "SO2", code: "SO-5288", opp: "O8", oppName: "Switchgear Replacement Order", name: "Havells India", owner: "Priya N.", ago: 20, taxable: 500_000 },
+    { id: "SI5", so: "SO1", code: "SO-5276", opp: "O3", oppName: "Factory Automation Retrofit", name: "JSW Steel", owner: "Rohit M.", ago: 70, taxable: 200_000 },
+    { id: "SI6", so: "SO1", code: "SO-5276", opp: "O3", oppName: "Factory Automation Retrofit", name: "JSW Steel", owner: "Rohit M.", ago: 10, taxable: 423_729 },
+  ].map(
+    (d): SalesInvoice => ({
+      id: d.id,
+      invoiceNumber: `SI-77${d.id.slice(2)}0`,
+      salesOrderId: d.so,
+      salesOrderCode: d.code,
+      opportunityId: d.opp,
+      opportunityName: d.oppName,
+      customerName: d.name,
+      ownerName: d.owner,
+      invoiceDate: daysAgo(d.ago),
+      taxableAmount: d.taxable,
+      gstAmount: Math.round(d.taxable * 0.18),
+      totalAmount: Math.round(d.taxable * 1.18),
+      status: "POSTED",
+      paymentStatus: "PENDING",
+      createdAt: daysAgo(d.ago),
+    })
+  ),
 ];
 
 // ---------------------------------------------------------------------------
@@ -447,6 +477,26 @@ export const SEED_ACCOUNTS_RECEIVABLE: AccountsReceivable[] = [
     paymentStatus: "PENDING",
     createdAt: daysAgo(4),
   },
+  // DEMO receivables for the Collections screens. Like the real ones, a receivable created with an
+  // invoice has its due date set to the invoice's own date (SI2, SI4, SI5), which is why
+  // SI2 shows as long overdue; SI3 and SI6 have a later due date.
+  { id: "AR2", salesInvoiceId: "SI2", invoiceNumber: "SI-77200", customerName: "Havells India", dueDate: daysAgo(45), outstandingAmount: 6_136_000, paidAmount: 2_000_000, balanceAmount: 4_136_000, paymentStatus: "PARTIAL", createdAt: daysAgo(45) },
+  { id: "AR3", salesInvoiceId: "SI3", invoiceNumber: "SI-77300", customerName: "JSW Steel", dueDate: daysFromNow(2), outstandingAmount: 1_180_000, paidAmount: 0, balanceAmount: 1_180_000, paymentStatus: "PENDING", createdAt: daysAgo(1) },
+  { id: "AR4", salesInvoiceId: "SI4", invoiceNumber: "SI-77400", customerName: "Havells India", dueDate: daysAgo(20), outstandingAmount: 590_000, paidAmount: 590_000, balanceAmount: 0, paymentStatus: "PAID", createdAt: daysAgo(20) },
+  { id: "AR5", salesInvoiceId: "SI5", invoiceNumber: "SI-77500", customerName: "JSW Steel", dueDate: daysAgo(70), outstandingAmount: 236_000, paidAmount: 0, balanceAmount: 0, paymentStatus: "WRITTEN_OFF", createdAt: daysAgo(70) },
+  // The receivable's own figures disagree with themselves and with its payments: a case for "Needs review".
+  { id: "AR6", salesInvoiceId: "SI6", invoiceNumber: "SI-77600", customerName: "JSW Steel", dueDate: daysFromNow(15), outstandingAmount: 500_000, paidAmount: 100_000, balanceAmount: 300_000, paymentStatus: "PENDING", createdAt: daysAgo(10) },
+];
+
+// DEMO payment collections and their events. The 2,000,000 on AR2 was recorded after payments were
+// tracked (it has a recorder and an event); the one on AR4 predates that (no recorder, no event).
+export const SEED_PAYMENT_COLLECTIONS: PaymentCollectionRecord[] = [
+  { id: "PC-D1", accountsReceivableId: "AR2", paymentDate: daysAgo(30), amount: 2_000_000, paymentMode: "BANK_TRANSFER", referenceNumber: "UTR-DEMO-1", createdAt: daysAgo(30), recordedById: "mock-user", recordedByName: "Priya N." },
+  { id: "PC-D2", accountsReceivableId: "AR4", paymentDate: daysAgo(18), amount: 590_000, paymentMode: "Bank Transfer", referenceNumber: "UTR-DEMO-2", remarks: "Customer payment received", createdAt: daysAgo(18) },
+];
+
+export const SEED_PAYMENT_EVENTS: PaymentCollectionEvent[] = [
+  { id: "PE-D1", paymentCollectionId: "PC-D1", accountsReceivableId: "AR2", salesInvoiceId: "SI2", action: "PAYMENT_RECORDED", amount: 2_000_000, balanceBefore: 6_136_000, balanceAfter: 4_136_000, fromStatus: "PENDING", toStatus: "PARTIAL", actorId: "mock-user", actorName: "Priya N.", occurredAt: daysAgo(30) },
 ];
 
 export const SEED_CUSTOMER_LEDGER: CustomerStatementEntry[] = [

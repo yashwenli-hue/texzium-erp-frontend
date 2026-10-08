@@ -47,6 +47,8 @@ import {
   SEED_SALES_INVOICES,
   SEED_DISPATCH_ORDERS,
   SEED_ACCOUNTS_RECEIVABLE,
+  SEED_PAYMENT_COLLECTIONS,
+  SEED_PAYMENT_EVENTS,
   SEED_CUSTOMER_LEDGER,
   SEED_NOTIFICATIONS,
 } from "./seed";
@@ -98,8 +100,8 @@ export const db = {
   accountsReceivable: new EntityStore<AccountsReceivable>(SEED_ACCOUNTS_RECEIVABLE),
   // Mirrors the real backend: a collection, and the event that records it, are
   // written together by MockPaymentCollectionRepository.create().
-  paymentCollections: new EntityStore<PaymentCollectionRecord>([]),
-  paymentCollectionEvents: new EntityStore<PaymentCollectionEvent>([]),
+  paymentCollections: new EntityStore<PaymentCollectionRecord>(SEED_PAYMENT_COLLECTIONS),
+  paymentCollectionEvents: new EntityStore<PaymentCollectionEvent>(SEED_PAYMENT_EVENTS),
   customerLedger: new EntityStore<CustomerStatementEntry>(SEED_CUSTOMER_LEDGER),
   notifications: new EntityStore<AppNotification>(SEED_NOTIFICATIONS),
 };
