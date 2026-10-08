@@ -24,6 +24,7 @@ import {
   DispatchOrderOption,
   AccountsReceivable,
   PaymentCollectionRecord,
+  PaymentCollectionEvent,
   CustomerStatementEntry,
   AppNotification,
 } from "../../types/domain";
@@ -95,12 +96,10 @@ export const db = {
   salesInvoices: new EntityStore<SalesInvoice>(SEED_SALES_INVOICES),
   dispatchOrders: new EntityStore<DispatchOrderOption>(SEED_DISPATCH_ORDERS),
   accountsReceivable: new EntityStore<AccountsReceivable>(SEED_ACCOUNTS_RECEIVABLE),
-  // Mirrors the real backend: these rows exist once created, but no
-  // repository interface ever lists them (no GET /payment-collections on
-  // the real API) — kept as an EntityStore purely as the mock's equivalent
-  // of "a row in a table nothing reads back", so receipt-voucher generation
-  // can still look one up by id immediately after creation.
+  // Mirrors the real backend: a collection, and the event that records it, are
+  // written together by MockPaymentCollectionRepository.create().
   paymentCollections: new EntityStore<PaymentCollectionRecord>([]),
+  paymentCollectionEvents: new EntityStore<PaymentCollectionEvent>([]),
   customerLedger: new EntityStore<CustomerStatementEntry>(SEED_CUSTOMER_LEDGER),
   notifications: new EntityStore<AppNotification>(SEED_NOTIFICATIONS),
 };

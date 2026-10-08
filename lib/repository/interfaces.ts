@@ -32,6 +32,9 @@ import {
   DispatchOrderOption,
   AccountsReceivable,
   RecordPaymentResult,
+  PaymentCollection,
+  PaymentCollectionDetail,
+  InvoiceCollections,
   CustomerStatement,
   PaymentLinkResult,
   ReceiptVoucher,
@@ -607,22 +610,45 @@ export interface IAccountsReceivableRepository {
   getBySalesInvoiceId(salesInvoiceId: ID): Promise<AccountsReceivable | null>;
 }
 
-// Mirrors the VERIFIED CreatePaymentCollectionDto exactly: salesInvoiceId,
-// paymentDate, amountReceived, paymentMode, referenceNo — all required.
+// Mirrors the VERIFIED CreatePaymentCollectionDto (Payment Collection V1):
+// salesInvoiceId, paymentDate, amountReceived, paymentMode, referenceNo are
+// required; remarks is optional. paymentMode must be one of PAYMENT_MODES (see
+// lib/repository/shared/paymentCollection.ts): "Bank Transfer" is read as
+// BANK_TRANSFER, an unknown mode is refused. The recorder is never sent: it is
+// the signed-in user.
 export interface CreatePaymentCollectionInput {
   salesInvoiceId: ID;
   paymentDate: string; // ISO 8601
   amountReceived: number;
   paymentMode: string;
   referenceNo: string;
+  remarks?: string;
 }
 
-// VERIFIED: POST /payment-collections only — no GET/list exists for this
-// resource at all (confirmed empirically: GET /payment-collections returns
-// 404). create() is therefore the repository's only method; nothing else
-// is honestly offerable. See the Stage 2G report.
+export interface ListPaymentCollectionsQuery {
+  salesInvoiceId?: ID;
+  accountsReceivableId?: ID;
+  /** Payment date range, both ends inclusive (ISO 8601). */
+  from?: string;
+  to?: string;
+  /** 1-500, default 100. */
+  limit?: number;
+  offset?: number;
+}
+
+// VERIFIED (backend, Payment Collection V1): POST /payment-collections records a
+// payment atomically (it can be refused with a PaymentConflictError: more than is
+// owed, a receivable that is closed, an invoice that is not posted, a reference
+// already used, a receivable that changed meanwhile). The reads are GET
+// /payment-collections (newest first, capped), /:id and /invoices/:salesInvoiceId.
+// Every route needs a signed-in user and collections.record (POST) or
+// collections.view (reads). Collections recorded before this release have no
+// recorder and no events.
 export interface IPaymentCollectionRepository {
   create(input: CreatePaymentCollectionInput): Promise<RecordPaymentResult>;
+  list(query?: ListPaymentCollectionsQuery): Promise<PaymentCollection[]>;
+  getById(id: ID): Promise<PaymentCollectionDetail>;
+  getForInvoice(salesInvoiceId: ID): Promise<InvoiceCollections>;
 }
 
 // VERIFIED: GET /customer-statements/:customerName — derives entirely from

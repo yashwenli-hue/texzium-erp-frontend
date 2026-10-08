@@ -1063,12 +1063,12 @@ export interface AccountsReceivable {
   createdAt: string;
 }
 
-// The synchronous response body of POST /payment-collections is the ONLY
-// place a PaymentCollection's own id is ever available — it cannot be
-// looked up afterward through any endpoint. Kept as its own type (rather
-// than folded into AccountsReceivable) to make that ephemerality explicit:
-// a value of this shape is only ever held transiently in component state
-// right after a successful payment, never persisted/refetched.
+// VERIFIED (backend, Payment Collection V1): a payment received against one
+// receivable. Written only by POST /payment-collections, in one transaction with
+// the receivable update, the customer-ledger credit and an event. `recordedBy*` is
+// the signed-in user who recorded it; it is absent on collections recorded before
+// the recorder was kept. `paymentMode` is one of PAYMENT_MODES on new collections;
+// older ones keep whatever text they were saved with (for example "Bank Transfer").
 export interface PaymentCollectionRecord {
   id: ID;
   accountsReceivableId: ID;
@@ -1078,12 +1078,60 @@ export interface PaymentCollectionRecord {
   referenceNumber?: string;
   remarks?: string;
   createdAt: string;
+  recordedById?: ID;
+  recordedByName?: string;
+}
+
+// What happened to a payment collection: who, when, and what it did to the
+// receivable. The amount, balances and statuses are snapshots taken in the same
+// transaction as the change. Collections recorded before events existed have none.
+export type PaymentCollectionEventAction = "PAYMENT_RECORDED";
+
+export interface PaymentCollectionEvent {
+  id: ID;
+  paymentCollectionId: ID;
+  accountsReceivableId: ID;
+  salesInvoiceId: ID;
+  action: PaymentCollectionEventAction | string;
+  amount: number;
+  balanceBefore: number;
+  balanceAfter: number;
+  fromStatus?: string;
+  toStatus?: string;
+  remarks?: string;
+  actorId: ID;
+  actorName: string;
+  occurredAt: string;
+}
+
+// A collection as GET /payment-collections returns it: with its receivable's
+// current figures and the invoice it was collected against.
+export interface PaymentCollection extends PaymentCollectionRecord {
+  salesInvoiceId: ID;
+  invoiceNumber?: string;
+  customerName?: string;
+  /** The receivable's figures NOW, not at the time of this payment. */
+  receivableStatus?: string;
+  receivableBalance?: number;
+}
+
+export interface PaymentCollectionDetail extends PaymentCollection {
+  events: PaymentCollectionEvent[];
+}
+
+// GET /payment-collections/invoices/:salesInvoiceId: one invoice's receivable with
+// every payment collected against it and the events behind them.
+export interface InvoiceCollections {
+  receivable: AccountsReceivable;
+  collections: PaymentCollectionRecord[];
+  events: PaymentCollectionEvent[];
 }
 
 export interface RecordPaymentResult {
   paymentRecord: PaymentCollectionRecord;
-  /** Re-fetch AccountsReceivable via getBySalesInvoiceId() after this for the display-authoritative copy — this one has no nested salesInvoice (see realPaymentCollectionRepository.ts). */
+  /** Carries no nested invoice; read GET /payment-collections/invoices/:id for the display copy. */
   updatedReceivable: AccountsReceivable;
+  event: PaymentCollectionEvent;
 }
 
 // VERIFIED: GET /customer-statements/:customerName derives entirely from

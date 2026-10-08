@@ -26,6 +26,10 @@ import {
   DispatchOrderOption,
   AccountsReceivable,
   PaymentCollectionRecord,
+  PaymentCollectionEvent,
+  PaymentCollection,
+  PaymentCollectionDetail,
+  InvoiceCollections,
   CustomerStatement,
   ReceiptVoucher,
   Customer,
@@ -799,6 +803,9 @@ export interface BackendPaymentCollectionRecord {
   referenceNumber?: string | null;
   remarks?: string | null;
   createdAt: string;
+  /** Null on collections recorded before the recorder was kept. */
+  recordedById?: string | null;
+  recordedBy?: { id: string; fullName: string } | null;
 }
 
 export function mapPaymentCollectionRecord(raw: BackendPaymentCollectionRecord): PaymentCollectionRecord {
@@ -811,6 +818,96 @@ export function mapPaymentCollectionRecord(raw: BackendPaymentCollectionRecord):
     referenceNumber: raw.referenceNumber ?? undefined,
     remarks: raw.remarks ?? undefined,
     createdAt: raw.createdAt,
+    recordedById: raw.recordedById ?? raw.recordedBy?.id ?? undefined,
+    recordedByName: raw.recordedBy?.fullName ?? undefined,
+  };
+}
+
+export interface BackendPaymentCollectionEvent {
+  id: string;
+  paymentCollectionId: string;
+  accountsReceivableId: string;
+  salesInvoiceId: string;
+  action: string;
+  amount: number;
+  balanceBefore: number;
+  balanceAfter: number;
+  fromStatus?: string | null;
+  toStatus?: string | null;
+  remarks?: string | null;
+  actorId: string;
+  actor?: { id: string; fullName: string } | null;
+  occurredAt: string;
+  createdAt?: string;
+}
+
+export function mapPaymentCollectionEvent(raw: BackendPaymentCollectionEvent): PaymentCollectionEvent {
+  return {
+    id: raw.id,
+    paymentCollectionId: raw.paymentCollectionId,
+    accountsReceivableId: raw.accountsReceivableId,
+    salesInvoiceId: raw.salesInvoiceId,
+    action: raw.action,
+    amount: raw.amount,
+    balanceBefore: raw.balanceBefore,
+    balanceAfter: raw.balanceAfter,
+    fromStatus: raw.fromStatus ?? undefined,
+    toStatus: raw.toStatus ?? undefined,
+    remarks: raw.remarks ?? undefined,
+    actorId: raw.actorId,
+    actorName: raw.actor?.fullName ?? "",
+    occurredAt: raw.occurredAt,
+  };
+}
+
+interface BackendCollectionInvoice {
+  id: string;
+  invoiceNumber?: string | null;
+  customerName?: string | null;
+}
+
+/** GET /payment-collections and /:id: the collection with its receivable (and that receivable's invoice) nested. */
+export interface BackendPaymentCollection extends BackendPaymentCollectionRecord {
+  accountsReceivable: {
+    id: string;
+    salesInvoiceId: string;
+    balanceAmount: number;
+    paymentStatus: string;
+    salesInvoice?: BackendCollectionInvoice | null;
+  };
+}
+
+export function mapPaymentCollection(raw: BackendPaymentCollection): PaymentCollection {
+  const invoice = raw.accountsReceivable.salesInvoice;
+  return {
+    ...mapPaymentCollectionRecord(raw),
+    salesInvoiceId: raw.accountsReceivable.salesInvoiceId,
+    invoiceNumber: invoice ? invoice.invoiceNumber || `#${invoice.id.slice(0, 8).toUpperCase()}` : undefined,
+    customerName: invoice?.customerName ?? undefined,
+    receivableStatus: raw.accountsReceivable.paymentStatus,
+    receivableBalance: raw.accountsReceivable.balanceAmount,
+  };
+}
+
+export interface BackendPaymentCollectionDetail extends BackendPaymentCollection {
+  events: BackendPaymentCollectionEvent[];
+}
+
+export function mapPaymentCollectionDetail(raw: BackendPaymentCollectionDetail): PaymentCollectionDetail {
+  return { ...mapPaymentCollection(raw), events: (raw.events ?? []).map(mapPaymentCollectionEvent) };
+}
+
+export interface BackendInvoiceCollections {
+  receivable: BackendAccountsReceivable;
+  collections: BackendPaymentCollectionRecord[];
+  events: BackendPaymentCollectionEvent[];
+}
+
+export function mapInvoiceCollections(raw: BackendInvoiceCollections): InvoiceCollections {
+  return {
+    receivable: mapAccountsReceivable(raw.receivable),
+    collections: raw.collections.map(mapPaymentCollectionRecord),
+    events: raw.events.map(mapPaymentCollectionEvent),
   };
 }
 
