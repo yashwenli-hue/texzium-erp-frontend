@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Icon } from "../../../components/ui/Icon";
 import { Panel } from "../../../components/ui/Card";
+import { DocumentCustomer } from "../../../components/ui/DocumentCustomer";
 import { SalesOrderStatusTag, SalesInvoiceStatusTag, DispatchOrderStatusTag, AdvanceReceiptStatusTag, Tag } from "../../../components/ui/Tag";
 import { Button, EmptyState } from "../../../components/ui/Button";
 import { DataTable, Column } from "../../../components/ui/DataTable";
@@ -64,6 +65,7 @@ export default function SalesOrderDetailPage() {
     proforma,
     quotation,
     opportunity,
+    opportunityStatus,
     loading,
     error,
     refetch,
@@ -298,6 +300,7 @@ export default function SalesOrderDetailPage() {
             <div className="tagrow">
               <SalesOrderStatusTag status={salesOrder.status} />
               <Tag color="n">{formatInr(salesOrder.totalAmount)}</Tag>
+              <DocumentCustomer opportunity={opportunity ?? null} status={opportunityStatus} />
             </div>
           </div>
 

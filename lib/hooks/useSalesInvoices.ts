@@ -3,6 +3,7 @@
 import { useCallback } from "react";
 import { useRepository } from "../repository/RepositoryProvider";
 import { useAsyncList } from "./useAsyncList";
+import { useDocumentOpportunity } from "./useDocumentOpportunity";
 import { CreateSalesInvoiceInput } from "../repository/interfaces";
 
 export function useSalesInvoices() {
@@ -54,10 +55,7 @@ export function useSalesInvoiceDetail(id: string | undefined) {
     [repo, invoice?.quotationId]
   );
 
-  const { data: opportunity } = useAsyncList(
-    () => (invoice?.opportunityId ? repo.opportunities.getById(invoice.opportunityId) : Promise.resolve(null)),
-    [repo, invoice?.opportunityId]
-  );
+  const { opportunity, status: opportunityStatus } = useDocumentOpportunity(invoice?.opportunityId);
 
-  return { invoice, salesOrder, proforma, quotation, opportunity, loading, error, refetch };
+  return { invoice, salesOrder, proforma, quotation, opportunity, opportunityStatus, loading, error, refetch };
 }

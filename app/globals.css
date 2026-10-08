@@ -421,7 +421,7 @@ tbody tr.clickable:hover{background:var(--row-hover)}
 /* detail / drilldown */
 .back-link{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted);font-weight:600;margin-bottom:16px;cursor:pointer}
 .back-link:hover{color:var(--text)}
-.crm-grid{display:grid;grid-template-columns:1.5fr 1fr;gap:16px;align-items:start}
+.crm-grid{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:16px;align-items:start}
 .lead-row{display:flex;align-items:center;gap:12px;padding:13px 16px;border-bottom:1px solid var(--line-2);cursor:pointer;transition:background .1s}
 .lead-row:last-child{border-bottom:none}
 .lead-row:hover{background:var(--lead-row-hover)}
@@ -514,7 +514,7 @@ tbody tr.clickable:hover{background:var(--row-hover)}
 .result .body b{font-size:13px}
 .result .body small{display:block;color:var(--muted);font-size:12px;margin-top:2px}
 
-@media(max-width:1080px){.cols{grid-template-columns:1fr}.crm-grid{grid-template-columns:1fr}.stat-row{grid-template-columns:repeat(2,1fr)}.tiles{grid-template-columns:1fr 1fr}.notes-grid{grid-template-columns:1fr 1fr}.kanban{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:1080px){.cols{grid-template-columns:1fr}.crm-grid{grid-template-columns:minmax(0,1fr)}.stat-row{grid-template-columns:repeat(2,1fr)}.tiles{grid-template-columns:1fr 1fr}.notes-grid{grid-template-columns:1fr 1fr}.kanban{grid-template-columns:repeat(3,1fr)}}
 @media(max-width:720px){
   .rail{position:fixed;left:0;top:0;z-index:60;width:250px;transform:translateX(-100%);transition:transform .22s}
   .rail.show{transform:none;box-shadow:0 0 0 100vmax var(--scrim-rail)}
@@ -1234,3 +1234,14 @@ th[aria-sort] .th-sort{color:var(--ink)}
 .tl-day{margin:14px 0 6px;font-size:11px;text-transform:uppercase;letter-spacing:.4px;font-weight:700;color:var(--c-sub, var(--text))}
 .tl-day-group:first-child .tl-day{margin-top:2px}
 .hist-detail a{color:var(--text);text-decoration:underline;text-underline-offset:2px;font-weight:600}
+
+/* ============================================================
+   Customer V1.1 - the customer on a commercial document (Enhancement CP3)
+   ============================================================ */
+.doc-customer{display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:9px;font-size:12.5px;color:var(--text);min-width:0;max-width:100%}
+.doc-customer .k{font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;font-weight:700;color:var(--text)}
+.doc-customer .dc-unlinked{color:var(--text)}
+.doc-customer .dc-unlinked a{font-weight:600;text-decoration:underline;text-underline-offset:2px}
+.tagrow .doc-customer{margin-top:0}
+.doc-customer .entity-chip{min-width:0}
+.doc-head .ident > div{min-width:0}

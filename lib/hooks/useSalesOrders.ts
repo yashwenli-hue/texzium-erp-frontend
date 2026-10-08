@@ -3,6 +3,7 @@
 import { useCallback } from "react";
 import { useRepository } from "../repository/RepositoryProvider";
 import { useAsyncList } from "./useAsyncList";
+import { useDocumentOpportunity } from "./useDocumentOpportunity";
 import { useAuth } from "../auth/AuthContext";
 import { CreateAdvanceReceiptInput, CreatePaymentTermInput, CreateSalesOrderInput } from "../repository/interfaces";
 import { AdvanceReceiptOutcome } from "../types/domain";
@@ -53,10 +54,7 @@ export function useSalesOrderDetail(id: string | undefined) {
     [repo, salesOrder?.quotationId]
   );
 
-  const { data: opportunity } = useAsyncList(
-    () => (salesOrder?.opportunityId ? repo.opportunities.getById(salesOrder.opportunityId) : Promise.resolve(null)),
-    [repo, salesOrder?.opportunityId]
-  );
+  const { opportunity, status: opportunityStatus } = useDocumentOpportunity(salesOrder?.opportunityId);
 
   // Each commercial section is only fetched when the person may view it; the
   // backend refuses the request otherwise (403), so asking would just fail.
@@ -176,6 +174,7 @@ export function useSalesOrderDetail(id: string | undefined) {
     proforma,
     quotation,
     opportunity,
+    opportunityStatus,
     loading,
     error,
     refetch,

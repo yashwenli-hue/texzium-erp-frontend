@@ -3,6 +3,7 @@
 import { useCallback } from "react";
 import { useRepository } from "../repository/RepositoryProvider";
 import { useAsyncList } from "./useAsyncList";
+import { useDocumentOpportunity } from "./useDocumentOpportunity";
 import { useAuth } from "../auth/AuthContext";
 import { CreateProformaInvoiceInput, CreateQuotationInput } from "../repository/interfaces";
 import { QUOTATION_PERMISSIONS, QuotationConflictError } from "../repository/shared/quotationLifecycle";
@@ -64,10 +65,7 @@ export function useQuotationDetail(id: string | undefined) {
     [repo, id]
   );
 
-  const { data: opportunity } = useAsyncList(
-    () => (quotation?.opportunityId ? repo.opportunities.getById(quotation.opportunityId) : Promise.resolve(null)),
-    [repo, quotation?.opportunityId]
-  );
+  const { opportunity, status: opportunityStatus } = useDocumentOpportunity(quotation?.opportunityId);
 
   // The lifecycle history is part of viewing a quotation (quotations.view).
   const viewHistory = hasPermission(QUOTATION_PERMISSIONS.view);
@@ -152,6 +150,7 @@ export function useQuotationDetail(id: string | undefined) {
   return {
     quotation,
     opportunity,
+    opportunityStatus,
     loading,
     error,
     refetch,

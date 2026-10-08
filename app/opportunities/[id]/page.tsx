@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { Icon } from "../../../components/ui/Icon";
 import { LeadHistoryTimeline } from "../../../components/ui/LeadHistoryTimeline";
 import { Panel } from "../../../components/ui/Card";
+import { DocumentCustomer } from "../../../components/ui/DocumentCustomer";
 import { CustomerStatusTag, OpportunityStageTag, QuotationStatusTag, Tag } from "../../../components/ui/Tag";
 import { DocumentActions, DocumentAction } from "../../../components/ui/DocumentActions";
 import { LinkCustomerDialog } from "../../../components/forms/LinkCustomerDialog";
@@ -168,10 +169,8 @@ export default function OpportunityDetailPage() {
               <OpportunityStageTag stage={opportunity.stage} />
               <Tag color="n">{formatInr(opportunity.expectedValue)}</Tag>
               <Tag color="n">{opportunity.probability}% probability</Tag>
-              {opportunity.customer ? (
-                <Link href={`/customers/${opportunity.customer.id}`} className="tag-link" aria-label={`Customer: ${opportunity.customer.customerName}`}>
-                  <Tag color="g">Customer · {opportunity.customer.customerName}</Tag>
-                </Link>
+              {opportunity.customerId && opportunity.customer ? (
+                <DocumentCustomer opportunity={opportunity} status="ready" />
               ) : (
                 <a href="#customer-panel" className="tag-link" aria-label="No customer linked. Go to the customer section">
                   <Tag color="w">No customer linked</Tag>

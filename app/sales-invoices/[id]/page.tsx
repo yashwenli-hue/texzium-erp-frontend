@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Icon } from "../../../components/ui/Icon";
 import { Panel } from "../../../components/ui/Card";
+import { DocumentCustomer } from "../../../components/ui/DocumentCustomer";
 import { SalesInvoiceStatusTag, AccountsReceivableStatusTag, DispatchOrderStatusTag, Tag } from "../../../components/ui/Tag";
 import { Button, EmptyState } from "../../../components/ui/Button";
 import { DataTable, Column } from "../../../components/ui/DataTable";
@@ -34,7 +35,7 @@ export default function SalesInvoiceDetailPage() {
   const router = useRouter();
   const id = params?.id;
   const toast = useToast();
-  const { invoice, salesOrder, proforma, quotation, opportunity, loading, error, refetch } = useSalesInvoiceDetail(id);
+  const { invoice, salesOrder, proforma, quotation, opportunity, opportunityStatus, loading, error, refetch } = useSalesInvoiceDetail(id);
   const { accountsReceivable, loading: arLoading, error: arError, refetch: refetchAr } = useAccountsReceivableForInvoice(id);
   const { recordPayment } = useRecordPayment();
   const { statement, loading: statementLoading, error: statementError, refetch: refetchStatement } = useCustomerStatement(invoice?.customerName);
@@ -157,6 +158,7 @@ export default function SalesInvoiceDetailPage() {
               <SalesInvoiceStatusTag status={invoice.status} />
               {accountsReceivable && <AccountsReceivableStatusTag status={accountsReceivable.paymentStatus} />}
               <Tag color="n">{formatInr(invoice.totalAmount)}</Tag>
+              <DocumentCustomer opportunity={opportunity ?? null} status={opportunityStatus} />
             </div>
           </div>
 

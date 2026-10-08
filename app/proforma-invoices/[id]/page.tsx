@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { Icon } from "../../../components/ui/Icon";
 import { Panel } from "../../../components/ui/Card";
+import { DocumentCustomer } from "../../../components/ui/DocumentCustomer";
 import { ProformaInvoiceStatusTag, QuotationStatusTag, SalesOrderStatusTag } from "../../../components/ui/Tag";
 import { Button, EmptyState } from "../../../components/ui/Button";
 import { DataTable, Column } from "../../../components/ui/DataTable";
@@ -42,6 +43,7 @@ export default function ProformaInvoiceDetailPage() {
     proforma,
     quotation,
     opportunity,
+    opportunityStatus,
     loading,
     error,
     refetch,
@@ -187,6 +189,7 @@ export default function ProformaInvoiceDetailPage() {
               <div className="statusrow">
                 <ProformaInvoiceStatusTag status={proforma.status} expired={proforma.isExpired} />
               </div>
+              <DocumentCustomer opportunity={opportunity ?? null} status={opportunityStatus} />
             </div>
           </div>
           <div className="doc-amount">

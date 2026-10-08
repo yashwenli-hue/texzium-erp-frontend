@@ -3,6 +3,7 @@
 import { useCallback } from "react";
 import { useRepository } from "../repository/RepositoryProvider";
 import { useAsyncList } from "./useAsyncList";
+import { useDocumentOpportunity } from "./useDocumentOpportunity";
 import { useAuth } from "../auth/AuthContext";
 import { CreateSalesOrderInput } from "../repository/interfaces";
 import { PROFORMA_PERMISSIONS, ProformaConflictError } from "../repository/shared/proformaLifecycle";
@@ -55,10 +56,7 @@ export function useProformaInvoiceDetail(id: string | undefined) {
     [repo, proforma?.quotationId]
   );
 
-  const { data: opportunity } = useAsyncList(
-    () => (quotation?.opportunityId ? repo.opportunities.getById(quotation.opportunityId).catch(() => null) : Promise.resolve(null)),
-    [repo, quotation?.opportunityId]
-  );
+  const { opportunity, status: opportunityStatus } = useDocumentOpportunity(quotation?.opportunityId);
 
   // The lifecycle history is part of viewing a Proforma (proformas.view).
   const viewHistory = hasPermission(PROFORMA_PERMISSIONS.view);
@@ -128,6 +126,7 @@ export function useProformaInvoiceDetail(id: string | undefined) {
     proforma,
     quotation,
     opportunity,
+    opportunityStatus,
     loading,
     error,
     refetch,
