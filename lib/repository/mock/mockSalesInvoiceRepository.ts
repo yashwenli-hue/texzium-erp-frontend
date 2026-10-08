@@ -53,6 +53,7 @@ export class MockSalesInvoiceRepository implements ISalesInvoiceRepository {
       dispatchOrderNo: dispatchOrder.dispatchOrderNo,
       dispatchStatus: dispatchOrder.status,
       customerName: input.customerName,
+      invoiceCustomerName: input.customerName.trim() !== "" ? input.customerName : undefined,
       ownerName: salesOrder.ownerName,
       invoiceDate: input.invoiceDate,
       taxableAmount,

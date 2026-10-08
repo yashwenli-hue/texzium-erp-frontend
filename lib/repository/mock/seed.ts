@@ -442,6 +442,7 @@ export const SEED_SALES_INVOICES: SalesInvoice[] = [
       opportunityId: d.opp,
       opportunityName: d.oppName,
       customerName: d.name,
+      invoiceCustomerName: d.name,
       ownerName: d.owner,
       invoiceDate: daysAgo(d.ago),
       taxableAmount: d.taxable,

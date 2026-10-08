@@ -1019,7 +1019,14 @@ export interface SalesInvoice {
   dispatchLrNumber?: string | null;
   dispatchDestination?: string | null;
   dispatchExpectedDelivery?: string | null;
+  /** For display: the invoice's own name, else the Sales Order's, else "—". Do not use it to say what the invoice says. */
   customerName: string;
+  /**
+   * What the invoice record itself says: the backend's customerName, untouched by any fallback,
+   * and undefined when it is blank. This is the name the customer ledger is keyed by, so it is the
+   * only one that may be shown as "Name on invoice" or checked for "no customer name".
+   */
+  invoiceCustomerName?: string;
   ownerName: string;
   invoiceDate: string;
   taxableAmount: number;

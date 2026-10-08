@@ -748,6 +748,8 @@ export function mapSalesInvoice(raw: BackendSalesInvoice, salesOrderById: Map<st
     dispatchDestination: raw.dispatchOrder?.destination ?? undefined,
     dispatchExpectedDelivery: raw.dispatchOrder?.expectedDelivery ?? undefined,
     customerName: raw.customerName || so?.customerName || "—",
+    // What the invoice itself says, kept apart from the display fallback above.
+    invoiceCustomerName: raw.customerName && raw.customerName.trim() !== "" ? raw.customerName : undefined,
     ownerName: so?.ownerName ?? "Unassigned",
     invoiceDate: raw.invoiceDate,
     taxableAmount: raw.taxableAmount,

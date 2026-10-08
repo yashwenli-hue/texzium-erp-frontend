@@ -157,6 +157,7 @@ const near = (a: number, b: number) => Math.abs(toPaise(a) - toPaise(b)) === 0;
  */
 export function receivableAnomalies(args: {
   receivable: Pick<AccountsReceivable, "paymentStatus" | "outstandingAmount" | "paidAmount" | "balanceAmount" | "dueDate">;
+  /** `customerName` is what the invoice record itself says (SalesInvoice.invoiceCustomerName), never the display fallback. */
   invoice: { status: string; customerName?: string | null } | undefined;
   collected: number | null;
 }): Anomaly[] {
@@ -229,7 +230,7 @@ export function buildCollectionRows(args: {
     const own = byReceivable.get(ar.id) ?? [];
     const collected = collections === null ? null : own.reduce((s, c) => s + toPaise(c.amount), 0) / 100;
     const identity = identityOf(invoice, opportunities);
-    const anomalies = receivableAnomalies({ receivable: ar, invoice: invoice ? { status: invoice.status, customerName: invoice.customerName } : undefined, collected });
+    const anomalies = receivableAnomalies({ receivable: ar, invoice: invoice ? { status: invoice.status, customerName: invoice.invoiceCustomerName } : undefined, collected });
     const last = own.map((c) => c.paymentDate).sort((a, b) => (dateKeyOf(a) < dateKeyOf(b) ? 1 : -1))[0];
     const state = collectionState(ar, now);
     return {
@@ -238,7 +239,8 @@ export function buildCollectionRows(args: {
       invoiceNumber: ar.invoiceNumber ?? documentNumber(ar.salesInvoiceId, invoice?.invoiceNumber),
       invoiceDate: invoice?.invoiceDate,
       invoiceStatus: invoice?.status,
-      invoiceCustomerName: (invoice?.customerName ?? ar.customerName) || undefined,
+      // Only what the invoice itself says: never the display fallback (Sales Order / deal name).
+      invoiceCustomerName: (invoice ? invoice.invoiceCustomerName : ar.customerName)?.trim() || undefined,
       identity,
       dueDate: ar.dueDate,
       daysUntilDue: daysUntil(ar.dueDate, now),

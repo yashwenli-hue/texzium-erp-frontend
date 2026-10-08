@@ -35,7 +35,7 @@ export class MockPaymentCollectionRepository implements IPaymentCollectionReposi
     const existingReferences = receivables.length === 1
       ? db.paymentCollections.getAll().filter((c) => c.accountsReceivableId === receivables[0].id && c.referenceNumber).map((c) => c.referenceNumber as string)
       : [];
-    const ledgerName = invoice?.customerName ?? "";
+    const ledgerName = invoice?.invoiceCustomerName ?? "";
     const lastLedger = [...db.customerLedger.getAll()]
       .filter((e) => e.customerName === ledgerName)
       .sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1))
@@ -43,7 +43,7 @@ export class MockPaymentCollectionRepository implements IPaymentCollectionReposi
 
     const plan = planPayment({
       input,
-      invoice: invoice ? { status: invoice.status, customerName: invoice.customerName } : null,
+      invoice: invoice ? { status: invoice.status, customerName: invoice.invoiceCustomerName } : null,
       receivables,
       existingReferences,
       lastLedgerBalance: lastLedger?.balanceAmount ?? null,
