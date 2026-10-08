@@ -3,7 +3,7 @@ import { Lead, Opportunity, OpportunityStage } from "../../types/domain";
 import { IOpportunityRepository, CreateOpportunityInput, OpportunitySortField, IUserRepository } from "../interfaces";
 import { apiFetch, ApiError } from "../../api/httpClient";
 import { applyListQuery } from "../shared/listQuery";
-import { OpportunityStageConflictError, validateOpportunityStageMove } from "../shared/opportunityStage";
+import { OpportunityStageConflictError, normalizeStageRemark, stageRemarkProblem, validateOpportunityStageMove } from "../shared/opportunityStage";
 import { BackendOpportunity, mapLead, mapOpportunityStage } from "./mappers";
 import { toCustomerError } from "./realCustomerRepository";
 
@@ -115,15 +115,21 @@ export class RealOpportunityRepository implements IOpportunityRepository {
     };
   }
 
-  async updateStage(id: ID, fromStage: OpportunityStage, toStage: OpportunityStage): Promise<Opportunity> {
+  async updateStage(id: ID, fromStage: OpportunityStage, toStage: OpportunityStage, remarks?: string): Promise<Opportunity> {
     // The backend applies the same rules; checking first spares a round trip
     // and gives the same wording for a move that can never be valid.
     validateOpportunityStageMove(fromStage, toStage);
+    const problem = stageRemarkProblem(remarks);
+    if (problem) throw new Error(problem);
+    const remark = normalizeStageRemark(remarks);
 
     try {
+      // The remark rides on the same request as the move, so the stage and its history event
+      // are still one atomic change on the backend. A blank remark is not sent. The actor is
+      // never sent: the backend takes it from the signed-in user.
       await apiFetch<unknown>(`/opportunities/${id}/stage`, {
         method: "PATCH",
-        body: { fromStage, toStage },
+        body: remark === undefined ? { fromStage, toStage } : { fromStage, toStage, remarks: remark },
       });
     } catch (err) {
       if (err instanceof ApiError) {

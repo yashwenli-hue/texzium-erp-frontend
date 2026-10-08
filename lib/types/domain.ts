@@ -242,6 +242,8 @@ export interface LeadTimelineEntry {
   icon: string; // maps to an icon key in the icon set
   title: string;
   detail: string;
+  /** What the person who performed the action wrote about it (today: the remark on a stage move). Apart from `detail`, which is the system's own sentence. Absent on every event recorded without one. */
+  userRemark?: string;
   /** Empty for system events, and for employee entries whose author was not recorded. */
   actorName: string;
   actorId?: ID;

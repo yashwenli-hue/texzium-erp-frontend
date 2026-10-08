@@ -371,8 +371,11 @@ export interface IOpportunityRepository {
    * (lib/repository/shared/opportunityStage.ts): one step forward or back, or
    * Lost from any open stage; Won and Lost are final. Throws
    * OpportunityStageConflictError when the stage has changed in the meantime.
+   * `remarks` is what the person says about the move (at most 500 characters once
+   * trimmed; blank means none). It is kept on the history event apart from the
+   * system's own sentence. The actor is the signed-in user and is never sent.
    */
-  updateStage(id: ID, fromStage: OpportunityStage, toStage: OpportunityStage): Promise<Opportunity>;
+  updateStage(id: ID, fromStage: OpportunityStage, toStage: OpportunityStage, remarks?: string): Promise<Opportunity>;
   /**
    * Links the opportunity to a customer, changes it, or (null) removes it
    * (PATCH /opportunities/:id/customer, permission opportunities.edit). The

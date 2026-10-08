@@ -37,11 +37,12 @@ export function useOpportunities() {
   // show the message. Nothing is changed optimistically.
   const items = data?.items;
   const updateStage = useCallback(
-    async (id: string, toStage: OpportunityStage) => {
+    async (id: string, toStage: OpportunityStage, remarks?: string, fromStage?: OpportunityStage) => {
       const current = items?.find((o: Opportunity) => o.id === id);
       if (!current) throw new Error(NOT_LOADED_MESSAGE);
       try {
-        await repo.opportunities.updateStage(id, current.stage, toStage);
+        // `fromStage` is the stage the person confirmed the move from; without it, the stage the list shows now.
+        await repo.opportunities.updateStage(id, fromStage ?? current.stage, toStage, remarks);
         refetch();
       } catch (err) {
         if (err instanceof OpportunityStageConflictError) refetch();
@@ -89,11 +90,11 @@ export function useOpportunityDetail(id: string | undefined) {
   const timeline = lead?.timelines ?? fetchedTimeline ?? [];
 
   const updateStage = useCallback(
-    async (toStage: OpportunityStage) => {
+    async (toStage: OpportunityStage, remarks?: string, fromStage?: OpportunityStage) => {
       if (!id) return;
       if (!opportunity) throw new Error(NOT_LOADED_MESSAGE);
       try {
-        await repo.opportunities.updateStage(id, opportunity.stage, toStage);
+        await repo.opportunities.updateStage(id, fromStage ?? opportunity.stage, toStage, remarks);
         refetch();
       } catch (err) {
         if (err instanceof OpportunityStageConflictError) refetch();

@@ -17,6 +17,7 @@ import { LifecycleStepper } from "../../../components/ui/LifecycleStepper";
 import { QuickActions } from "../../../components/ui/QuickActions";
 import { DataTable, Column } from "../../../components/ui/DataTable";
 import { ConfirmDialog } from "../../../components/ui/ConfirmDialog";
+import { OpportunityStageDialog } from "../../../components/opportunities/OpportunityStageDialog";
 import { QuotationForm } from "../../../components/forms/QuotationForm";
 import { useOpportunityDetail } from "../../../lib/hooks/useOpportunities";
 import { useQuotations } from "../../../lib/hooks/useQuotations";
@@ -37,7 +38,8 @@ function goBackOrTo(router: ReturnType<typeof useRouter>, fallback: string) {
   }
 }
 
-type StageAction = { kind: "forward" | "back"; stage: OpportunityStage } | { kind: "lost" };
+/** The move being confirmed: captured when the person asks for it, so the dialog keeps saying what it was asked about even if the page reloads behind it. */
+type PendingMove = { from: OpportunityStage; to: OpportunityStage };
 
 export default function OpportunityDetailPage() {
   const params = useParams<{ id: string }>();
@@ -48,7 +50,7 @@ export default function OpportunityDetailPage() {
   const id = params?.id;
   const { opportunity, lead, timeline, loading, error, updateStage, linkCustomer, refetch } = useOpportunityDetail(id);
   const { quotations, createQuotation, refetch: refetchQuotations } = useQuotations();
-  const [pendingAction, setPendingAction] = useState<StageAction | null>(null);
+  const [pendingMove, setPendingMove] = useState<PendingMove | null>(null);
   const [showQuotationForm, setShowQuotationForm] = useState(false);
   const [customerDialog, setCustomerDialog] = useState<null | "link" | "remove">(null);
 
@@ -128,20 +130,13 @@ export default function OpportunityDetailPage() {
     stepBefore && canMoveOpportunityStage(opportunity.stage, stepBefore) ? stepBefore : undefined;
   const noStagePermission = "You don't have permission to change an opportunity's stage";
 
-  async function runAction() {
-    if (!pendingAction) return;
-    // Errors (a stage that changed in the meantime, no permission, a refused
-    // move) are thrown to the confirm dialog, which shows the message.
-    if (pendingAction.kind === "lost") {
-      await updateStage("LOST");
-      toast.show("Opportunity marked Lost", "close");
-    } else if (pendingAction.stage === "WON") {
-      await updateStage("WON");
-      toast.show("Opportunity marked Won", "check");
-    } else {
-      await updateStage(pendingAction.stage);
-      toast.show(`Moved to ${formatOpportunityStage(pendingAction.stage)}`, "check");
-    }
+  // The dialog asks for the remark, shows the account and runs this. A success is announced only
+  // once the move has really happened; a refusal is thrown back into the dialog, which explains it.
+  async function moveTo(from: OpportunityStage, to: OpportunityStage, remark: string | undefined) {
+    await updateStage(to, remark, from);
+    if (to === "LOST") toast.success("Opportunity marked Lost", { icon: "close" });
+    else if (to === "WON") toast.success("Opportunity marked Won");
+    else toast.success(`Moved to ${formatOpportunityStage(to)}`);
   }
 
   const quoteColumns: Column<Quotation>[] = [
@@ -204,9 +199,9 @@ export default function OpportunityDetailPage() {
                     icon="arrow"
                     disabled={!canEditStage}
                     title={canEditStage ? undefined : noStagePermission}
-                    onClick={() => setPendingAction({ kind: "forward", stage: nextStep })}
+                    onClick={() => setPendingMove({ from: opportunity.stage, to: nextStep })}
                   >
-                    Move to {formatOpportunityStage(nextStep)}
+                    {nextStep === "WON" ? "Mark Won" : `Move to ${formatOpportunityStage(nextStep)}`}
                   </Button>
                 )}
                 {prevStep && (
@@ -214,7 +209,7 @@ export default function OpportunityDetailPage() {
                     variant="ghost"
                     disabled={!canEditStage}
                     title={canEditStage ? undefined : noStagePermission}
-                    onClick={() => setPendingAction({ kind: "back", stage: prevStep })}
+                    onClick={() => setPendingMove({ from: opportunity.stage, to: prevStep })}
                   >
                     Move back to {formatOpportunityStage(prevStep)}
                   </Button>
@@ -225,7 +220,7 @@ export default function OpportunityDetailPage() {
                   icon="close"
                   disabled={!canEditStage}
                   title={canEditStage ? undefined : noStagePermission}
-                  onClick={() => setPendingAction({ kind: "lost" })}
+                  onClick={() => setPendingMove({ from: opportunity.stage, to: "LOST" })}
                 >
                   Mark Lost
                 </Button>
@@ -321,36 +316,14 @@ export default function OpportunityDetailPage() {
         </div>
       </div>
 
-      {pendingAction && (
-        <ConfirmDialog
-          title={
-            pendingAction.kind === "lost"
-              ? "Mark Opportunity Lost"
-              : pendingAction.stage === "WON"
-              ? "Mark Opportunity Won"
-              : pendingAction.kind === "back"
-              ? "Move Stage Back"
-              : "Advance Stage"
-          }
-          body={
-            pendingAction.kind === "lost"
-              ? `Mark "${opportunity.title}" as Lost? Lost is final — the opportunity can't be reopened and will drop out of the active pipeline.`
-              : pendingAction.stage === "WON"
-              ? `Mark "${opportunity.title}" as Won? Won is final — the opportunity can't be moved again or reopened.`
-              : pendingAction.kind === "back"
-              ? `Move "${opportunity.title}" back to ${formatOpportunityStage(pendingAction.stage)}? Use this if the deal genuinely regressed.`
-              : `Move "${opportunity.title}" to ${formatOpportunityStage(pendingAction.stage)}?`
-          }
-          confirmLabel={
-            pendingAction.kind === "lost"
-              ? "Mark Lost"
-              : pendingAction.stage === "WON"
-              ? "Mark Won"
-              : `Move to ${formatOpportunityStage(pendingAction.stage)}`
-          }
-          destructive={pendingAction.kind === "lost"}
-          onClose={() => setPendingAction(null)}
-          onConfirm={runAction}
+      {pendingMove && (
+        <OpportunityStageDialog
+          opportunityTitle={opportunity.title}
+          customerName={opportunity.customer?.customerName ?? opportunity.customerName}
+          from={pendingMove.from}
+          to={pendingMove.to}
+          onConfirm={(remark) => moveTo(pendingMove.from, pendingMove.to, remark)}
+          onClose={() => setPendingMove(null)}
         />
       )}
 

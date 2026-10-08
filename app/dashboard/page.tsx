@@ -7,7 +7,7 @@ import { StatCard, StatRow, Panel, Cols } from "../../components/ui/Card";
 import { Button } from "../../components/ui/Button";
 import { Icon } from "../../components/ui/Icon";
 import { OPPORTUNITY_STAGE_TINT } from "../../components/ui/Tag";
-import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
+import { OpportunityStageDialog } from "../../components/opportunities/OpportunityStageDialog";
 import { useToast } from "../../components/ui/Toast";
 import { KanbanBoard, KanbanColumnConfig } from "../../components/kanban/KanbanBoard";
 import { LeadFunnel } from "../../components/ui/Funnel";
@@ -68,7 +68,8 @@ export default function DashboardPage() {
   const toast = useToast();
   const { hasPermission } = useAuth();
   const canEditStage = hasPermission("opportunities.edit");
-  const [pendingWon, setPendingWon] = useState<Opportunity | null>(null);
+  // The move waiting for its confirmation: every drop on the board asks first, and a cancelled one leaves the card where it was.
+  const [pendingMove, setPendingMove] = useState<{ opportunity: Opportunity; from: OpportunityStage; to: OpportunityStage } | null>(null);
   const { tasks } = useTasks();
   const { quotations } = useQuotations();
   const { customers } = useCustomers();
@@ -154,23 +155,17 @@ export default function DashboardPage() {
 
   const focusItems = focusExpanded ? allFocusItems : allFocusItems.slice(0, FOCUS_DEFAULT_COUNT);
 
-  async function moveOpportunity(id: string, stage: OpportunityStage) {
-    try {
-      await updateStage(id, stage);
-      toast.success(`Moved to ${formatOpportunityStage(stage)}`);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not move this opportunity. Please try again.");
-    }
+  // Every drop opens the same confirmation as the opportunity page (transition, who is acting, an optional
+  // remark). Nothing has moved yet: the board only changes after the server accepts the move.
+  function handleMove(id: string, stage: OpportunityStage) {
+    const opp = opportunities.find((o) => o.id === id);
+    if (opp) setPendingMove({ opportunity: opp, from: opp.stage, to: stage });
   }
 
-  // Won cannot be undone, so it is confirmed first; every other move is a single drop.
-  function handleMove(id: string, stage: OpportunityStage) {
-    if (stage === "WON") {
-      const opp = opportunities.find((o) => o.id === id);
-      if (opp) setPendingWon(opp);
-      return;
-    }
-    void moveOpportunity(id, stage);
+  // A success is announced only once the move has happened; a refusal stays in the dialog, which explains it.
+  async function confirmMove(move: { opportunity: Opportunity; from: OpportunityStage; to: OpportunityStage }, remark: string | undefined) {
+    await updateStage(move.opportunity.id, move.to, remark, move.from);
+    toast.success(move.to === "WON" ? "Opportunity marked Won" : `Moved to ${formatOpportunityStage(move.to)}`);
   }
 
   function explainBlockedMove(o: Opportunity, stage: OpportunityStage) {
@@ -348,16 +343,14 @@ export default function DashboardPage() {
         naive or misleading numbers rather than true analytics.
       </DesignNote>
 
-      {pendingWon && (
-        <ConfirmDialog
-          title="Mark Opportunity Won"
-          body={`Mark "${pendingWon.title}" as Won? Won is final — the opportunity can't be moved again or reopened.`}
-          confirmLabel="Mark Won"
-          onClose={() => setPendingWon(null)}
-          onConfirm={async () => {
-            await updateStage(pendingWon.id, "WON");
-            toast.show("Opportunity marked Won", "check");
-          }}
+      {pendingMove && (
+        <OpportunityStageDialog
+          opportunityTitle={pendingMove.opportunity.title}
+          customerName={pendingMove.opportunity.customerName}
+          from={pendingMove.from}
+          to={pendingMove.to}
+          onConfirm={(remark) => confirmMove(pendingMove, remark)}
+          onClose={() => setPendingMove(null)}
         />
       )}
 

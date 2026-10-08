@@ -89,6 +89,8 @@ export interface BackendLeadTimeline {
   /** Absent on responses from a backend that predates attributed activity. */
   source?: LeadTimelineSource;
   activityType?: LeadActivityType | null;
+  /** The remark a person wrote on a stage move; null on every other event and on events recorded before it existed. */
+  userRemark?: string | null;
   actorId?: string | null;
   /** Selected as { id, fullName } only — never a full User row. */
   actor?: { id: string; fullName?: string | null } | null;
@@ -233,6 +235,8 @@ export function mapLeadTimeline(raw: BackendLeadTimeline): LeadTimelineEntry {
     icon: TIMELINE_ICON_BY_ACTION[raw.action] ?? "pulse",
     title: titleCaseFromConstant(raw.action),
     detail: raw.remarks ?? "",
+    // Only a remark with something in it; the system sentence above is never touched.
+    userRemark: raw.userRemark && raw.userRemark.trim() !== "" ? raw.userRemark : undefined,
     actorName: raw.actor?.fullName ?? "",
     actorId: raw.actor?.id ?? undefined,
     occurredAt,

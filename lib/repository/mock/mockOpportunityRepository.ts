@@ -19,7 +19,9 @@ import {
 } from "../shared/customerLifecycle";
 import {
   OpportunityStageConflictError,
+  normalizeStageRemark,
   opportunityStageConflictMessage,
+  stageRemarkProblem,
   validateOpportunityStageMove,
 } from "../shared/opportunityStage";
 
@@ -73,8 +75,11 @@ export class MockOpportunityRepository implements IOpportunityRepository {
   }
 
   /** Same rules and wording as the backend: rule check, then missing/inactive checks, then the stage the caller saw must still be current. */
-  async updateStage(id: ID, fromStage: OpportunityStage, toStage: OpportunityStage): Promise<Opportunity> {
+  async updateStage(id: ID, fromStage: OpportunityStage, toStage: OpportunityStage, remarks?: string): Promise<Opportunity> {
     validateOpportunityStageMove(fromStage, toStage);
+    const problem = stageRemarkProblem(remarks);
+    if (problem) throw new Error(problem);
+    const remark = normalizeStageRemark(remarks);
 
     const current = db.opportunities.getById(id);
     if (!current) throw new Error("Opportunity not found.");
@@ -92,6 +97,7 @@ export class MockOpportunityRepository implements IOpportunityRepository {
       icon: "pulse",
       title: "Opportunity Stage Changed",
       detail: `Opportunity "${current.title}": ${formatOpportunityStage(fromStage)} → ${formatOpportunityStage(toStage)}`,
+      ...(remark === undefined ? {} : { userRemark: remark }),
       actorName: "You",
       actorId: "mock-user",
       occurredAt: new Date().toISOString(),

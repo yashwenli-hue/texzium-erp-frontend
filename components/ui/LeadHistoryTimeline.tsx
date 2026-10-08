@@ -43,6 +43,12 @@ export function LeadHistoryTimeline({
                 <span className="when">{formatDateTime(t.occurredAt)}</span>
               </div>
               {t.detail && <p>{t.detail}</p>}
+              {t.userRemark && (
+                <blockquote className="tl-remark" data-testid="history-remark">
+                  <span className="lbl">{t.actorName ? `Remark by ${t.actorName}` : "Remark"}</span>
+                  <span className="txt">{t.userRemark}</span>
+                </blockquote>
+              )}
               <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginTop: 4 }}>
                 <Tag color={employee ? "g" : "n"}>{employee ? "Employee" : "System"}</Tag>
                 {employee && (
