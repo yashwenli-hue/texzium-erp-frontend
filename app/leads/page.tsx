@@ -1,9 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { PageHeader, DesignNote } from "../../components/ui/PageHeader";
 import { Panel } from "../../components/ui/Card";
+import { Icon } from "../../components/ui/Icon";
 import { Button, EmptyState } from "../../components/ui/Button";
 import { LeadStatusTag, LeadDeactivatedTag, LeadScoreTag, Chip, ChipGroup } from "../../components/ui/Tag";
 import { SourceTag } from "../../components/ui/SourceBadge";
@@ -232,15 +234,23 @@ export default function LeadsPage() {
         title="Leads"
         subtitle="Every inbound and outbound lead, from first contact to qualification."
         cta={
-          <Button
-            variant="primary"
-            icon="plus"
-            onClick={() => setShowForm(true)}
-            disabled={!hasPermission("leads.create")}
-            title={hasPermission("leads.create") ? undefined : "You don't have permission to create leads"}
-          >
-            New Lead
-          </Button>
+          <>
+            {hasPermission("governance.deletions.view") && (
+              <Link className="btn ghost" href="/recycle-bin">
+                <Icon name="trash" size={16} />
+                Recycle Bin
+              </Link>
+            )}
+            <Button
+              variant="primary"
+              icon="plus"
+              onClick={() => setShowForm(true)}
+              disabled={!hasPermission("leads.create")}
+              title={hasPermission("leads.create") ? undefined : "You don't have permission to create leads"}
+            >
+              New Lead
+            </Button>
+          </>
         }
       />
 

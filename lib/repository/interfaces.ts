@@ -1,3 +1,14 @@
+import type {
+  DeleteRecordInput,
+  DeletionEntityType,
+  DeletionLogEntry,
+  DeletionLogQuery,
+  DeletionPreview,
+  DeletionResult,
+  PurgeResult,
+  RestorePreview,
+  RestoreResult,
+} from "./shared/dataDeletion";
 import { ListQuery, Page, ID } from "../types/common";
 import {
   Lead,
@@ -755,6 +766,32 @@ export interface ISearchRepository {
   search(term: string): Promise<SearchResults>;
 }
 
+/**
+ * Governed deletion and recovery for leads and customers (backend data-governance).
+ * `preview` says what stands in the way and gives the token the deletion must carry;
+ * a deleted record goes to the Recycle Bin and `restore` puts it back until its
+ * recovery window ends (the deadline itself is still inside it); `purge` erases the copy
+ * for good, at any time, by an administrator (before or after the window); records nobody
+ * restored or purged are erased automatically by the backend once the window has ended.
+ * VERIFIED routes: GET /leads/:id/deletion-preview, DELETE /leads/:id,
+ * GET /customers/:id/deletion-preview, DELETE /customers/:id (leads.delete /
+ * customers.delete); GET /data-deletions[/:id] (governance.deletions.view);
+ * GET /data-deletions/:id/restore-preview and POST /data-deletions/:id/restore
+ * (governance.deletions.view + .restore); POST /data-deletions/:id/purge
+ * (governance.deletions.view + .purge). The actor is always the signed-in user.
+ */
+export interface IDataDeletionRepository {
+  preview(entityType: DeletionEntityType, id: ID): Promise<DeletionPreview>;
+  /** Throws DeletionBlockedError (409), DeletionStaleError (409) or an ApiError. Nothing is deleted unless it resolves. */
+  delete(entityType: DeletionEntityType, id: ID, input: DeleteRecordInput): Promise<DeletionResult>;
+  list(query?: DeletionLogQuery): Promise<DeletionLogEntry[]>;
+  get(recordId: ID): Promise<DeletionLogEntry>;
+  restorePreview(recordId: ID): Promise<RestorePreview>;
+  /** Throws RestoreBlockedError, RestoreStaleError, RecoveryClosedError (409) or an ApiError. */
+  restore(recordId: ID, version: string): Promise<RestoreResult>;
+  purge(recordId: ID): Promise<PurgeResult>;
+}
+
 /** The full set of repositories the app needs. Provided via RepositoryProvider. */
 export interface RevenueOSRepository {
   /** Which implementation is wired up — lets the few UI spots with a genuine backend
@@ -790,4 +827,5 @@ export interface RevenueOSRepository {
   buyerGstRegistrations: IBuyerGstRepository;
   notifications: INotificationRepository;
   search: ISearchRepository;
+  dataDeletions: IDataDeletionRepository;
 }

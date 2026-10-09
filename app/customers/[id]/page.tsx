@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { Icon } from "../../../components/ui/Icon";
 import { Panel } from "../../../components/ui/Card";
 import { Button, EmptyState } from "../../../components/ui/Button";
@@ -23,6 +23,8 @@ import { CustomerForm } from "../../../components/forms/CustomerForm";
 import { GstRegistrationForm } from "../../../components/forms/GstRegistrationForm";
 import { OpportunityForm } from "../../../components/forms/OpportunityForm";
 import { QuotationForm } from "../../../components/forms/QuotationForm";
+import { DeleteRecordDialog } from "../../../components/governance/DeleteRecordDialog";
+import { DeletedRecordNotice } from "../../../components/governance/DeletedRecordNotice";
 import { useCustomerDetail } from "../../../lib/hooks/useCustomers";
 import { useAuth } from "../../../lib/auth/AuthContext";
 import { useRepository } from "../../../lib/repository/RepositoryProvider";
@@ -36,6 +38,7 @@ import { CustomerGstRegistration } from "../../../lib/types/domain";
 type Dialog =
   | { kind: "edit" }
   | { kind: "deactivate" }
+  | { kind: "delete" }
   | { kind: "reactivate" }
   | { kind: "gstAdd" }
   | { kind: "gstEdit"; reg: CustomerGstRegistration }
@@ -55,6 +58,7 @@ const SECTIONS = [
 export default function CustomerCockpitPage() {
   const params = useParams<{ id: string }>();
   const toast = useToast();
+  const router = useRouter();
   const repo = useRepository();
   const { hasPermission } = useAuth();
   const id = params?.id;
@@ -109,9 +113,7 @@ export default function CustomerCockpitPage() {
     return (
       <div className="page">
         {back}
-        <Panel title="Customer not found">
-          <p style={{ color: "var(--muted)", fontSize: 13.5 }}>This customer may have been removed, or the link is out of date.</p>
-        </Panel>
+        <DeletedRecordNotice entityType="CUSTOMER" id={id ?? ""} onRestored={d.refreshAll} />
       </div>
     );
   }
@@ -162,6 +164,10 @@ export default function CustomerCockpitPage() {
     customer.isActive
       ? { key: "deactivate", label: "Deactivate", icon: "close", tone: "danger", state: actions.deactivate, onClick: () => setDialog({ kind: "deactivate" }) }
       : { key: "reactivate", label: "Reactivate", icon: "check", state: actions.reactivate, onClick: () => setDialog({ kind: "reactivate" }) },
+    // Governed deletion: only for people who have the permission (it is not a quiet action to show to everyone).
+    ...(hasPermission("customers.delete")
+      ? [{ key: "delete", label: "Delete…", icon: "trash", tone: "danger" as const, state: { enabled: true }, onClick: () => setDialog({ kind: "delete" }) }]
+      : []),
   ];
 
   function onAction(a: AttentionAction) {
@@ -265,6 +271,19 @@ export default function CustomerCockpitPage() {
       </div>
 
       {dialog?.kind === "edit" && <CustomerForm mode="edit" customer={customer} onClose={close} onSubmit={(input) => d.editCustomer(input)} />}
+      {dialog?.kind === "delete" && (
+        <DeleteRecordDialog
+          entityType="CUSTOMER"
+          id={customer.id}
+          name={customer.customerName}
+          onClose={close}
+          onDeleted={(result) => {
+            close();
+            toast.success(`Customer "${result.label}" moved to the Recycle Bin`);
+            router.push("/customers");
+          }}
+        />
+      )}
       {dialog?.kind === "deactivate" && (
         <ConfirmDialog
           title={`Deactivate ${customer.customerName}`}

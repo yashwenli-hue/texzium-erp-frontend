@@ -28,6 +28,7 @@ import { MockSellerGstRepository } from "./mockSellerGstRepository";
 import { MockBuyerGstRepository } from "./mockBuyerGstRepository";
 import { MockNotificationRepository } from "./mockNotificationRepository";
 import { MockSearchRepository } from "./mockSearchRepository";
+import { MockDataDeletionRepository } from "./mockDataDeletionRepository";
 
 /**
  * The temporary, fully in-memory implementation of RevenueOSRepository.
@@ -67,6 +68,7 @@ export function createMockRepository(): RevenueOSRepository {
     sellerGstRegistrations: new MockSellerGstRepository(),
     buyerGstRegistrations: new MockBuyerGstRepository(),
     notifications: new MockNotificationRepository(),
+    dataDeletions: new MockDataDeletionRepository(),
     search: new MockSearchRepository(),
   };
 }

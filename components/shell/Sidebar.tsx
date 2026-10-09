@@ -6,6 +6,8 @@ import { usePathname } from "next/navigation";
 import { Icon } from "../ui/Icon";
 import { NAV_SECTIONS, NavItem } from "../../lib/pageMeta";
 import { useLiveCounts } from "../../lib/hooks/useLiveCounts";
+import { useAuth } from "../../lib/auth/AuthContext";
+import { visibleNavSections } from "../../lib/navVisibility";
 
 interface TooltipState {
   label: string;
@@ -34,6 +36,7 @@ export function Sidebar({
 }) {
   const pathname = usePathname();
   const counts = useLiveCounts();
+  const { hasPermission } = useAuth();
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
 
   // Tooltip is position:fixed (not CSS-hover ::after) because the rail's
@@ -74,7 +77,7 @@ export function Sidebar({
         </div>
       </div>
       <div className="rail-scroll">
-        {NAV_SECTIONS.map((section) => (
+        {visibleNavSections(NAV_SECTIONS, hasPermission).map((section) => (
           <div key={section.label}>
             <div className="nav-label">{section.label}</div>
             {section.items.map((item) => {

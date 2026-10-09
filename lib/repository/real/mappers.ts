@@ -197,6 +197,9 @@ const TIMELINE_ICON_BY_ACTION: Record<string, string> = {
   OPPORTUNITY_STAGE_CHANGED: "pulse",
   LEAD_DEACTIVATED: "alert",
   LEAD_REACTIVATED: "check",
+  LEAD_RESTORED: "restore",
+  LEAD_DUPLICATE_REMOVED: "trash",
+  LEAD_DUPLICATE_RESTORED: "restore",
 };
 
 /**

@@ -12,6 +12,8 @@ const PATHS: Record<string, string> = {
   bell: '<path d="M6 8a6 6 0 1 1 12 0c0 5 2 6 2 6H4s2-1 2-6M10 20a2 2 0 0 0 4 0"/>',
   search: '<circle cx="11" cy="11" r="7"/><path d="m21 21-4-4"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
+  trash: '<path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M6 6l1 14a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-14M10 11v6M14 11v6"/>',
+  restore: '<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/>',
   filter: '<path d="M4 4h16l-6 8v6l-4 2v-8z"/>',
   down: '<path d="m6 9 6 6 6-6"/>',
   up: '<path d="m18 15-6-6-6 6"/>',

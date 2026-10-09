@@ -678,6 +678,58 @@ tbody tr.clickable:hover{background:var(--row-hover)}
 .tl-remark{margin:6px 0 2px;padding:8px 12px;border-left:3px solid var(--m);background:var(--m-soft);border-radius:0 8px 8px 0;font-size:13px}
 .tl-remark .lbl{display:block;font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--text-2);margin-bottom:2px}
 .tl-remark .txt{display:block;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--text)}
+/* Governed deletion and recovery: the delete / restore dialogs and the Recycle Bin */
+.gov-dialog{display:flex;flex-direction:column;gap:12px}
+.gov-lead{margin:0;font-size:13.5px;color:var(--text)}
+.gov-muted{margin:0;font-size:13px;color:var(--text-2)}
+.gov-alert{padding:10px 13px;border-radius:10px;background:var(--warn-bg);color:var(--text);font-size:13px}
+.gov-error{margin:0;font-size:12.5px;color:var(--bad)}
+.gov-alert-danger{background:var(--bad-bg);color:var(--text);border:1px solid var(--bad)}
+.gov-warn{margin:0;padding:9px 12px;border-radius:10px;background:var(--warn-bg);color:var(--text);font-size:13px;display:flex;gap:8px;align-items:flex-start}
+.gov-check{display:flex;gap:10px;align-items:flex-start;font-size:13.5px;color:var(--text);cursor:pointer}
+.gov-check input{width:auto;margin-top:3px;accent-color:var(--bad);flex:none}
+.gov-blockers{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.gov-blockers li{display:flex;flex-direction:column;gap:2px;padding:9px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface-inset, var(--surface))}
+.gov-blocker-msg{font-size:13.5px;color:var(--text)}
+.gov-blocker-hint{font-size:12.5px;color:var(--text-2)}
+.gov-box{border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--surface-inset, var(--surface))}
+.gov-box-title{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--text-2);margin-bottom:6px}
+.gov-box ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
+.gov-box li{display:flex;justify-content:space-between;gap:12px;font-size:13.5px}
+.gov-keeps{display:flex;gap:6px;align-items:flex-start;margin:8px 0 0;font-size:12.5px;color:var(--text-2)}
+.gov-keeps svg{flex:none;margin-top:2px}
+.linklike{background:none;border:0;padding:0;font:inherit;color:var(--m);text-decoration:underline;cursor:pointer}
+.bin-filters{display:flex;flex-direction:column;gap:8px;margin-bottom:14px}
+.bin-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.bin-row{display:grid;grid-template-columns:minmax(0,1fr) 150px auto;gap:14px;align-items:center;padding:14px 4px;border-top:1px solid var(--line-2)}
+.bin-row:first-child{border-top:0}
+.bin-title{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:14px}
+.bin-title b{overflow-wrap:anywhere}
+.bin-code{font-size:12px;color:var(--text-2)}
+.bin-reason{margin-top:4px;font-size:13px;color:var(--text);overflow-wrap:anywhere}
+.bin-rc{font-weight:600}
+.bin-meta{margin-top:2px;font-size:12px;color:var(--text-2)}
+.bin-state{display:flex;flex-direction:column;gap:4px;align-items:flex-start}
+.bin-when{font-size:12px;color:var(--text-2)}
+.bin-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.bin-detail{margin:0;display:flex;flex-direction:column;gap:10px}
+.bin-detail div{display:grid;grid-template-columns:150px minmax(0,1fr);gap:10px;font-size:13.5px}
+.bin-detail dt{color:var(--text-2);font-size:12.5px}
+.bin-detail dd{margin:0;overflow-wrap:anywhere}
+.bin-detail .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px}
+.bin-impact{list-style:none;margin:0;padding:0}
+/* Tablet and narrow desktop: with the sidebar there is not room for the name, the state and three buttons side by side
+   (the name would be squeezed to a letter a line), so the buttons go on their own line under them. */
+@media(max-width:1100px){
+  .bin-row{grid-template-columns:minmax(0,1fr) 150px}
+  .bin-actions{grid-column:1 / -1;justify-content:flex-start}
+}
+@media(max-width:720px){
+  .bin-row{grid-template-columns:1fr;gap:10px}
+  .bin-actions{justify-content:flex-start}
+  .bin-actions .btn{min-height:44px}
+  .bin-detail div{grid-template-columns:1fr;gap:2px}
+}
 /* Toast / inline feedback. The stack holds two always-present live regions (polite: success and info, assertive: errors);
    the stack lets clicks through between toasts, each toast takes them. The toast is dark in both themes, so its accents are the
    light ones. */
@@ -1066,7 +1118,7 @@ a.doc-trail-node:hover{border-color:var(--m);background:var(--m-soft)}
 .cockpit{--c-sub:color-mix(in srgb,var(--text) 74%,var(--surface))}
 
 /* Header: who, whether it is quotable, how to reach it, the menu */
-.cust-head{margin-bottom:14px}
+.cust-head{margin-bottom:14px;overflow:visible}
 .cust-head .ch-top{display:flex;gap:14px;align-items:flex-start;padding:19px}
 .cust-head .ch-id{flex:1;min-width:0}
 .cust-head h1{font-family:var(--display);font-size:21px;font-weight:700;color:var(--ink);overflow-wrap:anywhere;margin:0}

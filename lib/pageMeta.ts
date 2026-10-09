@@ -2,6 +2,8 @@ export interface NavItem {
   href: string;
   label: string;
   icon: string;
+  /** Shown only to a user who has this permission. */
+  permission?: string;
   countKey?:
     | "leadsCount"
     | "openTasksCount"
@@ -75,6 +77,7 @@ export const NAV_SECTIONS: NavSection[] = [
     label: "System",
     items: [
       { href: "/notifications", label: "Notifications", icon: "bell", countKey: "unreadNotificationsCount" },
+      { href: "/recycle-bin", label: "Recycle Bin", icon: "trash", permission: "governance.deletions.view" },
     ],
   },
 ];
@@ -100,4 +103,5 @@ export const PAGE_META: Record<string, { title: string; subtitle: string }> = {
   "sales-invoices": { title: "Sales Invoices", subtitle: "Raised once a sales order is dispatched." },
   payments: { title: "Collections", subtitle: "Who owes what, since when, and the payments received." },
   reports: { title: "Reports", subtitle: "Funnel, revenue, conversion and performance reports." },
+  "recycle-bin": { title: "Recycle Bin", subtitle: "Deleted leads and customers: what was removed, by whom, why, and how long it can be restored." },
 };

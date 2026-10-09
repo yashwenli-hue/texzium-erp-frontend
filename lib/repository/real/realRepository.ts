@@ -24,6 +24,7 @@ import { RealCustomerRepository } from "./realCustomerRepository";
 import { RealCustomerGstRepository } from "./realCustomerGstRepository";
 import { RealSearchRepository } from "./realSearchRepository";
 import { RealNotificationRepository } from "./realNotificationRepository";
+import { RealDataDeletionRepository } from "./realDataDeletionRepository";
 import { MockContactRepository } from "../mock/mockContactRepository";
 import { MockActivityRepository } from "../mock/mockActivityRepository";
 import { MockTaskRepository } from "../mock/mockTaskRepository";
@@ -82,6 +83,7 @@ export function createRealRepository(): RevenueOSRepository {
     tasks: new MockTaskRepository(),
     notes: new MockNoteRepository(),
     notifications: new RealNotificationRepository(),
+    dataDeletions: new RealDataDeletionRepository(),
     search: new RealSearchRepository(leads, customers, quotations, opportunities, proformaInvoices, salesOrders, salesInvoices),
   };
 }

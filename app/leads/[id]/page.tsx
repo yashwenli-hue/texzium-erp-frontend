@@ -33,6 +33,8 @@ import { useOpportunities } from "../../../lib/hooks/useOpportunities";
 import { useRepository } from "../../../lib/repository/RepositoryProvider";
 import { useAuth } from "../../../lib/auth/AuthContext";
 import { useToast } from "../../../components/ui/Toast";
+import { DeleteRecordDialog } from "../../../components/governance/DeleteRecordDialog";
+import { DeletedRecordNotice } from "../../../components/governance/DeletedRecordNotice";
 import { initials } from "../../../components/ui/Who";
 import { formatInr, formatDateTime } from "../../../lib/format";
 import { nextPendingFollowup } from "../../../lib/followup";
@@ -62,7 +64,7 @@ export default function LeadDetailPage() {
   const id = params?.id;
   const { lead, timeline, loading, error, refetch, logActivity, deactivateLead, reactivateLead, assignLead, qualifyLead, rejectLead, updateLead } = useLeadDetail(id);
   const { notes, refetch: refetchNotes } = useNotesByRelated(id);
-  const { followups, createFollowup, completeFollowup, rescheduleFollowup, cancelFollowup } = useLeadFollowups(id);
+  const { followups, createFollowup, completeFollowup, rescheduleFollowup, cancelFollowup, refetch: refetchFollowups } = useLeadFollowups(id);
   const { quotations } = useQuotations();
   const { opportunities, createOpportunity } = useOpportunities();
   const repo = useRepository();
@@ -74,6 +76,7 @@ export default function LeadDetailPage() {
   const [showQualify, setShowQualify] = useState(false);
   const [showReject, setShowReject] = useState(false);
   const [showDeactivate, setShowDeactivate] = useState(false);
+  const [showDelete, setShowDelete] = useState(false);
   const [reactivating, setReactivating] = useState(false);
   const [showConvert, setShowConvert] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
@@ -135,11 +138,11 @@ export default function LeadDetailPage() {
         <a className="back-link" onClick={() => goBackOrTo(router, "/leads")}>
           <Icon name="back" size={14} /> Back to Leads
         </a>
-        <Panel title="Lead not found">
-          <p style={{ color: "var(--muted)", fontSize: 13.5 }}>
-            This lead may have been removed, or the link is out of date.
-          </p>
-        </Panel>
+        <DeletedRecordNotice entityType="LEAD" id={id ?? ""} onRestored={() => {
+          refetch();
+          refetchFollowups();
+          refetchNotes();
+        }} />
       </div>
     );
   }
@@ -257,6 +260,17 @@ export default function LeadDetailPage() {
                 >
                   Reject
                 </Button>
+                {hasPermission("leads.delete") && (
+                  <Button
+                    variant="ghost"
+                    className="danger-ghost"
+                    icon="trash"
+                    onClick={() => setShowDelete(true)}
+                    title="Move this lead to the Recycle Bin (only for a lead that was entered by mistake and has had no real work done on it)"
+                  >
+                    Delete
+                  </Button>
+                )}
                 {!inactive && (
                   <Button
                     variant="ghost"
@@ -552,6 +566,27 @@ export default function LeadDetailPage() {
           onConfirm={async (reason) => {
             await rejectLead(reason!);
             toast.show(`${lead.customerName} rejected`, "close");
+          }}
+        />
+      )}
+      {showDelete && (
+        <DeleteRecordDialog
+          entityType="LEAD"
+          id={lead.id}
+          name={lead.customerName}
+          onClose={() => setShowDelete(false)}
+          onDeactivateInstead={
+            inactive || !hasPermission("leads.deactivate")
+              ? undefined
+              : () => {
+                  setShowDelete(false);
+                  setShowDeactivate(true);
+                }
+          }
+          onDeleted={(result) => {
+            setShowDelete(false);
+            toast.success(`Lead "${result.label}" moved to the Recycle Bin`);
+            router.push("/leads");
           }}
         />
       )}
