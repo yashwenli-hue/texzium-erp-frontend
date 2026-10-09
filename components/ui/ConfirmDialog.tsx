@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactNode, useState } from "react";
+import { ReactNode, useRef, useState } from "react";
 import { Modal } from "./Modal";
 import { Button } from "./Button";
 import { TextAreaField } from "./FormField";
@@ -37,12 +37,17 @@ export function ConfirmDialog({
   const [note, setNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Set at once, before React has re-rendered the disabled button, so a second activation in the
+  // same instant (a double click, a held Enter) never starts the action twice.
+  const running = useRef(false);
 
   async function handleConfirm() {
+    if (running.current) return;
     if (noteRequired && !note.trim()) {
       setError(`${noteLabel ?? "This field"} is required.`);
       return;
     }
+    running.current = true;
     setSubmitting(true);
     setError(null);
     try {
@@ -51,6 +56,7 @@ export function ConfirmDialog({
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
     } finally {
+      running.current = false;
       setSubmitting(false);
     }
   }
