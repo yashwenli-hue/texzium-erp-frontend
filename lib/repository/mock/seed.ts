@@ -43,6 +43,14 @@ const daysAgo = (n: number) => new Date(NOW - n * DAY).toISOString();
 const daysFromNow = (n: number) => new Date(NOW + n * DAY).toISOString();
 const monthsAgo = (n: number) => new Date(NOW - n * 30 * DAY).toISOString();
 
+// Due, invoice and payment dates are dates, not moments: the backend stores midnight UTC of the
+// calendar day, and Collections reads "today" in India. A moment 45 days back would name the
+// wrong day for the six hours when UTC is still a day behind India, so these start from India's day.
+const businessDay = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(NOW));
+const dateOnly = (n: number) => new Date(Date.parse(`${businessDay}T00:00:00.000Z`) + n * DAY).toISOString();
+const dateAgo = (n: number) => dateOnly(-n);
+const dateFromNow = (n: number) => dateOnly(n);
+
 // ---------------------------------------------------------------------------
 // LEAD SOURCES — VERIFIED names from database discovery (contract §4).
 // `category` is MOCK/UI-ONLY (see LeadSourceRecord) — a rough grouping used
@@ -417,7 +425,7 @@ export const SEED_SALES_INVOICES: SalesInvoice[] = [
     dispatchExpectedDelivery: daysAgo(2),
     customerName: "Adani Green",
     ownerName: "Vikram J.",
-    invoiceDate: daysAgo(4),
+    invoiceDate: dateAgo(4),
     taxableAmount: 11_000_000,
     gstAmount: 1_980_000,
     totalAmount: 12_980_000,
@@ -446,7 +454,7 @@ export const SEED_SALES_INVOICES: SalesInvoice[] = [
       customerName: d.name,
       invoiceCustomerName: d.name,
       ownerName: d.owner,
-      invoiceDate: daysAgo(d.ago),
+      invoiceDate: dateAgo(d.ago),
       taxableAmount: d.taxable,
       gstAmount: Math.round(d.taxable * 0.18),
       totalAmount: Math.round(d.taxable * 1.18),
@@ -473,7 +481,7 @@ export const SEED_ACCOUNTS_RECEIVABLE: AccountsReceivable[] = [
     salesInvoiceId: "SI1",
     invoiceNumber: "SI-7701",
     customerName: "Adani Green",
-    dueDate: daysFromNow(20),
+    dueDate: dateFromNow(20),
     outstandingAmount: 12_980_000,
     paidAmount: 0,
     balanceAmount: 12_980_000,
@@ -483,19 +491,19 @@ export const SEED_ACCOUNTS_RECEIVABLE: AccountsReceivable[] = [
   // DEMO receivables for the Collections screens. Like the real ones, a receivable created with an
   // invoice has its due date set to the invoice's own date (SI2, SI4, SI5), which is why
   // SI2 shows as long overdue; SI3 and SI6 have a later due date.
-  { id: "AR2", salesInvoiceId: "SI2", invoiceNumber: "SI-77200", customerName: "Havells India", dueDate: daysAgo(45), outstandingAmount: 6_136_000, paidAmount: 2_000_000, balanceAmount: 4_136_000, paymentStatus: "PARTIAL", createdAt: daysAgo(45) },
-  { id: "AR3", salesInvoiceId: "SI3", invoiceNumber: "SI-77300", customerName: "JSW Steel", dueDate: daysFromNow(2), outstandingAmount: 1_180_000, paidAmount: 0, balanceAmount: 1_180_000, paymentStatus: "PENDING", createdAt: daysAgo(1) },
-  { id: "AR4", salesInvoiceId: "SI4", invoiceNumber: "SI-77400", customerName: "Havells India", dueDate: daysAgo(20), outstandingAmount: 590_000, paidAmount: 590_000, balanceAmount: 0, paymentStatus: "PAID", createdAt: daysAgo(20) },
-  { id: "AR5", salesInvoiceId: "SI5", invoiceNumber: "SI-77500", customerName: "JSW Steel", dueDate: daysAgo(70), outstandingAmount: 236_000, paidAmount: 0, balanceAmount: 0, paymentStatus: "WRITTEN_OFF", createdAt: daysAgo(70) },
+  { id: "AR2", salesInvoiceId: "SI2", invoiceNumber: "SI-77200", customerName: "Havells India", dueDate: dateAgo(45), outstandingAmount: 6_136_000, paidAmount: 2_000_000, balanceAmount: 4_136_000, paymentStatus: "PARTIAL", createdAt: daysAgo(45) },
+  { id: "AR3", salesInvoiceId: "SI3", invoiceNumber: "SI-77300", customerName: "JSW Steel", dueDate: dateFromNow(2), outstandingAmount: 1_180_000, paidAmount: 0, balanceAmount: 1_180_000, paymentStatus: "PENDING", createdAt: daysAgo(1) },
+  { id: "AR4", salesInvoiceId: "SI4", invoiceNumber: "SI-77400", customerName: "Havells India", dueDate: dateAgo(20), outstandingAmount: 590_000, paidAmount: 590_000, balanceAmount: 0, paymentStatus: "PAID", createdAt: daysAgo(20) },
+  { id: "AR5", salesInvoiceId: "SI5", invoiceNumber: "SI-77500", customerName: "JSW Steel", dueDate: dateAgo(70), outstandingAmount: 236_000, paidAmount: 0, balanceAmount: 0, paymentStatus: "WRITTEN_OFF", createdAt: daysAgo(70) },
   // The receivable's own figures disagree with themselves and with its payments: a case for "Needs review".
-  { id: "AR6", salesInvoiceId: "SI6", invoiceNumber: "SI-77600", customerName: "JSW Steel", dueDate: daysFromNow(15), outstandingAmount: 500_000, paidAmount: 100_000, balanceAmount: 300_000, paymentStatus: "PENDING", createdAt: daysAgo(10) },
+  { id: "AR6", salesInvoiceId: "SI6", invoiceNumber: "SI-77600", customerName: "JSW Steel", dueDate: dateFromNow(15), outstandingAmount: 500_000, paidAmount: 100_000, balanceAmount: 300_000, paymentStatus: "PENDING", createdAt: daysAgo(10) },
 ];
 
 // DEMO payment collections and their events. The 2,000,000 on AR2 was recorded after payments were
 // tracked (it has a recorder and an event); the one on AR4 predates that (no recorder, no event).
 export const SEED_PAYMENT_COLLECTIONS: PaymentCollectionRecord[] = [
-  { id: "PC-D1", accountsReceivableId: "AR2", paymentDate: daysAgo(30), amount: 2_000_000, paymentMode: "BANK_TRANSFER", referenceNumber: "UTR-DEMO-1", createdAt: daysAgo(30), recordedById: "mock-user", recordedByName: "Priya N." },
-  { id: "PC-D2", accountsReceivableId: "AR4", paymentDate: daysAgo(18), amount: 590_000, paymentMode: "Bank Transfer", referenceNumber: "UTR-DEMO-2", remarks: "Customer payment received", createdAt: daysAgo(18) },
+  { id: "PC-D1", accountsReceivableId: "AR2", paymentDate: dateAgo(30), amount: 2_000_000, paymentMode: "BANK_TRANSFER", referenceNumber: "UTR-DEMO-1", createdAt: daysAgo(30), recordedById: "mock-user", recordedByName: "Priya N." },
+  { id: "PC-D2", accountsReceivableId: "AR4", paymentDate: dateAgo(18), amount: 590_000, paymentMode: "Bank Transfer", referenceNumber: "UTR-DEMO-2", remarks: "Customer payment received", createdAt: daysAgo(18) },
 ];
 
 export const SEED_PAYMENT_EVENTS: PaymentCollectionEvent[] = [
