@@ -19,7 +19,10 @@ import { LeadHistoryTimeline } from "../../../components/ui/LeadHistoryTimeline"
 import { LeadDeactivationBanner } from "../../../components/ui/LeadDeactivationBanner";
 import { DeactivateLeadDialog } from "../../../components/forms/DeactivateLeadDialog";
 // Unassign remarks follow the same rule as stage-change remarks (the backend uses the same limit).
-import { OPPORTUNITY_STAGE_REMARK_MAX_LENGTH as LEAD_UNASSIGN_REMARK_MAX_LENGTH } from "../../../lib/repository/shared/opportunityStage";
+import {
+  OPPORTUNITY_STAGE_REMARK_MAX_LENGTH as LEAD_UNASSIGN_REMARK_MAX_LENGTH,
+  OPPORTUNITY_STAGE_REMARK_MAX_LENGTH as LEAD_REJECT_REASON_MAX_LENGTH,
+} from "../../../lib/repository/shared/opportunityStage";
 import { AssignLeadDialog } from "../../../components/forms/AssignLeadDialog";
 import { EditLeadDialog } from "../../../components/forms/EditLeadDialog";
 import { QualifyLeadDialog } from "../../../components/forms/QualifyLeadDialog";
@@ -41,7 +44,7 @@ import { initials } from "../../../components/ui/Who";
 import { formatInr, formatDateTime } from "../../../lib/format";
 import { nextPendingFollowup } from "../../../lib/followup";
 import { formatLeadLocation, formatLeadLocationShort } from "../../../lib/geo/leadLocation";
-import { isQualifiedLeadStatus, leadActivityMeta, LeadActivityType, LeadFollowup, Quotation, Opportunity, Note } from "../../../lib/types/domain";
+import { canAssignLeadFrom, canQualifyLeadFrom, canRejectLeadFrom, isQualifiedLeadStatus, leadActionBlockedReason, leadActivityMeta, LeadActivityType, LeadFollowup, Quotation, Opportunity, Note } from "../../../lib/types/domain";
 
 const SUMMARY_TYPES: LeadActivityType[] = ["CALL", "MEETING", "EMAIL", "WHATSAPP"];
 
@@ -152,14 +155,19 @@ export default function LeadDetailPage() {
 
   const opportunityIds = new Set(relatedOpportunities.map((o) => o.id));
   const relatedQuotes = quotations.filter((q) => q.opportunityId && opportunityIds.has(q.opportunityId));
-  const canQualify = !isQualifiedLeadStatus(lead.status) && lead.status !== "REJECTED";
-  const canReject = lead.status !== "REJECTED";
+  // The backend enforces which statuses each action may start from (409 otherwise);
+  // these mirror it so the buttons and hints match (see canAssignLeadFrom & co.).
+  const canAssign = canAssignLeadFrom(lead.status);
+  const canQualify = canQualifyLeadFrom(lead.status);
+  const canReject = canRejectLeadFrom(lead.status);
   // Only a pre-sales assignment that nothing has built on yet can be undone (the backend
   // refuses anything else with a 409).
   const canUnassign = lead.status === "PRE_SALES_ASSIGNED" && !!lead.assignedToId;
   // A deactivated lead takes no normal sales actions until it is reactivated.
   const inactive = !lead.isActive;
   const INACTIVE_HINT = "Reactivate this lead to make changes.";
+  const actionHint = (action: "assign" | "qualify" | "reject", permission: string, noPermission: string) =>
+    inactive ? INACTIVE_HINT : !hasPermission(permission) ? noPermission : leadActionBlockedReason(action, lead.status);
   const unassignHint = inactive
     ? INACTIVE_HINT
     : !hasPermission("leads.assign")
@@ -249,8 +257,8 @@ export default function LeadDetailPage() {
                   variant="ghost"
                   icon="user"
                   onClick={() => setShowAssign(true)}
-                  disabled={inactive || !hasPermission("leads.assign")}
-                  title={inactive ? INACTIVE_HINT : hasPermission("leads.assign") ? undefined : "You don't have permission to assign leads"}
+                  disabled={inactive || !hasPermission("leads.assign") || !canAssign}
+                  title={actionHint("assign", "leads.assign", "You don't have permission to assign leads")}
                 >
                   {lead.assignedToId ? "Reassign" : "Assign"}
                 </Button>
@@ -270,7 +278,7 @@ export default function LeadDetailPage() {
                   icon="check"
                   onClick={() => setShowQualify(true)}
                   disabled={inactive || !canQualify || !hasPermission("leads.qualify")}
-                  title={inactive ? INACTIVE_HINT : hasPermission("leads.qualify") ? undefined : "You don't have permission to qualify leads"}
+                  title={actionHint("qualify", "leads.qualify", "You don't have permission to qualify leads")}
                 >
                   Qualify
                 </Button>
@@ -280,7 +288,7 @@ export default function LeadDetailPage() {
                   icon="close"
                   onClick={() => setShowReject(true)}
                   disabled={inactive || !canReject || !hasPermission("leads.reject")}
-                  title={inactive ? INACTIVE_HINT : hasPermission("leads.reject") ? undefined : "You don't have permission to reject leads"}
+                  title={actionHint("reject", "leads.reject", "You don't have permission to reject leads")}
                 >
                   Reject
                 </Button>
@@ -560,6 +568,7 @@ export default function LeadDetailPage() {
       {showAssign && (
         <AssignLeadDialog
           currentAssigneeId={lead.assignedToId}
+          excludeUserId={lead.status === "PRE_SALES_ASSIGNED" ? lead.assignedToId : undefined}
           onClose={() => setShowAssign(false)}
           onSubmit={(assignedToId, assignedToName) => assignLead(assignedToId, assignedToName)}
         />
@@ -605,6 +614,9 @@ export default function LeadDetailPage() {
           noteRequired
           onClose={() => setShowReject(false)}
           onConfirm={async (reason) => {
+            if (reason && reason.length > LEAD_REJECT_REASON_MAX_LENGTH) {
+              throw new Error(`The reason can be at most ${LEAD_REJECT_REASON_MAX_LENGTH} characters.`);
+            }
             await rejectLead(reason!);
             toast.show(`${lead.customerName} rejected`, "close");
           }}

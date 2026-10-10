@@ -7,12 +7,16 @@ import { Button } from "../ui/Button";
 import { useToast } from "../ui/Toast";
 import { useAssignableUsers } from "../../lib/hooks/useAssignableUsers";
 
+// Only active users are offered (the backend refuses inactive and suspended ones).
+// `excludeUserId` is the current pre-sales assignee: reassigning to them is refused.
 export function AssignLeadDialog({
   currentAssigneeId,
+  excludeUserId,
   onClose,
   onSubmit,
 }: {
   currentAssigneeId?: string;
+  excludeUserId?: string;
   onClose: () => void;
   onSubmit: (assignedToId: string, assignedToName: string) => Promise<unknown>;
 }) {
@@ -22,10 +26,12 @@ export function AssignLeadDialog({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const effectiveUserId = userId || users[0]?.id || "";
+  const offered = users.filter((u) => u.active && u.id !== excludeUserId);
+  const effectiveUserId = offered.some((u) => u.id === userId) ? userId : offered[0]?.id || "";
+  const noneOffered = !usersLoading && offered.length === 0;
 
   async function handleSubmit() {
-    const user = users.find((u) => u.id === effectiveUserId);
+    const user = offered.find((u) => u.id === effectiveUserId);
     if (!user) return;
     setSubmitting(true);
     setError(null);
@@ -49,7 +55,7 @@ export function AssignLeadDialog({
           <Button variant="ghost" onClick={onClose} disabled={submitting}>
             Cancel
           </Button>
-          <Button variant="primary" onClick={handleSubmit} disabled={submitting || usersLoading}>
+          <Button variant="primary" onClick={handleSubmit} disabled={submitting || usersLoading || noneOffered}>
             {submitting ? "Assigning…" : "Assign"}
           </Button>
         </>
@@ -60,8 +66,9 @@ export function AssignLeadDialog({
         value={effectiveUserId}
         onChange={(e) => setUserId(e.target.value)}
         disabled={usersLoading}
-        options={users.map((u) => ({ value: u.id, label: u.name }))}
+        options={offered.map((u) => ({ value: u.id, label: u.name }))}
       />
+      {noneOffered && <p style={{ color: "var(--muted)", fontSize: 12.5 }}>No other active user is available to take this lead.</p>}
       {error && <p style={{ color: "var(--bad)", fontSize: 12.5 }}>{error}</p>}
     </Modal>
   );

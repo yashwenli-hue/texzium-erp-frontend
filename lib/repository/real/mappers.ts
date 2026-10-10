@@ -65,7 +65,8 @@ export interface BackendUser {
   id: string;
   fullName?: string;
   email?: string;
-  [key: string]: unknown; // e.g. passwordHash — never read past id/fullName below.
+  status?: string;
+  [key: string]: unknown; // e.g. passwordHash — never read past id/fullName/status below.
 }
 
 export interface BackendLeadSource {
@@ -175,7 +176,9 @@ export function mapLeadSource(raw: BackendLeadSource): LeadSourceRecord {
 }
 
 export function mapAssignableUser(raw: BackendUser): AssignableUser {
-  return { id: raw.id, name: raw.fullName || raw.email || raw.id };
+  // GET /users returns status ACTIVE | INACTIVE | SUSPENDED; a row without one is
+  // offered (the backend still decides).
+  return { id: raw.id, name: raw.fullName || raw.email || raw.id, active: raw.status === undefined || raw.status === "ACTIVE" };
 }
 
 export function mapLeadNote(raw: BackendLeadNote): LeadNoteEntry {

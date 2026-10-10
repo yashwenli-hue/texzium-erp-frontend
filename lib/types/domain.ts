@@ -69,6 +69,48 @@ export function isQualifiedLeadStatus(status: LeadStatus): boolean {
   return status === "QUALIFIED" || status === "SALES_ASSIGNED";
 }
 
+// Which statuses Assign, Qualify and Reject may start from. These mirror the
+// backend's lead-transitions.ts, which enforces them (409 otherwise); here they only
+// decide which buttons are enabled and what the hint says.
+//   before qualification   NEW, ASSIGNED, CONTACTED, PRE_SALES_ASSIGNED
+//   qualified / in sales   QUALIFIED, SALES_ASSIGNED, PROPOSAL_SENT, NEGOTIATION
+//   closed                 WON, LOST, REJECTED
+export const LEAD_BEFORE_QUALIFICATION_STATUSES: LeadStatus[] = ["NEW", "ASSIGNED", "CONTACTED", "PRE_SALES_ASSIGNED"];
+export const LEAD_CLOSED_STATUSES: LeadStatus[] = ["WON", "LOST", "REJECTED"];
+
+/** Assign → Pre Sales Assigned (from Pre Sales Assigned only to a different user). */
+export function canAssignLeadFrom(status: LeadStatus): boolean {
+  return LEAD_BEFORE_QUALIFICATION_STATUSES.includes(status);
+}
+
+/** Qualify → Sales Assigned. */
+export function canQualifyLeadFrom(status: LeadStatus): boolean {
+  return LEAD_BEFORE_QUALIFICATION_STATUSES.includes(status);
+}
+
+/** Reject → Rejected, from anything that is not closed. */
+export function canRejectLeadFrom(status: LeadStatus): boolean {
+  return !LEAD_CLOSED_STATUSES.includes(status);
+}
+
+/** Why an assignment action is not available for this status (the same wording as the backend), or undefined. */
+export function leadActionBlockedReason(action: "assign" | "qualify" | "reject", status: LeadStatus): string | undefined {
+  const label = formatLeadStatus(status);
+  const closed = LEAD_CLOSED_STATUSES.includes(status);
+  if (action === "assign" && !canAssignLeadFrom(status)) {
+    return closed
+      ? `This lead is closed (${label}), so it cannot be assigned to pre-sales.`
+      : `This lead has already been qualified (${label}), so it cannot be assigned to pre-sales.`;
+  }
+  if (action === "qualify" && !canQualifyLeadFrom(status)) {
+    return closed ? `This lead is closed (${label}), so it cannot be qualified.` : `This lead has already been qualified (${label}).`;
+  }
+  if (action === "reject" && !canRejectLeadFrom(status)) {
+    return status === "REJECTED" ? "This lead has already been rejected." : `This lead is closed (${label}), so it cannot be rejected.`;
+  }
+  return undefined;
+}
+
 // Frontend-only lead-scoring heuristic for presentation/prioritization.
 // No backend equivalent — never treat as authoritative.
 export type LeadScore = "Hot" | "Warm" | "Cold";
@@ -127,6 +169,8 @@ export interface LeadFollowup {
 export interface AssignableUser {
   id: ID;
   name: string;
+  /** Only an active user can take a lead (the backend refuses INACTIVE and SUSPENDED users). Inactive users are still listed so their names resolve. */
+  active: boolean;
 }
 
 // Minimal option shapes needed to populate the real Quotation creation form's

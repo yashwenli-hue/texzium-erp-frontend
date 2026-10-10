@@ -1,5 +1,14 @@
 import { ID, ListQuery, Page } from "../../types/common";
-import { Lead, LeadStatus, LeadTimelineEntry, leadActivityMeta } from "../../types/domain";
+import {
+  Lead,
+  LeadStatus,
+  LeadTimelineEntry,
+  canAssignLeadFrom,
+  canQualifyLeadFrom,
+  canRejectLeadFrom,
+  leadActionBlockedReason,
+  leadActivityMeta,
+} from "../../types/domain";
 import {
   ILeadRepository,
   CreateLeadInput,
@@ -17,6 +26,22 @@ import { db } from "./db";
 import { delay } from "./queryUtils";
 import { applyListQuery } from "./queryUtils";
 import { mockId } from "./entityStore";
+import { MOCK_ASSIGNABLE_USERS } from "./mockUserRepository";
+import { OPPORTUNITY_STAGE_REMARK_MAX_LENGTH as LEAD_REJECT_REASON_MAX_LENGTH } from "../shared/opportunityStage";
+
+// Like the backend: only an existing, active user can take a lead.
+function activeAssignee(userId: ID) {
+  const user = MOCK_ASSIGNABLE_USERS.find((u) => u.id === userId);
+  if (!user) throw new Error("The selected user does not exist.");
+  if (!user.active) throw new Error("The selected user is not active and cannot take leads.");
+  return user;
+}
+
+// " (previously Rohit M.)" when someone else held the lead; nothing otherwise.
+function previously(lead: Lead, newAssigneeId: ID) {
+  if (!lead.assignedToId || lead.assignedToId === newAssigneeId) return "";
+  return ` (previously ${lead.assignedToName ?? lead.assignedToId})`;
+}
 
 const SEARCHABLE: (keyof Lead)[] = ["customerName", "companyName", "sourceName", "assignedToName", "email"];
 
@@ -129,10 +154,18 @@ export class MockLeadRepository implements ILeadRepository {
     return delay(updated);
   }
 
-  async assign(id: ID, assignedToId: ID, assignedToName: string): Promise<Lead> {
+  // Same rules and sentence as the backend (lead-transitions.ts there).
+  async assign(id: ID, assignedToId: ID, _assignedToName: string): Promise<Lead> {
     assertMockLeadActive(id);
+    const lead = db.leads.getById(id);
+    if (!lead) throw new Error(`Lead ${id} not found`);
+    if (!canAssignLeadFrom(lead.status)) throw new Error(leadActionBlockedReason("assign", lead.status));
+    const assignee = activeAssignee(assignedToId);
+    if (lead.status === "PRE_SALES_ASSIGNED" && lead.assignedToId === assignee.id) {
+      throw new Error(`This lead is already assigned to ${assignee.name}.`);
+    }
     const now = new Date().toISOString();
-    const updated = db.leads.update(id, { assignedToId, assignedToName, status: "PRE_SALES_ASSIGNED", updatedAt: now, lastActivityAt: now });
+    const updated = db.leads.update(id, { assignedToId: assignee.id, assignedToName: assignee.name, status: "PRE_SALES_ASSIGNED", updatedAt: now, lastActivityAt: now });
     if (!updated) throw new Error(`Lead ${id} not found`);
     db.leadTimeline.add({
       source: "SYSTEM",
@@ -140,7 +173,7 @@ export class MockLeadRepository implements ILeadRepository {
       leadId: id,
       icon: "user",
       title: "Pre Sales Assigned",
-      detail: `Assigned to ${assignedToName}`,
+      detail: `Assigned to pre-sales: ${assignee.name}${previously(lead, assignee.id)}.`,
       actorName: "You",
       occurredAt: now,
     });
@@ -177,10 +210,10 @@ export class MockLeadRepository implements ILeadRepository {
     assertMockLeadActive(id);
     const lead = db.leads.getById(id);
     if (!lead) throw new Error(`Lead ${id} not found`);
-    if (lead.status === "SALES_ASSIGNED" || lead.status === "QUALIFIED") throw new Error("Lead is already qualified");
-    if (lead.status === "REJECTED") throw new Error("A rejected lead cannot be qualified");
+    if (!canQualifyLeadFrom(lead.status)) throw new Error(leadActionBlockedReason("qualify", lead.status));
+    const salesUser = activeAssignee(salesUserId);
     const now = new Date().toISOString();
-    const updated = db.leads.update(id, { status: "SALES_ASSIGNED", assignedToId: salesUserId, updatedAt: now, lastActivityAt: now });
+    const updated = db.leads.update(id, { status: "SALES_ASSIGNED", assignedToId: salesUser.id, assignedToName: salesUser.name, updatedAt: now, lastActivityAt: now });
     if (!updated) throw new Error(`Lead ${id} not found`);
     db.leadTimeline.add({
       source: "SYSTEM",
@@ -188,7 +221,7 @@ export class MockLeadRepository implements ILeadRepository {
       leadId: id,
       icon: "check",
       title: "Lead Qualified",
-      detail: "",
+      detail: `Qualified and assigned to sales: ${salesUser.name}${previously(lead, salesUser.id)}.`,
       actorName: "You",
       occurredAt: now,
     });
@@ -199,7 +232,14 @@ export class MockLeadRepository implements ILeadRepository {
     assertMockLeadActive(id);
     const lead = db.leads.getById(id);
     if (!lead) throw new Error(`Lead ${id} not found`);
-    if (lead.status === "REJECTED") throw new Error("Lead is already rejected");
+    if (!canRejectLeadFrom(lead.status)) throw new Error(leadActionBlockedReason("reject", lead.status));
+    // Like the backend: the reason is required, trimmed, at most 500 characters, and
+    // kept as the person's remark beside a fixed sentence. The assignee is kept.
+    const userRemark = (reason ?? "").trim();
+    if (!userRemark) throw new Error("A reason is required to reject a lead.");
+    if (userRemark.length > LEAD_REJECT_REASON_MAX_LENGTH) {
+      throw new Error(`The reason can be at most ${LEAD_REJECT_REASON_MAX_LENGTH} characters.`);
+    }
     const now = new Date().toISOString();
     const updated = db.leads.update(id, { status: "REJECTED", updatedAt: now, lastActivityAt: now });
     if (!updated) throw new Error(`Lead ${id} not found`);
@@ -209,7 +249,8 @@ export class MockLeadRepository implements ILeadRepository {
       leadId: id,
       icon: "close",
       title: "Lead Rejected",
-      detail: reason ?? "",
+      detail: "Lead rejected.",
+      userRemark,
       actorName: "You",
       occurredAt: now,
     });

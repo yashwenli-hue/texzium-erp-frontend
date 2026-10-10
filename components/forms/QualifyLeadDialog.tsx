@@ -27,7 +27,10 @@ export function QualifyLeadDialog({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const effectiveUserId = salesUserId || users[0]?.id || "";
+  // Only active users are offered (the backend refuses inactive and suspended ones).
+  const offered = users.filter((u) => u.active);
+  const effectiveUserId = offered.some((u) => u.id === salesUserId) ? salesUserId : offered[0]?.id || "";
+  const noneOffered = !usersLoading && offered.length === 0;
 
   async function handleSubmit() {
     if (!effectiveUserId) {
@@ -56,7 +59,7 @@ export function QualifyLeadDialog({
           <Button variant="ghost" onClick={onClose} disabled={submitting}>
             Cancel
           </Button>
-          <Button variant="primary" onClick={handleSubmit} disabled={submitting || usersLoading}>
+          <Button variant="primary" onClick={handleSubmit} disabled={submitting || usersLoading || noneOffered}>
             {submitting ? "Qualifying…" : "Qualify"}
           </Button>
         </>
@@ -71,8 +74,9 @@ export function QualifyLeadDialog({
         value={effectiveUserId}
         onChange={(e) => setSalesUserId(e.target.value)}
         disabled={usersLoading}
-        options={users.map((u) => ({ value: u.id, label: u.name }))}
+        options={offered.map((u) => ({ value: u.id, label: u.name }))}
       />
+      {noneOffered && <p style={{ color: "var(--muted)", fontSize: 12.5 }}>No active user is available to take this lead.</p>}
       {error && <p style={{ color: "var(--bad)", fontSize: 12.5 }}>{error}</p>}
     </Modal>
   );
