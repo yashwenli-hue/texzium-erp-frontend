@@ -186,6 +186,7 @@ const TIMELINE_ICON_BY_ACTION: Record<string, string> = {
   LEAD_CREATED: "funnel",
   LEAD_UPDATED: "pulse",
   PRE_SALES_ASSIGNED: "user",
+  LEAD_UNASSIGNED: "user",
   LEAD_QUALIFIED: "check",
   LEAD_REJECTED: "close",
   STATUS_UPDATED: "pulse",

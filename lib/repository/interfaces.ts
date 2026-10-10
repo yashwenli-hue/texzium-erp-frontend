@@ -148,6 +148,13 @@ export interface ILeadRepository {
   updateStatus(id: ID, status: LeadStatus): Promise<Lead>;
   /** VERIFIED: AssignLeadDto { leadId, assignedToId } — writes PRE_SALES_ASSIGNED. */
   assign(id: ID, assignedToId: ID, assignedToName: string): Promise<Lead>;
+  /**
+   * VERIFIED: PATCH /lead-assignments/:id/unassign, body { assignedToId, remarks? } (leads.assign).
+   * Only an active PRE_SALES_ASSIGNED lead still assigned to `assignedToId` (the assignee the
+   * person saw) goes back to NEW with no assignee; anything else is a 409. Writes one
+   * LEAD_UNASSIGNED event carrying the optional remark.
+   */
+  unassign(id: ID, assignedToId: ID, remark?: string): Promise<Lead>;
   /** VERIFIED: PATCH /:id/qualify, body { salesUserId } — writes LEAD_QUALIFIED, status SALES_ASSIGNED. Gated by leads.qualify. */
   qualify(id: ID, salesUserId: ID): Promise<Lead>;
   /** VERIFIED: PATCH /:id/reject, body { reason } — writes LEAD_REJECTED. Gated by leads.reject. */

@@ -18,6 +18,8 @@ import { LeadActivityForm } from "../../../components/forms/LeadActivityForm";
 import { LeadHistoryTimeline } from "../../../components/ui/LeadHistoryTimeline";
 import { LeadDeactivationBanner } from "../../../components/ui/LeadDeactivationBanner";
 import { DeactivateLeadDialog } from "../../../components/forms/DeactivateLeadDialog";
+// Unassign remarks follow the same rule as stage-change remarks (the backend uses the same limit).
+import { OPPORTUNITY_STAGE_REMARK_MAX_LENGTH as LEAD_UNASSIGN_REMARK_MAX_LENGTH } from "../../../lib/repository/shared/opportunityStage";
 import { AssignLeadDialog } from "../../../components/forms/AssignLeadDialog";
 import { EditLeadDialog } from "../../../components/forms/EditLeadDialog";
 import { QualifyLeadDialog } from "../../../components/forms/QualifyLeadDialog";
@@ -62,7 +64,7 @@ export default function LeadDetailPage() {
   const router = useRouter();
   const toast = useToast();
   const id = params?.id;
-  const { lead, timeline, loading, error, refetch, logActivity, deactivateLead, reactivateLead, assignLead, qualifyLead, rejectLead, updateLead } = useLeadDetail(id);
+  const { lead, timeline, loading, error, refetch, logActivity, deactivateLead, reactivateLead, assignLead, unassignLead, qualifyLead, rejectLead, updateLead } = useLeadDetail(id);
   const { notes, refetch: refetchNotes } = useNotesByRelated(id);
   const { followups, createFollowup, completeFollowup, rescheduleFollowup, cancelFollowup, refetch: refetchFollowups } = useLeadFollowups(id);
   const { quotations } = useQuotations();
@@ -73,6 +75,7 @@ export default function LeadDetailPage() {
   const [showNoteForm, setShowNoteForm] = useState(false);
   const [showActivityForm, setShowActivityForm] = useState(false);
   const [showAssign, setShowAssign] = useState(false);
+  const [showUnassign, setShowUnassign] = useState(false);
   const [showQualify, setShowQualify] = useState(false);
   const [showReject, setShowReject] = useState(false);
   const [showDeactivate, setShowDeactivate] = useState(false);
@@ -151,9 +154,19 @@ export default function LeadDetailPage() {
   const relatedQuotes = quotations.filter((q) => q.opportunityId && opportunityIds.has(q.opportunityId));
   const canQualify = !isQualifiedLeadStatus(lead.status) && lead.status !== "REJECTED";
   const canReject = lead.status !== "REJECTED";
+  // Only a pre-sales assignment that nothing has built on yet can be undone (the backend
+  // refuses anything else with a 409).
+  const canUnassign = lead.status === "PRE_SALES_ASSIGNED" && !!lead.assignedToId;
   // A deactivated lead takes no normal sales actions until it is reactivated.
   const inactive = !lead.isActive;
   const INACTIVE_HINT = "Reactivate this lead to make changes.";
+  const unassignHint = inactive
+    ? INACTIVE_HINT
+    : !hasPermission("leads.assign")
+      ? "You don't have permission to assign leads"
+      : !canUnassign
+        ? "Only a lead that is assigned to pre-sales (Pre Sales Assigned) can be unassigned"
+        : "Remove the assignee and return this lead to New";
   const pendingFollowupCount = followups.filter((f) => f.status === "PENDING").length;
 
   async function handleReactivate() {
@@ -241,6 +254,17 @@ export default function LeadDetailPage() {
                 >
                   {lead.assignedToId ? "Reassign" : "Assign"}
                 </Button>
+                {lead.assignedToId && (
+                  <Button
+                    variant="ghost"
+                    icon="user"
+                    onClick={() => setShowUnassign(true)}
+                    disabled={inactive || !hasPermission("leads.assign") || !canUnassign}
+                    title={unassignHint}
+                  >
+                    Unassign
+                  </Button>
+                )}
                 <Button
                   variant="ghost"
                   icon="check"
@@ -538,6 +562,23 @@ export default function LeadDetailPage() {
           currentAssigneeId={lead.assignedToId}
           onClose={() => setShowAssign(false)}
           onSubmit={(assignedToId, assignedToName) => assignLead(assignedToId, assignedToName)}
+        />
+      )}
+      {showUnassign && lead.assignedToId && (
+        <ConfirmDialog
+          title="Unassign Lead"
+          body={`Remove ${lead.assignedToName ?? "the assignee"} from ${lead.customerName}? The lead goes back to New with no assignee. Its history is kept, and this change is added to it.`}
+          confirmLabel="Unassign"
+          noteLabel="Remark (optional)"
+          onClose={() => setShowUnassign(false)}
+          onConfirm={async (remark) => {
+            if (remark && remark.length > LEAD_UNASSIGN_REMARK_MAX_LENGTH) {
+              throw new Error(`The remark can be at most ${LEAD_UNASSIGN_REMARK_MAX_LENGTH} characters.`);
+            }
+            // The assignee shown here: if the lead was reassigned meanwhile, the backend refuses (409).
+            await unassignLead(lead.assignedToId!, remark);
+            toast.show(`${lead.customerName} unassigned`, "user");
+          }}
         />
       )}
       {showEdit && (

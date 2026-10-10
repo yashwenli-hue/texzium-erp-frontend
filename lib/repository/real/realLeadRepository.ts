@@ -109,6 +109,14 @@ export class RealLeadRepository implements ILeadRepository {
     return mapLead(row);
   }
 
+  async unassign(id: ID, assignedToId: ID, remark?: string): Promise<Lead> {
+    const row = await apiFetch<BackendLead>(`/lead-assignments/${id}/unassign`, {
+      method: "PATCH",
+      body: remark ? { assignedToId, remarks: remark } : { assignedToId },
+    });
+    return mapLead(row);
+  }
+
   async qualify(id: ID, salesUserId: ID): Promise<Lead> {
     const row = await apiFetch<BackendLead>(`/lead-assignments/${id}/qualify`, {
       method: "PATCH",

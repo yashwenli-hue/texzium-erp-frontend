@@ -147,6 +147,32 @@ export class MockLeadRepository implements ILeadRepository {
     return delay(updated);
   }
 
+  async unassign(id: ID, assignedToId: ID, remark?: string): Promise<Lead> {
+    assertMockLeadActive(id);
+    const lead = db.leads.getById(id);
+    if (!lead) throw new Error(`Lead ${id} not found`);
+    if (lead.status !== "PRE_SALES_ASSIGNED" || !lead.assignedToId) {
+      throw new Error("Only a lead that is assigned to pre-sales (Pre Sales Assigned) can be unassigned.");
+    }
+    if (lead.assignedToId !== assignedToId) throw new Error("This lead's assignment has changed. Reload the lead and try again.");
+    const now = new Date().toISOString();
+    const updated = db.leads.update(id, { assignedToId: undefined, assignedToName: undefined, status: "NEW", updatedAt: now, lastActivityAt: now });
+    if (!updated) throw new Error(`Lead ${id} not found`);
+    const userRemark = remark?.trim() || undefined;
+    db.leadTimeline.add({
+      source: "SYSTEM",
+      id: mockId("T"),
+      leadId: id,
+      icon: "user",
+      title: "Lead Unassigned",
+      detail: `Unassigned from ${lead.assignedToName ?? lead.assignedToId}; status returned to New.`,
+      ...(userRemark ? { userRemark } : {}),
+      actorName: "You",
+      occurredAt: now,
+    });
+    return delay(updated);
+  }
+
   async qualify(id: ID, salesUserId: ID): Promise<Lead> {
     assertMockLeadActive(id);
     const lead = db.leads.getById(id);

@@ -144,6 +144,16 @@ export function useLeadDetail(id: string | undefined) {
     [id, repo, refetch, refetchTimeline]
   );
 
+  const unassignLead = useCallback(
+    async (assignedToId: string, remark?: string) => {
+      if (!id) return;
+      await repo.leads.unassign(id, assignedToId, remark);
+      refetch();
+      refetchTimeline();
+    },
+    [id, repo, refetch, refetchTimeline]
+  );
+
   const qualifyLead = useCallback(
     async (salesUserId: string) => {
       if (!id) return;
@@ -183,6 +193,7 @@ export function useLeadDetail(id: string | undefined) {
     deactivateLead,
     reactivateLead,
     assignLead,
+    unassignLead,
     qualifyLead,
     rejectLead,
     updateLead,
