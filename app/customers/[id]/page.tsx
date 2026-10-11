@@ -66,6 +66,9 @@ export default function CustomerCockpitPage() {
   const d = useCustomerDetail(id);
   const [dialog, setDialog] = useState<Dialog | null>(null);
   const close = () => setDialog(null);
+  // Bumped after a change that can alter the ledger statement (an opportunity linked, a payment recorded).
+  const [ledgerVersion, setLedgerVersion] = useState(0);
+  const ledgerChanged = () => setLedgerVersion((v) => v + 1);
 
   const back = (
     <Link className="back-link" href="/customers">
@@ -246,8 +249,19 @@ export default function CustomerCockpitPage() {
               </div>
             )}
           </section>
-          {canViewCollections && rawOverview && <CollectionsStatementSection customer={customer} invoices={rawOverview.invoices} canRecord={canRecordPayment} now={now} onChanged={d.refreshAll} />}
-          {canViewCollections && <LedgerStatementSection customer={customer} />}
+          {canViewCollections && rawOverview && (
+            <CollectionsStatementSection
+              customer={customer}
+              invoices={rawOverview.invoices}
+              canRecord={canRecordPayment}
+              now={now}
+              onChanged={() => {
+                d.refreshAll();
+                ledgerChanged();
+              }}
+            />
+          )}
+          {canViewCollections && <LedgerStatementSection customer={customer} version={ledgerVersion} />}
         </div>
 
         <aside className="cockpit-rail" aria-label="Customer details">
@@ -376,6 +390,7 @@ export default function CustomerCockpitPage() {
           onClose={close}
           onConfirm={async () => {
             await d.linkOpportunity(dialog.opp.id);
+            ledgerChanged();
             toast.show("Opportunity linked", "check");
           }}
         />

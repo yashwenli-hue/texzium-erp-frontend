@@ -19,15 +19,17 @@ import { useToast } from "../ui/Toast";
  * recorded; nothing is inferred from them.
  *
  * Only rendered for someone with collections.view; the backend checks it as well.
+ * `version` is bumped by the page after a change that can alter the statement (an
+ * opportunity linked, a payment recorded), so it is fetched again.
  */
-export function LedgerStatementSection({ customer }: { customer: Pick<Customer, "id" | "customerCode" | "customerName" | "isActive"> }) {
+export function LedgerStatementSection({ customer, version = 0 }: { customer: Pick<Customer, "id" | "customerCode" | "customerName" | "isActive">; version?: number }) {
   const repo = useRepository();
   const toast = useToast();
   const [draft, setDraft] = useState<StatementPeriod>({});
   const [period, setPeriod] = useState<StatementPeriod>({});
   const [downloading, setDownloading] = useState(false);
   const rangeError = draft.from && draft.to && draft.from > draft.to ? "The start date must not be after the end date." : undefined;
-  const { data: statement, loading, error, refetch } = useCustomerStatement(customer.id, period, true);
+  const { data: statement, loading, error, refetch } = useCustomerStatement(customer.id, period, true, version);
 
   const apply = (next: StatementPeriod) => {
     setDraft(next);
@@ -58,7 +60,7 @@ export function LedgerStatementSection({ customer }: { customer: Pick<Customer, 
         </Button>
       </div>
       <p className="stmt-note">
-        From the customer ledger, for the invoices of opportunities linked to this customer. Balances come from the ledger&apos;s debits and credits (a positive balance is owed by the customer); receivables and payments are in the Collections Statement above.
+        From the customer ledger. Only entries for invoices of opportunities linked to this customer are shown. Balances come from the ledger&apos;s debits and credits (a positive balance is owed by the customer); receivables and payments are in the Collections Statement above.
       </p>
 
       <div className="ledger-filters">
@@ -73,12 +75,12 @@ export function LedgerStatementSection({ customer }: { customer: Pick<Customer, 
 
       {coverage && coverage.postedInvoicesWithoutLedgerEntries > 0 && (
         <p className="col-note warn" role="note">
-          {coverage.postedInvoicesWithoutLedgerEntries} posted invoice{coverage.postedInvoicesWithoutLedgerEntries === 1 ? " has" : "s have"} no ledger entry, so {coverage.postedInvoicesWithoutLedgerEntries === 1 ? "it is" : "they are"} not in this statement.
+          {coverage.postedInvoicesWithoutLedgerEntries} posted invoice{coverage.postedInvoicesWithoutLedgerEntries === 1 ? " of this customer has" : "s of this customer have"} no ledger entry, so {coverage.postedInvoicesWithoutLedgerEntries === 1 ? "it is" : "they are"} not in this statement. Linking opportunities does not add ledger entries.
         </p>
       )}
       {coverage && coverage.unlinkedLegacyMatches > 0 && (
         <p className="col-note warn" role="note">
-          {coverage.unlinkedLegacyMatches} opportunit{coverage.unlinkedLegacyMatches === 1 ? "y looks" : "ies look"} like this customer but {coverage.unlinkedLegacyMatches === 1 ? "is" : "are"} not linked to it. Their invoices are not in this statement until {coverage.unlinkedLegacyMatches === 1 ? "it is" : "they are"} linked (see Possible legacy matches).
+          {coverage.unlinkedLegacyMatches === 1 ? "An opportunity looks" : `${coverage.unlinkedLegacyMatches} opportunities look`} like this customer but {coverage.unlinkedLegacyMatches === 1 ? "is" : "are"} not linked to it, so ledger entries for {coverage.unlinkedLegacyMatches === 1 ? "its" : "their"} invoices are not in this statement. To include them, check the suggested {coverage.unlinkedLegacyMatches === 1 ? "deal" : "deals"} under <a href="#deals">Deals</a> (&ldquo;Looks like this customer&apos;s deal&rdquo;) and choose Review and link.
         </p>
       )}
 
