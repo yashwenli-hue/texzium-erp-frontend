@@ -1201,13 +1201,12 @@ export interface RecordPaymentResult {
   event: PaymentCollectionEvent;
 }
 
-// VERIFIED: GET /customer-statements/:customerName derives entirely from
-// CustomerLedger rows for that customer — the same real ledger every Sales
-// Invoice/Payment Collection/Credit Note/Debit Note writes to. Entries have
-// NO PaymentCollection id and no structured payment-mode field — payment
-// mode only ever appears inside the free-text `remarks` (e.g. "Payment
-// received UTR10001"). Do not present these as PaymentCollection records;
-// present as ledger/statement history only. See the Stage 2G report.
+// One CustomerLedger row as stored — the ledger every Sales Invoice, Payment
+// Collection, Credit Note and Debit Note writes to (the mock ledger keeps rows in this
+// shape). Entries have NO PaymentCollection id and no structured payment-mode field —
+// payment mode only ever appears inside the free-text `remarks` (e.g. "Payment received
+// UTR10001"). Do not present these as PaymentCollection records; present as ledger /
+// statement history only. See the Stage 2G report.
 export interface CustomerStatementEntry {
   id: ID;
   customerName: string;
@@ -1220,11 +1219,41 @@ export interface CustomerStatementEntry {
   createdAt: string;
 }
 
+/** A statement period: calendar days (YYYY-MM-DD), both inclusive; absent = open-ended. */
+export interface StatementPeriod {
+  from?: string;
+  to?: string;
+}
+
+/** One line of a ledger statement: the stored remarks as recorded, the balance recomputed. */
+export interface CustomerLedgerStatementLine {
+  id: ID;
+  entryDate: string;
+  salesInvoiceId: ID;
+  invoiceNumber?: string;
+  debit: number;
+  credit: number;
+  runningBalance: number;
+  remarks?: string;
+}
+
+// VERIFIED: GET /customers/:id/statement (collections.view). The customer's
+// CustomerLedger rows, found by id through the same chain as the customer overview
+// (customer -> linked opportunities -> quotations -> proformas -> sales orders ->
+// invoices), never by name. Balances come from debits and credits (positive = owed by
+// the customer); ledger-derived only, never mixed with receivables. Rows of
+// opportunities not linked to the customer are left out and counted in coverage.
 export interface CustomerStatement {
-  customerName: string;
+  customer: Pick<Customer, "id" | "customerCode" | "customerName" | "isActive">;
+  period: { from: string | null; to: string | null };
+  currency: "INR";
   openingBalance: number;
+  totalDebits: number;
+  totalCredits: number;
   closingBalance: number;
-  entries: CustomerStatementEntry[];
+  entries: CustomerLedgerStatementLine[];
+  coverage: { postedInvoicesWithoutLedgerEntries: number; unlinkedLegacyMatches: number };
+  generatedAt: string;
 }
 
 // VERIFIED: POST /payment-links/:salesInvoiceId/generate. The one real

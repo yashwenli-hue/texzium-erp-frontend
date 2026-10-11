@@ -64,24 +64,76 @@ async function performRequest<T>(path: string, options: RequestOptions): Promise
     payload = undefined;
   }
 
-  if (!res.ok) {
-    if (res.status === 401) {
-      clearStoredToken();
-      if (typeof window !== "undefined" && window.location.pathname !== "/login") {
-        window.location.href = "/login?expired=1";
-      }
-      throw new ApiError("Your session has expired. Please sign in again.", 401, payload);
-    }
-    if (res.status === 403) {
-      throw new ApiError("You don't have permission to do that.", 403, payload);
-    }
-    if (res.status === 404) {
-      throw new ApiError("That record could not be found.", 404, payload);
-    }
-    throw new ApiError(extractMessage(payload, `Request failed (${res.status}).`), res.status, payload);
-  }
+  if (!res.ok) throw failure(res.status, payload);
 
   return payload as T;
+}
+
+// The ApiError for a non-2xx response (a 401 also signs the user out).
+function failure(status: number, payload: unknown): ApiError {
+  if (status === 401) {
+    clearStoredToken();
+    if (typeof window !== "undefined" && window.location.pathname !== "/login") {
+      window.location.href = "/login?expired=1";
+    }
+    return new ApiError("Your session has expired. Please sign in again.", 401, payload);
+  }
+  if (status === 403) return new ApiError("You don't have permission to do that.", 403, payload);
+  if (status === 404) return new ApiError("That record could not be found.", 404, payload);
+  return new ApiError(extractMessage(payload, `Request failed (${status}).`), status, payload);
+}
+
+export interface DownloadedFile {
+  blob: Blob;
+  fileName: string;
+}
+
+/**
+ * A file the backend streams (e.g. a PDF): fetched with the bearer token, since a plain
+ * link cannot carry it. Only the expected content type is accepted; an error response
+ * (JSON) becomes the same ApiError as apiFetch. Never deduplicated or cached.
+ */
+export async function apiDownload(path: string, expectedType: string, fallbackName: string): Promise<DownloadedFile> {
+  const headers: Record<string, string> = {};
+  const token = getStoredToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE_URL}${path}`, { method: "GET", headers });
+  } catch {
+    throw new ApiError("Could not reach the RevenueOS backend. Check your connection and try again.", 0);
+  }
+
+  if (!res.ok) {
+    const text = await res.text();
+    let payload: unknown;
+    try {
+      payload = text ? JSON.parse(text) : undefined;
+    } catch {
+      payload = undefined;
+    }
+    throw failure(res.status, payload);
+  }
+
+  const type = (res.headers.get("content-type") ?? "").split(";")[0].trim();
+  if (type !== expectedType) throw new ApiError("The file could not be downloaded. Please try again.", res.status);
+
+  const match = /filename="([^"]+)"/.exec(res.headers.get("content-disposition") ?? "");
+  const fileName = match && /^[A-Za-z0-9._-]+$/.test(match[1]) ? match[1] : fallbackName;
+  return { blob: await res.blob(), fileName };
+}
+
+/** Hands a downloaded file to the browser as a download. */
+export function saveDownloadedFile(file: DownloadedFile): void {
+  const url = URL.createObjectURL(file.blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = file.fileName;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
 /**

@@ -931,41 +931,54 @@ export function mapInvoiceCollections(raw: BackendInvoiceCollections): InvoiceCo
   };
 }
 
-export interface BackendCustomerStatementEntry {
+export interface BackendCustomerStatementLine {
   id: string;
-  customerName: string;
-  salesInvoiceId: string;
-  debitAmount: number;
-  creditAmount: number;
-  balanceAmount: number;
   entryDate: string;
-  remarks?: string | null;
-  createdAt: string;
+  salesInvoiceId: string;
+  invoiceNumber: string | null;
+  debit: number;
+  credit: number;
+  runningBalance: number;
+  remarks: string | null;
 }
 
 export interface BackendCustomerStatement {
-  customerName: string;
+  customer: { id: string; customerCode: string; customerName: string; isActive: boolean };
+  period: { from: string | null; to: string | null };
+  currency: "INR";
   openingBalance: number;
+  totalDebits: number;
+  totalCredits: number;
   closingBalance: number;
-  entries: BackendCustomerStatementEntry[];
+  entries: BackendCustomerStatementLine[];
+  coverage: { postedInvoicesWithoutLedgerEntries: number; unlinkedLegacyMatches: number };
+  generatedAt: string;
 }
 
 export function mapCustomerStatement(raw: BackendCustomerStatement): CustomerStatement {
   return {
-    customerName: raw.customerName,
+    customer: { id: raw.customer.id, customerCode: raw.customer.customerCode, customerName: raw.customer.customerName, isActive: raw.customer.isActive },
+    period: { from: raw.period.from, to: raw.period.to },
+    currency: "INR",
     openingBalance: raw.openingBalance,
+    totalDebits: raw.totalDebits,
+    totalCredits: raw.totalCredits,
     closingBalance: raw.closingBalance,
     entries: raw.entries.map((e) => ({
       id: e.id,
-      customerName: e.customerName,
-      salesInvoiceId: e.salesInvoiceId,
-      debitAmount: e.debitAmount,
-      creditAmount: e.creditAmount,
-      balanceAmount: e.balanceAmount,
       entryDate: e.entryDate,
+      salesInvoiceId: e.salesInvoiceId,
+      invoiceNumber: e.invoiceNumber ?? undefined,
+      debit: e.debit,
+      credit: e.credit,
+      runningBalance: e.runningBalance,
       remarks: e.remarks ?? undefined,
-      createdAt: e.createdAt,
     })),
+    coverage: {
+      postedInvoicesWithoutLedgerEntries: raw.coverage.postedInvoicesWithoutLedgerEntries,
+      unlinkedLegacyMatches: raw.coverage.unlinkedLegacyMatches,
+    },
+    generatedAt: raw.generatedAt,
   };
 }
 

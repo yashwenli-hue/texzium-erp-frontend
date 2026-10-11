@@ -32,6 +32,7 @@ import { CreateOpportunityInput, CreateQuotationInput } from "../../../lib/repos
 import { CUSTOMER_PERMISSIONS, customerActions, quotingBlockerText, quotingBlockers, sortRegistrations } from "../../../lib/repository/shared/customerLifecycle";
 import { AttentionAction, buildAttention, buildDeactivationImpact, buildDeals, buildSnapshot, gstUsage, withoutCollections } from "../../../lib/repository/shared/customerCockpit";
 import { CollectionsStatementSection } from "../../../components/collections/CollectionsStatementSection";
+import { LedgerStatementSection } from "../../../components/collections/LedgerStatementSection";
 import { QUOTATION_PERMISSIONS } from "../../../lib/repository/shared/quotationLifecycle";
 import { CustomerGstRegistration } from "../../../lib/types/domain";
 
@@ -135,7 +136,7 @@ export default function CustomerCockpitPage() {
   const rawOverview = d.overview;
   const overview = rawOverview && !canViewCollections ? withoutCollections(rawOverview) : rawOverview;
   const now = new Date();
-  const sections = canViewCollections ? [SECTIONS[0], { id: "collections", label: "Collections" }, ...SECTIONS.slice(1)] : SECTIONS;
+  const sections = canViewCollections ? [SECTIONS[0], { id: "collections", label: "Collections" }, { id: "ledger-statement", label: "Ledger statement" }, ...SECTIONS.slice(1)] : SECTIONS;
 
   const attention = buildAttention({
     customer,
@@ -246,6 +247,7 @@ export default function CustomerCockpitPage() {
             )}
           </section>
           {canViewCollections && rawOverview && <CollectionsStatementSection customer={customer} invoices={rawOverview.invoices} canRecord={canRecordPayment} now={now} onChanged={d.refreshAll} />}
+          {canViewCollections && <LedgerStatementSection customer={customer} />}
         </div>
 
         <aside className="cockpit-rail" aria-label="Customer details">

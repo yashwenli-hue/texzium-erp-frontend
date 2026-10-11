@@ -10,6 +10,7 @@ import type {
   RestoreResult,
 } from "./shared/dataDeletion";
 import { ListQuery, Page, ID } from "../types/common";
+import type { DownloadedFile } from "../api/httpClient";
 import {
   Lead,
   LeadStatus,
@@ -47,6 +48,7 @@ import {
   PaymentCollectionDetail,
   InvoiceCollections,
   CustomerStatement,
+  StatementPeriod,
   PaymentLinkResult,
   ReceiptVoucher,
   SalesRevenueSummary,
@@ -687,10 +689,12 @@ export interface IPaymentCollectionRepository {
   getForInvoice(salesInvoiceId: ID): Promise<InvoiceCollections>;
 }
 
-// VERIFIED: GET /customer-statements/:customerName — derives entirely from
-// CustomerLedger. See CustomerStatement in lib/types/domain.ts.
+// VERIFIED: GET /customers/:id/statement and GET /customers/:id/statement.pdf, both
+// collections.view. See CustomerStatement in lib/types/domain.ts.
 export interface ICustomerStatementRepository {
-  get(customerName: string): Promise<CustomerStatement>;
+  get(customerId: ID, period?: StatementPeriod): Promise<CustomerStatement>;
+  /** The same statement as a PDF, for the browser to save. */
+  downloadPdf(customerId: ID, period?: StatementPeriod): Promise<DownloadedFile>;
 }
 
 // VERIFIED: POST /payment-links/:salesInvoiceId/generate. See
