@@ -155,7 +155,7 @@ export function ReceivableCollectionsPanel({ invoice, identity, canView, canReco
           )}
 
           <h4 style={{ margin: "18px 0 4px", fontSize: 13 }}>Payments</h4>
-          <PaymentHistorySection collections={collections.collections} events={collections.events} invoiceNumber={row.invoiceNumber} customer={customerText} canGenerateReceipt={!!actions?.generateReceipt.enabled} />
+          <PaymentHistorySection collections={collections.collections} events={collections.events} salesInvoiceId={row.salesInvoiceId} invoiceNumber={row.invoiceNumber} customer={customerText} canGenerateReceipt={!!actions?.generateReceipt.enabled} />
         </div>
       )}
       {recording && (

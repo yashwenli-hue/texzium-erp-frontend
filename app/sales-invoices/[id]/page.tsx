@@ -14,6 +14,10 @@ import { useAuth } from "../../../lib/auth/AuthContext";
 import { identityOf } from "../../../lib/repository/shared/collections";
 import { initials } from "../../../components/ui/Who";
 import { formatInr, formatDate } from "../../../lib/format";
+import { DocumentActions } from "../../../components/ui/DocumentActions";
+import { DocumentLinesPanel } from "../../../components/ui/DocumentLinesPanel";
+import { useDocumentDownload } from "../../../lib/hooks/useDocumentDownload";
+import { useRepository } from "../../../lib/repository/RepositoryProvider";
 
 function goBackOrTo(router: ReturnType<typeof useRouter>, fallback: string) {
   if (typeof window !== "undefined" && window.history.length > 1) {
@@ -29,12 +33,28 @@ export default function SalesInvoiceDetailPage() {
   const id = params?.id;
   const { invoice, salesOrder, proforma, quotation, opportunity, opportunityStatus, loading, error, refetch } = useSalesInvoiceDetail(id);
   const { hasPermission } = useAuth();
+  const repo = useRepository();
+  const { downloading, download } = useDocumentDownload();
+  const canViewInvoices = hasPermission("invoices.view");
   const canView = hasPermission("collections.view");
   const canRecord = hasPermission("collections.record");
   const collectionsQuery = useReceivableCollections(id, canView);
   const accountsReceivable = collectionsQuery.collections?.receivable ?? null;
   // The customer on this page is the deal's governed one, never a name on the invoice.
   const identity = invoice && opportunityStatus !== "loading" ? identityOf(invoice, opportunityStatus === "ready" && opportunity ? [opportunity] : null) : undefined;
+
+  if (!canViewInvoices) {
+    return (
+      <div className="page">
+        <a className="back-link" onClick={() => goBackOrTo(router, "/sales-invoices")}>
+          <Icon name="back" size={14} /> Back to Sales Invoices
+        </a>
+        <Panel title="Sales invoice">
+          <EmptyState icon="lock" title="No access" body="You don't have permission to view invoices." />
+        </Panel>
+      </div>
+    );
+  }
 
   if (loading && !invoice) {
     return (
@@ -109,6 +129,21 @@ export default function SalesInvoiceDetailPage() {
             </div>
           </div>
 
+          <DocumentActions
+            testId="invoice-actions"
+            actions={[
+              {
+                key: "pdf",
+                label: downloading ? "Preparing PDF…" : "Download tax invoice (PDF)",
+                icon: "file",
+                state: invoice.numbered
+                  ? { enabled: !downloading }
+                  : { enabled: false, reason: "Issued before invoices were numbered: it can't be printed as a tax invoice." },
+                onClick: () => download(() => repo.salesInvoices.downloadPdf(invoice.id), `${invoice.invoiceNumber} downloaded`),
+              },
+            ]}
+          />
+
           <div style={{ padding: "16px 19px", borderBottom: "1px solid var(--line-2)" }}>
             <DocumentTrail
               nodes={[
@@ -148,6 +183,7 @@ export default function SalesInvoiceDetailPage() {
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <DocumentLinesPanel lines={invoice.items} emptyText="This invoice was issued before its priced lines were stored." />
           {invoice.dispatchOrderNo && (
             <Panel title="Dispatch">
               <div className="info-grid" style={{ padding: 0 }}>

@@ -5,7 +5,7 @@ import { useRepository } from "../repository/RepositoryProvider";
 import { useAsyncList } from "./useAsyncList";
 import { useDocumentOpportunity } from "./useDocumentOpportunity";
 import { useAuth } from "../auth/AuthContext";
-import { CreateProformaInvoiceInput, CreateQuotationInput } from "../repository/interfaces";
+import { CreateProformaInvoiceInput, CreateQuotationInput, QuotationRevision } from "../repository/interfaces";
 import { QUOTATION_PERMISSIONS, QuotationConflictError } from "../repository/shared/quotationLifecycle";
 import { ProformaConflictError } from "../repository/shared/proformaLifecycle";
 import { SalesOrderConflictError } from "../repository/shared/salesOrderLifecycle";
@@ -112,10 +112,10 @@ export function useQuotationDetail(id: string | undefined) {
   const notLoaded = () => new Error("This quotation isn't loaded any more. Reload and try again.");
 
   const reviseQuotation = useCallback(
-    (taxableAmount: number, remarks?: string) =>
+    (change: QuotationRevision, remarks?: string) =>
       run(() => {
         if (!id) throw notLoaded();
-        return repo.quotations.revise(id, taxableAmount, remarks);
+        return repo.quotations.revise(id, change, remarks);
       }),
     [id, repo, run]
   );

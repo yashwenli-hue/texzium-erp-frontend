@@ -1,7 +1,8 @@
 import { ID, ListQuery, Page } from "../../types/common";
 import { ProformaEvent, ProformaInvoice, Quotation } from "../../types/domain";
 import { CreateProformaInvoiceInput, IProformaInvoiceRepository, IQuotationRepository, ProformaInvoiceSortField } from "../interfaces";
-import { ApiError, apiFetch } from "../../api/httpClient";
+import { ApiError, apiFetch, DownloadedFile } from "../../api/httpClient";
+import { downloadDocument } from "./documentDownload";
 import { applyListQuery } from "../shared/listQuery";
 import {
   PROFORMA_REASON_MAX_LENGTH,
@@ -114,5 +115,9 @@ export class RealProformaInvoiceRepository implements IProformaInvoiceRepository
   async listEvents(id: ID): Promise<ProformaEvent[]> {
     const rows = await apiFetch<BackendProformaEvent[]>(`/proforma-invoices/${id}/events`);
     return rows.map(mapProformaEvent);
+  }
+
+  downloadPdf(id: ID): Promise<DownloadedFile> {
+    return downloadDocument(`/proforma-invoices/${encodeURIComponent(id)}/document.pdf`, "proforma.pdf", "You don't have permission to view Proforma Invoices.");
   }
 }

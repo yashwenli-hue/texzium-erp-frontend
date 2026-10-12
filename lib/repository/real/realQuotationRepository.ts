@@ -1,7 +1,8 @@
 import { ID, ListQuery, Page } from "../../types/common";
 import { Opportunity, Quotation, QuotationEvent } from "../../types/domain";
-import { CreateQuotationInput, IOpportunityRepository, IQuotationRepository, QuotationSortField } from "../interfaces";
-import { ApiError, apiFetch } from "../../api/httpClient";
+import { CreateQuotationInput, IOpportunityRepository, IQuotationRepository, QuotationRevision, QuotationSortField } from "../interfaces";
+import { ApiError, apiFetch, DownloadedFile } from "../../api/httpClient";
+import { downloadDocument } from "./documentDownload";
 import { applyListQuery } from "../shared/listQuery";
 import {
   QUOTATION_REASON_MAX_LENGTH,
@@ -9,6 +10,7 @@ import {
   QuotationConflictError,
   cleanQuotationText,
   parseTaxableAmount,
+  parseUnitRate,
 } from "../shared/quotationLifecycle";
 import { BackendQuotation, BackendQuotationEvent, mapQuotation, mapQuotationEvent } from "./mappers";
 
@@ -103,13 +105,23 @@ export class RealQuotationRepository implements IQuotationRepository {
     return mapQuotation(raw, new Map());
   }
 
-  async revise(id: ID, taxableAmount: number, remarks?: string): Promise<Quotation> {
-    // Only the taxable amount goes over the wire; GST and the total are the backend's.
-    const parsed = parseTaxableAmount(String(taxableAmount));
+  async revise(id: ID, change: QuotationRevision, remarks?: string): Promise<Quotation> {
+    // Only the unit rate (or, for an older quotation, the taxable amount) goes
+    // over the wire; the taxable value, GST and the total are the backend's.
+    const byRate = "unitPrice" in change;
+    const parsed = byRate ? parseUnitRate(String(change.unitPrice)) : parseTaxableAmount(String(change.taxableAmount));
     if (parsed.error !== undefined) throw new Error(parsed.error);
     const note = cleanQuotationText(remarks, QUOTATION_REMARKS_MAX_LENGTH, false, "Remarks");
-    await this.mutate(`/quotations/${id}/revise`, { taxableAmount: parsed.value, ...(note ? { remarks: note } : {}) }, "You don't have permission to revise quotations.");
+    await this.mutate(
+      `/quotations/${id}/revise`,
+      { ...(byRate ? { unitPrice: parsed.value } : { taxableAmount: parsed.value }), ...(note ? { remarks: note } : {}) },
+      "You don't have permission to revise quotations."
+    );
     return this.reload(id);
+  }
+
+  downloadPdf(id: ID): Promise<DownloadedFile> {
+    return downloadDocument(`/quotations/${encodeURIComponent(id)}/document.pdf`, "quotation.pdf", "You don't have permission to view quotations.");
   }
 
   async approve(id: ID, remarks?: string): Promise<Quotation> {

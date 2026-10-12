@@ -59,9 +59,14 @@ export function useLiveCounts() {
     repo.salesOrders.list().then((page) => {
       if (!cancelled) setSalesOrdersCount(page.total);
     });
-    repo.salesInvoices.list().then((page) => {
-      if (!cancelled) setSalesInvoicesCount(page.total);
-    });
+    repo.salesInvoices
+      .list()
+      .then((page) => {
+        if (!cancelled) setSalesInvoicesCount(page.total);
+      })
+      .catch(() => {
+        // reading invoices needs invoices.view: without it there is no count to show
+      });
     repo.customers.list().then((page) => {
       if (!cancelled) setCustomersCount(page.total);
     });

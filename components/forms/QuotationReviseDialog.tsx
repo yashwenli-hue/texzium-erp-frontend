@@ -10,20 +10,26 @@ import {
   QUOTATION_REMARKS_MAX_LENGTH,
   computeQuotationAmounts,
   parseTaxableAmount,
+  parseUnitRate,
 } from "../../lib/repository/shared/quotationLifecycle";
+import type { DocumentLine } from "../../lib/types/domain";
+import type { QuotationRevision } from "../../lib/repository/interfaces";
 
 /**
- * Revising a quotation means changing its TAXABLE amount. GST comes from the
- * percentage the quotation already carries and the total is their sum, so the
- * person never types (or can get wrong) a total. The preview below uses the same
- * rule the backend applies; the backend recomputes and its figures are the ones
- * that are saved and shown afterwards.
+ * Revising a quotation changes its price. A quotation with a priced line is
+ * revised by its UNIT RATE (its quantity stays); one stored before lines
+ * existed, by its TAXABLE amount. GST comes from the percentage the quotation
+ * already carries and the total is their sum, so the person never types (or
+ * can get wrong) a total. The preview below uses the same rule the backend
+ * applies; the backend recomputes and its figures are the ones that are saved
+ * and shown afterwards.
  */
 export function QuotationReviseDialog({
   quoteNo,
   status,
   current,
   taxType,
+  line,
   onClose,
   onSubmit,
 }: {
@@ -31,18 +37,21 @@ export function QuotationReviseDialog({
   status: string;
   current: { taxableAmount: number; gstPercent: number; gstAmount: number; totalAmount: number };
   taxType?: string;
+  /** The quotation's priced line, when it has one: then the unit rate is revised. */
+  line?: DocumentLine;
   onClose: () => void;
-  onSubmit: (taxableAmount: number, remarks?: string) => Promise<unknown>;
+  onSubmit: (change: QuotationRevision, remarks?: string) => Promise<unknown>;
 }) {
   const toast = useToast();
-  const [taxable, setTaxable] = useState(String(current.taxableAmount));
+  const byRate = !!line;
+  const [taxable, setTaxable] = useState(String(byRate ? line.unitRate : current.taxableAmount));
   const [remarks, setRemarks] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const parsed = parseTaxableAmount(taxable);
-  const next = parsed.error === undefined ? computeQuotationAmounts(parsed.value, current.gstPercent) : null;
+  const parsed = byRate ? parseUnitRate(taxable) : parseTaxableAmount(taxable);
+  const next = parsed.error === undefined ? computeQuotationAmounts(byRate ? parsed.value * line.quantity : parsed.value, current.gstPercent) : null;
   const delta = (a: number, b: number) => {
     const d = Math.round((b - a) * 100) / 100;
     if (d === 0) return "no change";
@@ -63,7 +72,7 @@ export function QuotationReviseDialog({
     setError(null);
     setFormError(null);
     try {
-      await onSubmit(parsed.value, remarks.trim() || undefined);
+      await onSubmit(byRate ? { unitPrice: parsed.value } : { taxableAmount: parsed.value }, remarks.trim() || undefined);
       toast.show(`${quoteNo} revised — it needs approval again`, "check");
       onClose();
     } catch (err) {
@@ -96,8 +105,13 @@ export function QuotationReviseDialog({
           <>Saving moves this quotation to <b style={{ color: "var(--text)" }}>Revised</b>. It needs approval before a Proforma Invoice can be created.</>
         )}
       </p>
+      {byRate && (
+        <p style={{ fontSize: 13, marginBottom: 8 }} data-testid="revise-line">
+          <b>{line.description}</b> · quantity {line.quantity} · current rate {formatInrExact(line.unitRate)}
+        </p>
+      )}
       <TextField
-        label="New taxable amount (₹)"
+        label={byRate ? "New unit rate (₹)" : "New taxable amount (₹)"}
         required
         type="number"
         inputMode="decimal"
@@ -139,8 +153,8 @@ export function QuotationReviseDialog({
         </tbody>
       </table>
       <p className="preview-note">
-        A preview. GST uses the {current.gstPercent}% already on this quotation and the total is the sum; the system
-        recalculates both when you save, and its figures are the ones recorded.
+        A preview. {byRate ? `The taxable amount is the quantity (${line.quantity}) × the rate; ` : ""}GST uses the {current.gstPercent}% already on this quotation and the total is the sum; the system
+        recalculates them when you save, and its figures are the ones recorded.
       </p>
       <div style={{ marginTop: 14 }}>
         <TextAreaField

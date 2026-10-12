@@ -4,6 +4,7 @@ import {
   IQuotationRepository,
   CreateQuotationInput,
   QuotationSortField,
+  QuotationRevision,
 } from "../interfaces";
 import { db } from "./db";
 import {
@@ -15,6 +16,9 @@ import {
 } from "../shared/customerLifecycle";
 import { delay, applyListQuery } from "./queryUtils";
 import { mockId } from "./entityStore";
+import { mockPdf, mockPricedLine } from "./mockDocuments";
+import { MOCK_INVENTORY_ITEMS } from "./mockInventoryItemRepository";
+import { ApiError, DownloadedFile } from "../../api/httpClient";
 import {
   QUOTATION_REASON_MAX_LENGTH,
   QUOTATION_REMARKS_MAX_LENGTH,
@@ -24,6 +28,7 @@ import {
   hasConsistentTaxBreakdown,
   isQuotationTransitionAllowed,
   parseTaxableAmount,
+  parseUnitRate,
   quotationAmounts,
   quotationCannotApproveMessage,
   quotationCannotRejectMessage,
@@ -93,10 +98,21 @@ export class MockQuotationRepository implements IQuotationRepository {
     if (!buyer.isActive) throw new CustomerConflictError("The buyer GST registration is inactive. Choose an active one.", "GST_INACTIVE");
     quoteCounter += 1;
     const now = new Date().toISOString();
-    const amounts = computeQuotationAmounts(input.quantity * input.unitPrice, MOCK_GST_PERCENT);
+    // The line the backend would store: the quotation's amounts are its line's.
+    const line = mockPricedLine({
+      lineNumber: 1,
+      description: MOCK_INVENTORY_ITEMS.find((i) => i.id === input.inventoryItemId)?.name ?? "Item",
+      hsnCode: input.inventoryItemId === "INV1" ? "84137090" : undefined,
+      quantity: input.quantity,
+      unitRate: input.unitPrice,
+      gstRate: MOCK_GST_PERCENT,
+    });
+    const amounts = { taxableAmount: line.taxableAmount, gstAmount: line.gstAmount, totalAmount: line.totalAmount };
     const quotation: Quotation = {
       id: mockId("Q"),
       quoteNo: `QT-${quoteCounter}`,
+      numbered: true,
+      lines: [line],
       customerName: opportunity.customerName,
       opportunityId: opportunity.id,
       opportunityName: opportunity.title,
@@ -126,9 +142,16 @@ export class MockQuotationRepository implements IQuotationRepository {
     return delay(quotation);
   }
 
-  async revise(id: ID, taxableAmount: number, remarks?: string): Promise<Quotation> {
-    const parsed = parseTaxableAmount(String(taxableAmount));
+  async revise(id: ID, change: QuotationRevision, remarks?: string): Promise<Quotation> {
+    // As the backend: a quotation with a priced line is revised by its unit
+    // rate; one without, by its taxable amount.
+    const byRate = "unitPrice" in change;
+    const parsed = byRate ? parseUnitRate(String(change.unitPrice)) : parseTaxableAmount(String(change.taxableAmount));
     if (parsed.error !== undefined) throw new Error(parsed.error);
+    const lined = (db.quotations.getById(id)?.lines?.length ?? 0) > 0;
+    if (lined !== byRate) {
+      throw new ApiError(lined ? "This quotation has a priced line: revise its unit rate (unitPrice), not the taxable amount." : "This quotation has no priced line: revise its taxable amount (taxableAmount).", 400);
+    }
     const note = cleanQuotationText(remarks, QUOTATION_REMARKS_MAX_LENGTH, false, "Remarks");
     const existing = this.require(id);
     if (!isQuotationTransitionAllowed(existing.status, "REVISED")) {
@@ -149,13 +172,17 @@ export class MockQuotationRepository implements IQuotationRepository {
       }
       if (blockers.length > 0) throw new QuotationConflictError(quotationLockedByDownstreamMessage(blockers));
     }
-    const next = computeQuotationAmounts(parsed.value, current.gstPercent);
+    const revisedLine = byRate && existing.lines?.[0] ? mockPricedLine({ ...existing.lines[0], hsnCode: existing.lines[0].hsnCode, unitRate: parsed.value, gstRate: current.gstPercent, taxType: existing.taxType }) : null;
+    const next = revisedLine
+      ? { taxableAmount: revisedLine.taxableAmount, gstAmount: revisedLine.gstAmount, totalAmount: revisedLine.totalAmount }
+      : computeQuotationAmounts(parsed.value, current.gstPercent);
     const updated = db.quotations.update(id, {
       status: "REVISED",
       amount: next.totalAmount,
       taxableAmount: next.taxableAmount,
       gstAmount: next.gstAmount,
       totalAmount: next.totalAmount,
+      ...(revisedLine ? { lines: [revisedLine], unitPrice: parsed.value } : {}),
     });
     if (!updated) throw new Error(QUOTATION_NOT_FOUND_MESSAGE);
     this.record({
@@ -210,5 +237,9 @@ export class MockQuotationRepository implements IQuotationRepository {
       .map(({ e }) => e);
     return delay(events);
   }
-}
 
+  async downloadPdf(id: ID): Promise<DownloadedFile> {
+    const q = this.require(id);
+    return mockPdf(`Quotation ${q.quoteNo}`, [`Customer: ${q.customerName}`, `Total: ${q.totalAmount ?? q.amount}`], `quotation-${q.quoteNo}`);
+  }
+}

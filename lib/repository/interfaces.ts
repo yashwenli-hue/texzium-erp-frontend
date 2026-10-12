@@ -12,6 +12,8 @@ import type {
 import { ListQuery, Page, ID } from "../types/common";
 import type { DownloadedFile } from "../api/httpClient";
 import {
+  DocumentProfile,
+  DocumentProfileFields,
   Lead,
   LeadStatus,
   LeadSourceRecord,
@@ -444,18 +446,24 @@ export interface CreateQuotationInput {
  * caller saw (or a rule forbids the action), and an ApiError with status 403
  * when the user lacks the permission, which must never change anything locally.
  */
+/** What a revision changes: the unit rate of a quotation with a priced line, or the taxable amount of an older one. */
+export type QuotationRevision = { unitPrice: number } | { taxableAmount: number };
+
 export interface IQuotationRepository {
   list(query?: ListQuery<QuotationSortField>): Promise<Page<Quotation>>;
   getById(id: ID): Promise<Quotation | null>;
   create(input: CreateQuotationInput): Promise<Quotation>;
   /**
-   * VERIFIED: `PATCH /:id/revise` { taxableAmount, remarks? } (permission
-   * quotations.edit). The backend recomputes GST from the percentage the
-   * quotation already carries and sets the total; the caller never sends a
-   * total. Moves the quotation to REVISED (from DRAFT, REVISED, or an APPROVED
+   * VERIFIED: `PATCH /:id/revise` { unitPrice | taxableAmount, remarks? }
+   * (permission quotations.edit). A quotation with a priced line is revised by
+   * its unit rate; one stored before lines existed, by its taxable amount. The
+   * backend works out the taxable value, GST and total; the caller never sends
+   * them. Moves the quotation to REVISED (from DRAFT, REVISED, or an APPROVED
    * one with no active Proforma and no live Sales Order).
    */
-  revise(id: ID, taxableAmount: number, remarks?: string): Promise<Quotation>;
+  revise(id: ID, change: QuotationRevision, remarks?: string): Promise<Quotation>;
+  /** VERIFIED: `GET /:id/document.pdf` (quotations.view): the quotation as a PDF, built in memory. */
+  downloadPdf(id: ID): Promise<DownloadedFile>;
   /** VERIFIED: `PATCH /:id/approve` { remarks? } (permission quotations.approve): DRAFT or REVISED -> APPROVED. */
   approve(id: ID, remarks?: string): Promise<Quotation>;
   /** VERIFIED: `PATCH /:id/reject` { reason } (permission quotations.reject): DRAFT or REVISED -> REJECTED, final. The reason is mandatory. */
@@ -493,6 +501,8 @@ export interface IProformaInvoiceRepository {
   cancel(id: ID, reason: string): Promise<ProformaInvoice>;
   /** VERIFIED: `GET /:id/events` (permission proformas.view): the lifecycle history, newest first. */
   listEvents(id: ID): Promise<ProformaEvent[]>;
+  /** VERIFIED: `GET /:id/document.pdf` (proformas.view): the Proforma Invoice as a PDF (not a tax invoice). */
+  downloadPdf(id: ID): Promise<DownloadedFile>;
 }
 
 // Mirrors the VERIFIED CreateSalesOrderDto: proformaInvoiceId, orderDate,
@@ -618,15 +628,21 @@ export interface ISalesOrderCommercialRepository {
 export interface CreateSalesInvoiceInput {
   salesOrderId: ID;
   dispatchOrderId: ID;
-  invoiceDate: string; // ISO 8601
-  customerName: string;
+  invoiceDate: string; // a calendar day, YYYY-MM-DD, not after today (IST)
+  /** Not sent: the backend invoices the order's customer, from the customer record. */
+  customerName?: string;
   remarks?: string;
 }
 
+// VERIFIED: GET /sales-invoices needs invoices.view and POST needs
+// invoices.create (backend 2026-10-15). An order is invoiced once, from its
+// Quotation's amounts; a refusal is a 409 with the reason.
 export interface ISalesInvoiceRepository {
   list(query?: ListQuery<SalesInvoiceSortField>): Promise<Page<SalesInvoice>>;
   getById(id: ID): Promise<SalesInvoice | null>;
   create(input: CreateSalesInvoiceInput): Promise<SalesInvoice>;
+  /** VERIFIED: `GET /:id/document.pdf` (invoices.view): the tax invoice as a PDF; 409 (with the reason) for an invoice that cannot be printed as one. */
+  downloadPdf(id: ID): Promise<DownloadedFile>;
 }
 
 // Read-only — see DispatchOrderOption. No Dispatch Order management UI
@@ -708,7 +724,21 @@ export interface IPaymentLinkRepository {
 // callable with a PaymentCollection id obtained from that payment's own
 // creation response — see PaymentCollectionRecord in lib/types/domain.ts.
 export interface IReceiptVoucherRepository {
+  /** VERIFIED: `POST /:paymentCollectionId/generate` (collections.record): the payment's receipt; asking again returns the same one. */
   generate(paymentCollectionId: ID): Promise<ReceiptVoucher>;
+  /** VERIFIED: `GET /?salesInvoiceId=` (collections.view): the receipts of an invoice's payments. */
+  listForInvoice(salesInvoiceId: ID): Promise<ReceiptVoucher[]>;
+  /** VERIFIED: `GET /:id/document.pdf` (collections.view): the receipt as a PDF, built in memory. */
+  downloadPdf(id: ID): Promise<DownloadedFile>;
+}
+
+/** VERIFIED: /document-profile (documents.profile.manage). A field left out keeps its value; null clears it. */
+export interface IDocumentProfileRepository {
+  get(): Promise<DocumentProfile>;
+  update(input: Partial<DocumentProfileFields>): Promise<DocumentProfile>;
+  /** PNG or JPEG of at most 64 KB, sent as base64. */
+  setLogo(logo: { mimeType: "image/png" | "image/jpeg"; base64: string }): Promise<DocumentProfile>;
+  removeLogo(): Promise<DocumentProfile>;
 }
 
 // VERIFIED: GET /sales-reports/revenue-summary only. The sales-reports
@@ -831,6 +861,7 @@ export interface RevenueOSRepository {
   customerStatements: ICustomerStatementRepository;
   paymentLinks: IPaymentLinkRepository;
   receiptVouchers: IReceiptVoucherRepository;
+  documentProfile: IDocumentProfileRepository;
   salesReports: ISalesReportsRepository;
   collectionsDashboard: ICollectionsDashboardRepository;
   inventoryItems: IInventoryItemRepository;

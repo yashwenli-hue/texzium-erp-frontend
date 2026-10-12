@@ -161,8 +161,11 @@ export default function SalesOrderDetailPage() {
   // Sales Order, regardless of status, not just the DISPATCHED ones used to
   // gate invoice creation above. No create/pack/dispatch action exists here.
   const linkedDispatchOrders = dispatchOrders.filter((d) => d.salesOrderId === salesOrder.id);
-  const canCreateInvoice = salesOrder.status === "READY_FOR_INVOICING" && matchingDispatchedOrders.length > 0;
   const relatedInvoices = salesInvoices.filter((i) => i.salesOrderId === salesOrder.id);
+  // VERIFIED (backend 2026-10-15): issuing needs invoices.create, and an order
+  // is invoiced once (a second invoice is refused).
+  const mayInvoice = hasPermission("invoices.create");
+  const canCreateInvoice = mayInvoice && relatedInvoices.length === 0 && salesOrder.status === "READY_FOR_INVOICING" && matchingDispatchedOrders.length > 0;
 
   // ---- Commercial workflow. An action is offered when the order's status fits it
   // AND the person holds its permission (shown disabled, with the reason, when
@@ -353,6 +356,8 @@ export default function SalesOrderDetailPage() {
               emptyBody={
                 canCreateInvoice
                   ? "Create one now that a dispatched shipment exists for this order."
+                  : !mayInvoice && salesOrder.status === "READY_FOR_INVOICING"
+                  ? "You don't have permission to issue invoices."
                   : cancelled
                   ? "This order is cancelled and cannot be invoiced."
                   : salesOrder.status === "READY_FOR_INVOICING"

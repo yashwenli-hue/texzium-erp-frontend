@@ -8,6 +8,7 @@ import { Button, EmptyState } from "../../components/ui/Button";
 import { Pagination, paginate } from "../../components/ui/Button";
 import { SalesInvoiceStatusTag, ChipGroup, Chip } from "../../components/ui/Tag";
 import { DataTable, Column } from "../../components/ui/DataTable";
+import { useAuth } from "../../lib/auth/AuthContext";
 import { useSalesInvoices } from "../../lib/hooks/useSalesInvoices";
 import { SalesInvoice, formatSalesInvoiceStatus } from "../../lib/types/domain";
 import { formatInr, formatDate } from "../../lib/format";
@@ -17,6 +18,7 @@ const PAGE_SIZE = 8;
 export default function SalesInvoicesPage() {
   const router = useRouter();
   const { salesInvoices, loading, error, refetch } = useSalesInvoices();
+  const { hasPermission } = useAuth();
   const [statusChip, setStatusChip] = useState<string>("All");
   const [page, setPage] = useState(1);
 
@@ -47,6 +49,18 @@ export default function SalesInvoicesPage() {
     { key: "status", header: "Status", render: (i) => <SalesInvoiceStatusTag status={i.status} /> },
     { key: "invoiceDate", header: "Invoice Date", render: (i) => formatDate(i.invoiceDate) },
   ];
+
+  // VERIFIED (backend 2026-10-15): reading invoices needs invoices.view.
+  if (!hasPermission("invoices.view")) {
+    return (
+      <div className="page">
+        <PageHeader eyebrow="RevenueOS · Quote to Cash · Sales Invoices" title="Sales Invoices" subtitle="Raised once a sales order's dispatch is confirmed." />
+        <Panel title="Sales Invoices">
+          <EmptyState icon="lock" title="No access" body="You don't have permission to view invoices." />
+        </Panel>
+      </div>
+    );
+  }
 
   if (loading && salesInvoices.length === 0) {
     return (

@@ -12,6 +12,7 @@ import {
   Opportunity,
   OpportunityStage,
   Quotation,
+  DocumentLine,
   QuotationEvent,
   ProformaEvent,
   QuotationStatus,
@@ -337,9 +338,80 @@ export function mapGstRegistration(raw: BackendGstRegistration): GstRegistration
   };
 }
 
+/** VERIFIED: QuotationLine / ProformaInvoiceLine (backend migration 20261015_quotation_proforma_lines.sql). */
+export interface BackendDocumentLine {
+  id: string;
+  lineNumber: number;
+  inventoryItemId?: string | null;
+  description: string;
+  hsnCode?: string | null;
+  quantity: number;
+  unitRate: number;
+  taxableAmount: number;
+  gstRate: number;
+  cgstAmount: number;
+  sgstAmount: number;
+  igstAmount: number;
+  gstAmount: number;
+  totalAmount: number;
+}
+
+export function mapDocumentLine(raw: BackendDocumentLine): DocumentLine {
+  return {
+    lineNumber: raw.lineNumber,
+    description: raw.description,
+    hsnCode: raw.hsnCode ?? undefined,
+    quantity: raw.quantity,
+    unitRate: raw.unitRate,
+    taxableAmount: raw.taxableAmount,
+    gstRate: raw.gstRate,
+    cgstAmount: raw.cgstAmount,
+    sgstAmount: raw.sgstAmount,
+    igstAmount: raw.igstAmount,
+    gstAmount: raw.gstAmount,
+    totalAmount: raw.totalAmount,
+  };
+}
+
+/** VERIFIED: SalesInvoiceItem. Items of invoices issued before 2026-10-15 have no line number, description, HSN, rate or split. */
+export interface BackendSalesInvoiceItem {
+  id: string;
+  productId: string;
+  quantity: number;
+  rate: number;
+  taxableAmount: number;
+  gstAmount: number;
+  totalAmount: number;
+  lineNumber?: number | null;
+  description?: string | null;
+  hsnCode?: string | null;
+  gstRate?: number | null;
+  cgstAmount?: number | null;
+  sgstAmount?: number | null;
+  igstAmount?: number | null;
+}
+
+export function mapSalesInvoiceItem(raw: BackendSalesInvoiceItem, index: number): DocumentLine {
+  return {
+    lineNumber: raw.lineNumber ?? index + 1,
+    description: raw.description ?? "Item recorded without a description",
+    hsnCode: raw.hsnCode ?? undefined,
+    quantity: raw.quantity,
+    unitRate: raw.rate,
+    taxableAmount: raw.taxableAmount,
+    gstRate: raw.gstRate ?? undefined,
+    cgstAmount: raw.cgstAmount ?? 0,
+    sgstAmount: raw.sgstAmount ?? 0,
+    igstAmount: raw.igstAmount ?? 0,
+    gstAmount: raw.gstAmount,
+    totalAmount: raw.totalAmount,
+  };
+}
+
 export interface BackendQuotation {
   id: string;
   quotationCode?: string | null;
+  lines?: BackendDocumentLine[];
   opportunityId: string;
   quoteDate: string;
   quantity?: number;
@@ -369,9 +441,11 @@ export function mapQuotation(raw: BackendQuotation, opportunityById: Map<string,
   const opp = opportunityById.get(raw.opportunityId);
   return {
     id: raw.id,
-    // No verified code path ever sets quotationCode — fall back to a short,
-    // honestly-labeled id reference rather than fabricating a sequence number.
+    // Quotations created since numbering carry their number; older ones fall
+    // back to a short, honestly-labeled id reference, never a made-up number.
     quoteNo: raw.quotationCode || `#${raw.id.slice(0, 8).toUpperCase()}`,
+    numbered: !!raw.quotationCode,
+    lines: (raw.lines ?? []).map(mapDocumentLine),
     customerName: opp?.customerName ?? "—",
     opportunityId: raw.opportunityId,
     opportunityName: opp?.title ?? "—",
@@ -432,6 +506,7 @@ export function mapQuotationEvent(raw: BackendQuotationEvent): QuotationEvent {
 export interface BackendProformaInvoice {
   id: string;
   proformaNumber?: string | null;
+  lines?: BackendDocumentLine[];
   quotationId: string;
   issueDate: string;
   totalAmount: number;
@@ -455,9 +530,11 @@ export function mapProformaInvoice(raw: BackendProformaInvoice, quotationById: M
   const q = quotationById.get(raw.quotationId);
   return {
     id: raw.id,
-    // No verified code path ever sets proformaNumber — fall back to a
-    // short, honestly-labeled id reference rather than fabricating one.
+    // Numbered since 2026-10-15; older ones fall back to a short,
+    // honestly-labeled id reference rather than a made-up number.
     proformaNumber: raw.proformaNumber || `#${raw.id.slice(0, 8).toUpperCase()}`,
+    numbered: !!raw.proformaNumber,
+    lines: (raw.lines ?? []).map(mapDocumentLine),
     quotationId: raw.quotationId,
     quoteNo: q?.quoteNo ?? "—",
     customerName: q?.customerName ?? "—",
@@ -721,8 +798,9 @@ export interface BackendSalesInvoice {
   remarks?: string | null;
   createdAt: string;
   updatedAt?: string;
-  /** GET /sales-invoices nests the raw SalesOrder (never Quotation/Proforma) and the raw DispatchOrder. */
+  /** GET /sales-invoices nests the raw SalesOrder (never Quotation/Proforma), the raw DispatchOrder and the invoice's items. */
   salesOrder?: { id: string } | null;
+  SalesInvoiceItem?: BackendSalesInvoiceItem[];
   dispatchOrder?: BackendDispatchOrder | null;
 }
 
@@ -742,10 +820,11 @@ export function mapSalesInvoice(raw: BackendSalesInvoice, salesOrderById: Map<st
   const so = salesOrderById.get(raw.salesOrderId);
   return {
     id: raw.id,
-    // No verified code path ever sets invoiceNumber on the live endpoint —
-    // fall back to a short, honestly-labeled id reference rather than
-    // fabricating a sequence number.
+    // Invoices issued since numbering carry their number; older ones fall
+    // back to a short, honestly-labeled id reference, never a made-up number.
     invoiceNumber: raw.invoiceNumber || `#${raw.id.slice(0, 8).toUpperCase()}`,
+    numbered: !!raw.invoiceNumber,
+    items: (raw.SalesInvoiceItem ?? []).map(mapSalesInvoiceItem),
     salesOrderId: raw.salesOrderId,
     salesOrderCode: so?.salesOrderCode,
     quotationId: so?.quotationId,

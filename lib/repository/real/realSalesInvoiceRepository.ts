@@ -1,7 +1,8 @@
 import { ID, ListQuery, Page } from "../../types/common";
 import { SalesInvoice, SalesOrder } from "../../types/domain";
 import { CreateSalesInvoiceInput, ISalesInvoiceRepository, ISalesOrderRepository, SalesInvoiceSortField } from "../interfaces";
-import { apiFetch } from "../../api/httpClient";
+import { ApiError, apiFetch, DownloadedFile } from "../../api/httpClient";
+import { downloadDocument } from "./documentDownload";
 import { applyListQuery } from "../shared/listQuery";
 import { BackendSalesInvoice, mapSalesInvoice } from "./mappers";
 
@@ -52,19 +53,30 @@ export class RealSalesInvoiceRepository implements ISalesInvoiceRepository {
   }
 
   async create(input: CreateSalesInvoiceInput): Promise<SalesInvoice> {
-    const raw = await apiFetch<BackendSalesInvoice>("/sales-invoices", {
-      method: "POST",
-      body: {
-        salesOrderId: input.salesOrderId,
-        dispatchOrderId: input.dispatchOrderId,
-        invoiceDate: input.invoiceDate,
-        customerName: input.customerName,
-        remarks: input.remarks,
-      },
-    });
+    // The customer, every amount and the number are the backend's (from the
+    // order and its Quotation); only the order, dispatch, date and remarks go.
+    let raw: BackendSalesInvoice;
+    try {
+      raw = await apiFetch<BackendSalesInvoice>("/sales-invoices", {
+        method: "POST",
+        body: {
+          salesOrderId: input.salesOrderId,
+          dispatchOrderId: input.dispatchOrderId,
+          invoiceDate: input.invoiceDate,
+          ...(input.remarks ? { remarks: input.remarks } : {}),
+        },
+      });
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 403) throw new ApiError("You don't have permission to issue invoices.", 403, err.details);
+      throw err;
+    }
     const created = await this.getById(raw.id);
     if (created) return created;
     // Fallback in the unlikely event the immediate re-fetch races the write.
     return mapSalesInvoice(raw, new Map());
+  }
+
+  downloadPdf(id: ID): Promise<DownloadedFile> {
+    return downloadDocument(`/sales-invoices/${encodeURIComponent(id)}/document.pdf`, "invoice.pdf", "You don't have permission to view invoices.");
   }
 }

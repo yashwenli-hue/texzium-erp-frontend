@@ -706,10 +706,37 @@ export function formatQuotationStatus(status: string): string {
   return titleCaseFromConstant(status);
 }
 
+/**
+ * One priced line of a quotation, Proforma Invoice or sales invoice, exactly as
+ * the backend stored it (VERIFIED: QuotationLine, ProformaInvoiceLine and the
+ * line columns of SalesInvoiceItem, backend migrations 2026-10-15). The backend
+ * works out every amount (taxable = quantity x rate to the paisa, GST at the
+ * HSN rate, its CGST/SGST or IGST split); the frontend only shows them. Records
+ * created before lines were stored have none.
+ */
+export interface DocumentLine {
+  lineNumber: number;
+  description: string;
+  hsnCode?: string;
+  quantity: number;
+  unitRate: number;
+  taxableAmount: number;
+  gstRate?: number;
+  cgstAmount: number;
+  sgstAmount: number;
+  igstAmount: number;
+  gstAmount: number;
+  totalAmount: number;
+}
+
 export interface Quotation {
   id: ID;
-  /** quotationCode from the backend, which no verified code path ever sets — falls back to a short id reference (`#XXXXXXXX`), never a fabricated sequential number. */
+  /** quotationCode from the backend (QT24/26-27/00001 for quotations created since numbering); older ones fall back to a short id reference (`#XXXXXXXX`), never a fabricated sequential number. */
   quoteNo: string;
+  /** True when the backend gave the quotation a number. */
+  numbered?: boolean;
+  /** Its priced line(s); empty for a quotation stored before lines existed. */
+  lines?: DocumentLine[];
   customerId?: ID;
   customerName: string;
   opportunityId?: ID;
@@ -790,8 +817,11 @@ export function formatProformaInvoiceStatus(status: string): string {
 // quotation (an optional client total is only checked against it).
 export interface ProformaInvoice {
   id: ID;
-  /** proformaNumber from the backend, never set by any verified code path — falls back to a short id reference, never a fabricated sequential number. */
+  /** proformaNumber from the backend (PI24/26-27/00001 since numbering); older ones fall back to a short id reference, never a fabricated sequential number. */
   proformaNumber: string;
+  numbered?: boolean;
+  /** The copy of its quotation's lines taken when it was created; empty for older ones. */
+  lines?: DocumentLine[];
   quotationId: ID;
   quoteNo: string; // denormalized from the linked quotation, for display
   customerName: string; // denormalized via quotation -> opportunity -> lead
@@ -1053,8 +1083,12 @@ export function formatSalesInvoiceStatus(status: string): string {
 // Stage 2F report.
 export interface SalesInvoice {
   id: ID;
-  /** invoiceNumber from the backend — never set by the live endpoint; falls back to a short id reference, never a fabricated sequence number. */
+  /** invoiceNumber from the backend (SI24/26-27/00001 for invoices issued since numbering); older ones fall back to a short id reference, never a fabricated sequence number. */
   invoiceNumber: string;
+  /** True when the backend numbered the invoice: only then can it be printed as a tax invoice. */
+  numbered?: boolean;
+  /** The priced lines it was issued with (with HSN); empty for older invoices. */
+  items?: DocumentLine[];
   salesOrderId: ID;
   salesOrderCode?: string;
   quotationId?: ID;
@@ -1276,13 +1310,46 @@ export interface PaymentLinkResult {
   upiId?: string;
 }
 
-// VERIFIED: POST /receipt-vouchers/:paymentCollectionId/generate — only
-// reachable immediately after recording a payment, using the id from that
-// payment's own response (see PaymentCollectionRecord). GET
-// /receipt-pdf/:receiptVoucherId exists but writes a PDF to the backend's
-// own server filesystem and returns a local file path, not a downloadable
-// response — there is no way for this frontend to retrieve or display that
-// PDF, so it is not called. See the Stage 2G report.
+// The company document profile (VERIFIED: GET/PUT /document-profile and
+// PUT/DELETE /document-profile/logo, permission documents.profile.manage):
+// what the company prints on its documents besides its master data. Every
+// field may be empty; an empty field is simply not printed.
+export interface DocumentProfile {
+  company: {
+    id: ID;
+    companyCode: string;
+    companyName: string;
+    panNumber: string;
+    cinNumber?: string;
+    email?: string;
+    phone?: string;
+    website?: string;
+  };
+  registrations: Array<{ id: ID; gstin: string; legalName: string; tradeName?: string; stateCode: string; stateName: string; isDefault: boolean; isActive: boolean }>;
+  profile: DocumentProfileFields & { logo: { mimeType: string; base64: string } | null; updatedAt?: string };
+}
+
+export interface DocumentProfileFields {
+  registeredOfficeAddress: string | null;
+  bankAccountName: string | null;
+  bankName: string | null;
+  bankAccountNumber: string | null;
+  bankIfsc: string | null;
+  bankBranch: string | null;
+  upiId: string | null;
+  quotationTerms: string | null;
+  proformaTerms: string | null;
+  invoiceTerms: string | null;
+  receiptNote: string | null;
+  signatoryName: string | null;
+  signatoryDesignation: string | null;
+}
+
+// VERIFIED: POST /receipt-vouchers/:paymentCollectionId/generate
+// (collections.record) gives a payment its receipt; a payment has at most one
+// and asking again returns it. GET /receipt-vouchers?salesInvoiceId= and GET
+// /receipt-vouchers/:id/document.pdf (collections.view) list an invoice's
+// receipts and download one, built in memory.
 export interface ReceiptVoucher {
   id: ID;
   receiptNumber?: string;

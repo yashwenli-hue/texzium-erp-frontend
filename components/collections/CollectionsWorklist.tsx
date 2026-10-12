@@ -144,7 +144,7 @@ function RowDetail({ row, canReceipt }: { row: CollectionRow; canReceipt: boolea
           </button>
         </p>
       )}
-      {q.collections && <PaymentHistorySection collections={q.collections.collections} events={q.collections.events} invoiceNumber={row.invoiceNumber} customer={customerDescription(row.identity, row.invoiceCustomerName)} canGenerateReceipt={canReceipt} />}
+      {q.collections && <PaymentHistorySection collections={q.collections.collections} events={q.collections.events} salesInvoiceId={row.salesInvoiceId} invoiceNumber={row.invoiceNumber} customer={customerDescription(row.identity, row.invoiceCustomerName)} canGenerateReceipt={canReceipt} />}
     </div>
   );
 }

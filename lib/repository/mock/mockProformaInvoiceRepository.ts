@@ -5,6 +5,8 @@ import { db } from "./db";
 import { CustomerConflictError, customerInactiveForMessage } from "../shared/customerLifecycle";
 import { delay, applyListQuery } from "./queryUtils";
 import { mockId } from "./entityStore";
+import { mockPdf } from "./mockDocuments";
+import { DownloadedFile } from "../../api/httpClient";
 import {
   PROFORMA_ACTIVE_EXISTS_MESSAGE,
   PROFORMA_CANCEL_BLOCKED_BY_ORDER_MESSAGE,
@@ -86,6 +88,9 @@ export class MockProformaInvoiceRepository implements IProformaInvoiceRepository
     const proforma: ProformaInvoice = {
       id: mockId("PF"),
       proformaNumber: `PI-${proformaCounter}`,
+      numbered: true,
+      // a copy of the approved quotation's lines, as the backend takes it
+      lines: (quotation.lines ?? []).map((l) => ({ ...l })),
       quotationId: quotation.id,
       quoteNo: quotation.quoteNo,
       customerName: quotation.customerName,
@@ -146,5 +151,10 @@ export class MockProformaInvoiceRepository implements IProformaInvoiceRepository
       .sort((a, b) => +new Date(b.e.occurredAt) - +new Date(a.e.occurredAt) || b.index - a.index)
       .map(({ e }) => e);
     return delay(events);
+  }
+
+  async downloadPdf(id: ID): Promise<DownloadedFile> {
+    const p = this.require(id);
+    return mockPdf(`Proforma Invoice ${p.proformaNumber} - not a tax invoice`, [`Customer: ${p.customerName}`, `Total: ${p.totalAmount}`], `proforma-${p.proformaNumber}`);
   }
 }

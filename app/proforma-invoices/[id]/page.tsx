@@ -18,6 +18,9 @@ import { ProformaHistory } from "../../../components/ui/DocumentLifecycleHistory
 import { SalesOrderForm } from "../../../components/forms/SalesOrderForm";
 import { useProformaInvoiceDetail } from "../../../lib/hooks/useProformaInvoices";
 import { useToast } from "../../../components/ui/Toast";
+import { DocumentLinesPanel } from "../../../components/ui/DocumentLinesPanel";
+import { useDocumentDownload } from "../../../lib/hooks/useDocumentDownload";
+import { useRepository } from "../../../lib/repository/RepositoryProvider";
 import { useAuth } from "../../../lib/auth/AuthContext";
 import { SALES_ORDER_PERMISSIONS, isLiveSalesOrder } from "../../../lib/repository/shared/salesOrderLifecycle";
 import { PROFORMA_PERMISSIONS, proformaActions, validityLabel } from "../../../lib/repository/shared/proformaLifecycle";
@@ -58,6 +61,8 @@ export default function ProformaInvoiceDetailPage() {
     createSalesOrder,
   } = useProformaInvoiceDetail(id);
   const [dialog, setDialog] = useState<null | "approve" | "cancel" | "order">(null);
+  const repo = useRepository();
+  const { downloading, download } = useDocumentDownload();
 
   if (loading && !proforma) {
     return (
@@ -131,6 +136,13 @@ export default function ProformaInvoiceDetailPage() {
     { key: "approve", label: "Approve", icon: "check", variant: "primary", state: actions.approve, onClick: () => setDialog("approve") },
     { key: "createSalesOrder", label: "Create Sales Order", icon: "cart", variant: proforma.status === "APPROVED" && actions.createSalesOrder.enabled ? "primary" : "ghost", state: actions.createSalesOrder, onClick: () => setDialog("order") },
     { key: "cancel", label: "Cancel Proforma", icon: "close", className: "danger-ghost", state: actions.cancel, onClick: () => setDialog("cancel") },
+    {
+      key: "pdf",
+      label: downloading ? "Preparing PDF…" : "Download PDF",
+      icon: "file",
+      state: { enabled: !downloading },
+      onClick: () => download(() => repo.proformaInvoices.downloadPdf(proforma.id), `${proforma.proformaNumber} downloaded`),
+    },
   ];
 
   const quotationAmountsKnown = quotation ? quotationAmounts(quotation) : null;
@@ -251,6 +263,7 @@ export default function ProformaInvoiceDetailPage() {
               </div>
             )}
           </div>
+          <DocumentLinesPanel lines={proforma.lines} emptyText="Line details were not recorded for the quotation this Proforma Invoice was made from." />
           {allOrders.length > 0 && (
             <Panel title="Sales Orders from this Proforma" flush>
               <DataTable columns={orderColumns} rows={allOrders} onRowClick={(o) => router.push(`/sales-orders/${o.id}`)} emptyTitle="No sales orders yet" />

@@ -20,6 +20,7 @@ import { MockAccountsReceivableRepository } from "./mockAccountsReceivableReposi
 import { MockPaymentCollectionRepository } from "./mockPaymentCollectionRepository";
 import { MockCustomerStatementRepository } from "./mockCustomerStatementRepository";
 import { MockPaymentLinkRepository } from "./mockPaymentLinkRepository";
+import { MockDocumentProfileRepository } from "./mockDocumentProfileRepository";
 import { MockReceiptVoucherRepository } from "./mockReceiptVoucherRepository";
 import { MockSalesReportsRepository } from "./mockSalesReportsRepository";
 import { MockCollectionsDashboardRepository } from "./mockCollectionsDashboardRepository";
@@ -62,6 +63,7 @@ export function createMockRepository(): RevenueOSRepository {
     customerStatements: new MockCustomerStatementRepository(),
     paymentLinks: new MockPaymentLinkRepository(),
     receiptVouchers: new MockReceiptVoucherRepository(),
+    documentProfile: new MockDocumentProfileRepository(),
     salesReports: new MockSalesReportsRepository(),
     collectionsDashboard: new MockCollectionsDashboardRepository(),
     inventoryItems: new MockInventoryItemRepository(),

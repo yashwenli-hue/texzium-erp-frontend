@@ -16,6 +16,9 @@ import { ChainStage, DocumentChain } from "../../../components/ui/DocumentChain"
 import { QuotationCallout } from "../../../components/ui/QuotationCallout";
 import { QuotationHistory } from "../../../components/ui/DocumentLifecycleHistory";
 import { QuotationReviseDialog } from "../../../components/forms/QuotationReviseDialog";
+import { DocumentLinesPanel } from "../../../components/ui/DocumentLinesPanel";
+import { useDocumentDownload } from "../../../lib/hooks/useDocumentDownload";
+import { useRepository } from "../../../lib/repository/RepositoryProvider";
 import { QuotationApproveDialog } from "../../../components/forms/QuotationApproveDialog";
 import { ProformaInvoiceForm } from "../../../components/forms/ProformaInvoiceForm";
 import { useQuotationDetail } from "../../../lib/hooks/useQuotations";
@@ -60,6 +63,8 @@ export default function QuotationDetailPage() {
     refreshAll,
   } = useQuotationDetail(id);
   const [dialog, setDialog] = useState<null | "revise" | "approve" | "reject" | "proforma">(null);
+  const repo = useRepository();
+  const { downloading, download } = useDocumentDownload();
 
   if (loading && !quotation) {
     return (
@@ -135,6 +140,13 @@ export default function QuotationDetailPage() {
     { key: "createProforma", label: "Create Proforma Invoice", icon: "receipt", variant: quotation.status === "APPROVED" && actions.createProforma.enabled ? "primary" : "ghost", state: actions.createProforma, onClick: () => setDialog("proforma") },
     { key: "revise", label: "Revise", icon: "layers", state: actions.revise, onClick: () => setDialog("revise") },
     { key: "reject", label: "Reject", icon: "close", className: "danger-ghost", state: actions.reject, onClick: () => setDialog("reject") },
+    {
+      key: "pdf",
+      label: downloading ? "Preparing PDF…" : "Download PDF",
+      icon: "file",
+      state: { enabled: !downloading },
+      onClick: () => download(() => repo.quotations.downloadPdf(quotation.id), `${quotation.quoteNo} downloaded`),
+    },
   ];
 
   const olderProformas = chain.proformas.filter((p) => p !== activeProforma);
@@ -247,6 +259,7 @@ export default function QuotationDetailPage() {
               <div className="f"><label>Created</label><div>{formatDate(quotation.createdAt)}</div></div>
             </div>
           </div>
+          <DocumentLinesPanel lines={quotation.lines} emptyText="This quotation was recorded before line items were stored: its item, quantity and rate are not available." />
           {documentRows.length > 0 && (
             <Panel title="Documents built on this quotation" flush>
               <DataTable
@@ -269,8 +282,9 @@ export default function QuotationDetailPage() {
           status={quotation.status}
           current={amounts}
           taxType={quotation.taxType}
+          line={quotation.lines?.length === 1 ? quotation.lines[0] : undefined}
           onClose={() => setDialog(null)}
-          onSubmit={(taxable, remarks) => reviseQuotation(taxable, remarks)}
+          onSubmit={(change, remarks) => reviseQuotation(change, remarks)}
         />
       )}
       {dialog === "approve" && (

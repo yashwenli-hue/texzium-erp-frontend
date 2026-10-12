@@ -10,6 +10,8 @@ import { ReceiptConfirmDialog } from "./ReceiptConfirmDialog";
 import { CollectionStateTag } from "./parts";
 import { useRecordPayment } from "../../lib/hooks/usePaymentCollections";
 import { useReceiptVoucher } from "../../lib/hooks/useReceiptVouchers";
+import { useDocumentDownload } from "../../lib/hooks/useDocumentDownload";
+import { useRepository } from "../../lib/repository/RepositoryProvider";
 import { CollectionState, CustomerIdentity, customerDescription, formatDay, previewPayment, shiftKey, todayKey } from "../../lib/repository/shared/collections";
 import { paymentFailure, referenceSpec, validatePaymentForm } from "../../lib/repository/shared/paymentForm";
 import { PAYMENT_MODES, PAYMENT_REFERENCE_MAX_LENGTH, formatRupees, paymentModeLabel, toPaise } from "../../lib/repository/shared/paymentCollection";
@@ -36,6 +38,8 @@ export interface PaymentTarget {
 export function RecordPaymentDialog({ target: opened, liveBalance, onClose, onRecorded, onStale }: { target: PaymentTarget; /** The receivable's balance as the opener holds it NOW (it changes when a refused payment makes the screen reload). Falls back to the balance the dialog was opened with. */ liveBalance?: number; onClose: () => void; onRecorded?: (result: RecordPaymentResult) => void; onStale?: () => void }) {
   const target: PaymentTarget = liveBalance === undefined ? opened : { ...opened, balance: liveBalance };
   const toast = useToast();
+  const repo = useRepository();
+  const { downloading, download } = useDocumentDownload();
   const { recordPayment } = useRecordPayment();
   const { generate } = useReceiptVoucher();
   const today = useMemo(() => todayKey(new Date()), []);
@@ -123,7 +127,10 @@ export function RecordPaymentDialog({ target: opened, liveBalance, onClose, onRe
               )}
               {voucher && (
                 <p style={{ margin: "8px 0 0" }}>
-                  Receipt <b>{voucher.receiptNumber}</b> generated.
+                  Receipt <b>{voucher.receiptNumber}</b> generated.{" "}
+                  <Button variant="ghost" icon="file" disabled={downloading} onClick={() => download(() => repo.receiptVouchers.downloadPdf(voucher.id), `Receipt ${voucher.receiptNumber ?? ""} downloaded`)}>
+                    {downloading ? "Preparing…" : "Download PDF"}
+                  </Button>
                 </p>
               )}
             </div>

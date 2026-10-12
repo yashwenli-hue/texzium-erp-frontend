@@ -120,6 +120,15 @@ export function parseTaxableAmount(input: string): { value: number; error?: unde
   return { value };
 }
 
+/** The new unit rate of a quotation with a priced line: positive, at most two decimals. */
+export function parseUnitRate(input: string): { value: number; error?: undefined } | { value?: undefined; error: string } {
+  const text = input.trim();
+  if (!text) return { error: "Enter the new unit rate." };
+  const parsed = parseTaxableAmount(text);
+  if (parsed.error !== undefined) return { error: parsed.error.replace("The taxable amount", "The unit rate") };
+  return parsed;
+}
+
 /** Remarks/reason checks (trimmed). `required` mirrors the reject reason. */
 export function cleanQuotationText(text: string | undefined, max: number, required: boolean, label: string): string | undefined {
   const trimmed = (text ?? "").trim();

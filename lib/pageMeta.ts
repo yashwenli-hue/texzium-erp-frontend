@@ -50,7 +50,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { href: "/quotations", label: "Quotations", icon: "file", countKey: "quotationsCount" },
       { href: "/proforma-invoices", label: "Proforma Invoices", icon: "receipt", countKey: "proformaInvoicesCount" },
       { href: "/sales-orders", label: "Sales Orders", icon: "cart", countKey: "salesOrdersCount" },
-      { href: "/sales-invoices", label: "Sales Invoices", icon: "file", countKey: "salesInvoicesCount" },
+      { href: "/sales-invoices", label: "Sales Invoices", icon: "file", countKey: "salesInvoicesCount", permission: "invoices.view" },
       { href: "/payments", label: "Collections", icon: "cash" },
     ],
   },
@@ -78,6 +78,7 @@ export const NAV_SECTIONS: NavSection[] = [
     items: [
       { href: "/notifications", label: "Notifications", icon: "bell", countKey: "unreadNotificationsCount" },
       { href: "/recycle-bin", label: "Recycle Bin", icon: "trash", permission: "governance.deletions.view" },
+      { href: "/document-settings", label: "Document Settings", icon: "file", permission: "documents.profile.manage" },
     ],
   },
 ];
@@ -104,4 +105,5 @@ export const PAGE_META: Record<string, { title: string; subtitle: string }> = {
   payments: { title: "Collections", subtitle: "Who owes what, since when, and the payments received." },
   reports: { title: "Reports", subtitle: "Funnel, revenue, conversion and performance reports." },
   "recycle-bin": { title: "Recycle Bin", subtitle: "Deleted leads and customers: what was removed, by whom, why, and how long it can be restored." },
+  "document-settings": { title: "Document Settings", subtitle: "What the company prints on its quotations, Proforma Invoices, tax invoices, receipts and statements." },
 };

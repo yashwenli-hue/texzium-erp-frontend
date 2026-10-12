@@ -5,7 +5,7 @@ import { delay } from "./queryUtils";
 // UI ASSUMPTION: no RevenueOS-scoped inventory-item lookup is confirmed
 // (docs/backend-ui-contract.md §21). This mock roster stands in for it in
 // mock mode; real mode uses RealInventoryItemRepository (GET /inventory).
-const MOCK_INVENTORY_ITEMS: InventoryItemOption[] = [
+export const MOCK_INVENTORY_ITEMS: InventoryItemOption[] = [
   { id: "INV1", name: "Industrial Pump GST Mapped (PUMP-HSN-001)", stockQty: 100, availableQty: 100 },
   { id: "INV2", name: "Hydraulic Cylinder Assembly (HYD-CYL-014)", stockQty: 12, availableQty: 8 },
   // 0 available models a real backend possibility — the backend permits
