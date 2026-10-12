@@ -205,6 +205,7 @@ const TIMELINE_ICON_BY_ACTION: Record<string, string> = {
   LEAD_RESTORED: "restore",
   LEAD_DUPLICATE_REMOVED: "trash",
   LEAD_DUPLICATE_RESTORED: "restore",
+  CONTENT_SHARED: "share",
 };
 
 /**

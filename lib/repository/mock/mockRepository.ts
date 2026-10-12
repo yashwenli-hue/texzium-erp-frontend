@@ -1,4 +1,5 @@
 import { RevenueOSRepository } from "../interfaces";
+import { MockContentRepository } from "./mockContentRepository";
 import { MockLeadRepository } from "./mockLeadRepository";
 import { MockLeadSourceRepository } from "./mockLeadSourceRepository";
 import { MockLeadFollowupRepository } from "./mockLeadFollowupRepository";
@@ -64,6 +65,7 @@ export function createMockRepository(): RevenueOSRepository {
     paymentLinks: new MockPaymentLinkRepository(),
     receiptVouchers: new MockReceiptVoucherRepository(),
     documentProfile: new MockDocumentProfileRepository(),
+    content: new MockContentRepository(),
     salesReports: new MockSalesReportsRepository(),
     collectionsDashboard: new MockCollectionsDashboardRepository(),
     inventoryItems: new MockInventoryItemRepository(),

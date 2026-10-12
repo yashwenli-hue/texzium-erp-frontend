@@ -12,6 +12,15 @@ import type {
 import { ListQuery, Page, ID } from "../types/common";
 import type { DownloadedFile } from "../api/httpClient";
 import {
+  ContentAccessUrl,
+  ContentAsset,
+  ContentAssetDetail,
+  ContentListFilters,
+  ContentShare,
+  ContentShareInput,
+  ContentShareResult,
+  ContentUpdateInput,
+  ContentUploadInput,
   DocumentProfile,
   DocumentProfileFields,
   Lead,
@@ -733,6 +742,27 @@ export interface IReceiptVoucherRepository {
 }
 
 /** VERIFIED: /document-profile (documents.profile.manage). A field left out keeps its value; null clears it. */
+// VERIFIED (backend 2026-10-18): the sales content library. Reading needs
+// content.view; uploading, editing, versioning, archiving and restoring need
+// content.manage; recording a share needs content.view and content.share. Files are
+// opened through signed URLs (accessUrl) that expire after 15 minutes, because a
+// browser cannot attach the login token to <img>, <video> or a download link.
+export interface IContentRepository {
+  list(filters?: ContentListFilters): Promise<ContentAsset[]>;
+  get(id: ID): Promise<ContentAssetDetail>;
+  /** Multipart upload of the first version; `onProgress` gets 0..1. */
+  create(input: ContentUploadInput, file: File, onProgress?: (fraction: number) => void): Promise<ContentAssetDetail>;
+  update(id: ID, input: ContentUpdateInput): Promise<ContentAssetDetail>;
+  addVersion(id: ID, file: File, onProgress?: (fraction: number) => void): Promise<ContentAssetDetail>;
+  archive(id: ID, reason: string): Promise<ContentAssetDetail>;
+  restore(id: ID): Promise<ContentAssetDetail>;
+  /** A signed URL for one version (default: the current one), to view inline or download. */
+  accessUrl(id: ID, disposition: "inline" | "attachment", version?: number): Promise<ContentAccessUrl>;
+  /** Records the current version as shared with a lead, an opportunity or a customer (with its timeline/customer event). */
+  share(id: ID, input: ContentShareInput): Promise<ContentShareResult>;
+  listShares(id: ID): Promise<ContentShare[]>;
+}
+
 export interface IDocumentProfileRepository {
   get(): Promise<DocumentProfile>;
   update(input: Partial<DocumentProfileFields>): Promise<DocumentProfile>;
@@ -862,6 +892,7 @@ export interface RevenueOSRepository {
   paymentLinks: IPaymentLinkRepository;
   receiptVouchers: IReceiptVoucherRepository;
   documentProfile: IDocumentProfileRepository;
+  content: IContentRepository;
   salesReports: ISalesReportsRepository;
   collectionsDashboard: ICollectionsDashboardRepository;
   inventoryItems: IInventoryItemRepository;

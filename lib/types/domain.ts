@@ -382,6 +382,7 @@ export const CUSTOMER_EVENT_ACTIONS = [
   "GST_DEFAULT_CHANGED",
   "OPPORTUNITY_LINKED",
   "OPPORTUNITY_UNLINKED",
+  "CONTENT_SHARED",
 ] as const;
 
 const CUSTOMER_EVENT_LABEL: Record<string, string> = {
@@ -396,6 +397,7 @@ const CUSTOMER_EVENT_LABEL: Record<string, string> = {
   GST_DEFAULT_CHANGED: "Default GST registration changed",
   OPPORTUNITY_LINKED: "Opportunity linked",
   OPPORTUNITY_UNLINKED: "Opportunity unlinked",
+  CONTENT_SHARED: "Content shared",
 };
 
 export function formatCustomerEventAction(action: string): string {
@@ -1435,4 +1437,138 @@ export interface CollectionsRecoveryRate {
   totalInvoiceValue: number;
   totalCollected: number;
   recoveryRate: string; // backend returns a formatted "NN.NN%" string, not a number
+}
+
+// ---------------------------------------------------------------------------
+// Sales enablement content library (VERIFIED backend 2026-10-18:
+// /content-assets, /content-files; content.view / content.manage / content.share).
+// One library for product catalogues (PDF), machine photos (JPEG, PNG, WebP) and
+// machine videos (MP4). The backend decides every file's type from its bytes and
+// removes location data before storing; the limits below are the backend's.
+
+export type ContentKind = "CATALOGUE" | "PHOTO" | "VIDEO";
+export type ContentStatus = "ACTIVE" | "ARCHIVED";
+export type ContentShareChannel = "WHATSAPP" | "DOWNLOAD";
+export type ContentShareTargetType = "LEAD" | "OPPORTUNITY" | "CUSTOMER";
+
+export const CONTENT_KIND_META: Record<
+  ContentKind,
+  { label: string; plural: string; icon: string; accept: string; extensions: string[]; maxBytes: number; formats: string }
+> = {
+  CATALOGUE: { label: "Catalogue", plural: "Catalogues", icon: "file", accept: "application/pdf,.pdf", extensions: ["pdf"], maxBytes: 25 * 1024 * 1024, formats: "PDF, up to 25 MB" },
+  PHOTO: { label: "Photo", plural: "Photos", icon: "image", accept: "image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp", extensions: ["jpg", "jpeg", "png", "webp"], maxBytes: 10 * 1024 * 1024, formats: "JPEG, PNG or WebP, up to 10 MB" },
+  VIDEO: { label: "Video", plural: "Videos", icon: "video", accept: "video/mp4,.mp4,.m4v", extensions: ["mp4", "m4v"], maxBytes: 200 * 1024 * 1024, formats: "MP4, up to 200 MB" },
+};
+export const CONTENT_KINDS: ContentKind[] = ["CATALOGUE", "PHOTO", "VIDEO"];
+
+export interface UserRef {
+  id: string;
+  fullName: string;
+}
+
+export interface ContentFileVersion {
+  id: ID;
+  version: number;
+  originalName: string;
+  mimeType: string;
+  sizeBytes: number;
+  width: number | null;
+  height: number | null;
+  /** What the backend removed before storing: "gps", "exif", "xmp", "iptc", "mp4-metadata". */
+  metadataRemoved: string[];
+  uploadedBy: UserRef | null;
+  createdAt: string;
+}
+
+export interface ContentAsset {
+  id: ID;
+  title: string;
+  description: string | null;
+  kind: ContentKind;
+  tags: string[];
+  inventoryItem: { id: ID; sku: string; productName: string } | null;
+  status: ContentStatus;
+  archivedAt: string | null;
+  archiveReason: string | null;
+  archivedBy: UserRef | null;
+  createdBy: UserRef | null;
+  updatedBy: UserRef | null;
+  createdAt: string;
+  updatedAt: string;
+  currentVersion: ContentFileVersion | null;
+  versionCount: number;
+  shareCount: number;
+}
+
+export interface ContentAssetDetail extends ContentAsset {
+  versions: ContentFileVersion[];
+}
+
+export interface ContentAccessUrl {
+  /** A frontend path (through the backend proxy) that opens one version until expiresAt. */
+  url: string;
+  expiresAt: string;
+  fileId: ID;
+  version: number;
+  mimeType: string;
+  fileName: string;
+}
+
+export interface ContentShare {
+  id: ID;
+  assetId: ID;
+  fileId: ID;
+  version: number;
+  targetType: ContentShareTargetType;
+  lead: { id: ID; customerName: string; leadCode: string | null } | null;
+  opportunity: { id: ID; title: string } | null;
+  customer: { id: ID; customerName: string; customerCode: string } | null;
+  channel: ContentShareChannel;
+  recipientName: string | null;
+  recipientPhone: string | null;
+  message: string | null;
+  actor: UserRef | null;
+  createdAt: string;
+}
+
+export interface ContentShareResult extends ContentShare {
+  /** The exact shared version, ready to download and attach. */
+  download: ContentAccessUrl;
+}
+
+export interface ContentListFilters {
+  kind?: ContentKind;
+  status?: ContentStatus | "ALL";
+  q?: string;
+  tag?: string;
+}
+
+export interface ContentUploadInput {
+  title: string;
+  kind: ContentKind;
+  description?: string;
+  tags?: string[];
+  inventoryItemId?: string;
+}
+
+export interface ContentUpdateInput {
+  title?: string;
+  description?: string | null;
+  tags?: string[];
+  inventoryItemId?: string | null;
+}
+
+export interface ContentShareInput {
+  targetType: ContentShareTargetType;
+  targetId: ID;
+  channel: ContentShareChannel;
+  recipientName?: string;
+  recipientPhone?: string;
+  message?: string;
+}
+
+export function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(bytes < 10 * 1024 ? 1 : 0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(bytes < 10 * 1024 * 1024 ? 1 : 0)} MB`;
 }

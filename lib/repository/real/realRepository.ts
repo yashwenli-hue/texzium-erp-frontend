@@ -1,4 +1,5 @@
 import { RevenueOSRepository } from "../interfaces";
+import { RealContentRepository } from "./realContentRepository";
 import { RealLeadRepository } from "./realLeadRepository";
 import { RealLeadSourceRepository } from "./realLeadSourceRepository";
 import { RealOpportunityRepository } from "./realOpportunityRepository";
@@ -73,6 +74,7 @@ export function createRealRepository(): RevenueOSRepository {
     paymentLinks: new RealPaymentLinkRepository(),
     receiptVouchers: new RealReceiptVoucherRepository(),
     documentProfile: new RealDocumentProfileRepository(),
+    content: new RealContentRepository(),
     salesReports: new RealSalesReportsRepository(),
     collectionsDashboard: new RealCollectionsDashboardRepository(),
     inventoryItems: new RealInventoryItemRepository(),

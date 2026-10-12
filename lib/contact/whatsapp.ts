@@ -90,3 +90,12 @@ export function whatsappLink(phone: string | null | undefined, country?: string 
   }
   return refuse(country === undefined ? "needs-international" : country === null ? "needs-country" : "needs-international");
 }
+
+/**
+ * A wa.me link with a message filled in (WhatsApp's "text" parameter). The person still
+ * sends it; nothing is sent automatically.
+ */
+export function whatsappLinkWithText(url: string, text: string): string {
+  const message = text.trim();
+  return message ? `${url}?text=${encodeURIComponent(message)}` : url;
+}
