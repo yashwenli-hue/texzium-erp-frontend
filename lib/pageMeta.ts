@@ -70,6 +70,10 @@ export const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
+    label: "Sales Enablement",
+    items: [{ href: "/content", label: "Content Library", icon: "layers", permission: "content.view" }],
+  },
+  {
     label: "Analytics",
     items: [{ href: "/reports", label: "Reports", icon: "barChart" }],
   },
@@ -105,5 +109,6 @@ export const PAGE_META: Record<string, { title: string; subtitle: string }> = {
   payments: { title: "Collections", subtitle: "Who owes what, since when, and the payments received." },
   reports: { title: "Reports", subtitle: "Funnel, revenue, conversion and performance reports." },
   "recycle-bin": { title: "Recycle Bin", subtitle: "Deleted leads and customers: what was removed, by whom, why, and how long it can be restored." },
+  content: { title: "Content Library", subtitle: "Catalogues, machine photos and machine videos to share with leads and customers." },
   "document-settings": { title: "Document Settings", subtitle: "What the company prints on its quotations, Proforma Invoices, tax invoices, receipts and statements." },
 };
