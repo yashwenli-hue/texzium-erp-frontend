@@ -125,20 +125,22 @@ export async function apiDownload(path: string, expectedType: string, fallbackNa
 }
 
 /**
- * A multipart upload (one file plus form fields) with upload progress, which fetch()
- * cannot report. Same bearer token and the same ApiError mapping as apiFetch (a 401
- * signs the user out). `onProgress` gets 0..1.
+ * Sends one piece of a file (PUT, application/octet-stream) with upload progress, which
+ * fetch() cannot report. Same bearer token and the same ApiError mapping as apiFetch (a
+ * 401 signs the user out); a dropped connection is an ApiError with status 0.
  */
-export function apiUpload<T>(path: string, form: FormData, onProgress?: (fraction: number) => void): Promise<T> {
+export function apiPutBinary<T>(path: string, body: Blob, onProgress?: (fraction: number) => void): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
-    xhr.open("POST", `${API_BASE_URL}${path}`);
+    xhr.open("PUT", `${API_BASE_URL}${path}`);
+    xhr.setRequestHeader("Content-Type", "application/octet-stream");
     const token = getStoredToken();
     if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
     xhr.upload.onprogress = (e) => {
       if (onProgress && e.lengthComputable && e.total > 0) onProgress(e.loaded / e.total);
     };
-    xhr.onerror = () => reject(new ApiError("Could not reach the RevenueOS backend. Check your connection and try again.", 0));
+    xhr.onerror = () => reject(new ApiError("The connection to RevenueOS was interrupted.", 0));
+    xhr.ontimeout = () => reject(new ApiError("The connection to RevenueOS timed out.", 0));
     xhr.onabort = () => reject(new ApiError("The upload was cancelled.", 0));
     xhr.onload = () => {
       let payload: unknown;
@@ -148,10 +150,9 @@ export function apiUpload<T>(path: string, form: FormData, onProgress?: (fractio
         payload = undefined;
       }
       if (xhr.status >= 200 && xhr.status < 300) resolve(payload as T);
-      else if (xhr.status === 413 && payload === undefined) reject(new ApiError("The file is too large to upload.", 413));
       else reject(failure(xhr.status, payload));
     };
-    xhr.send(form);
+    xhr.send(body);
   });
 }
 

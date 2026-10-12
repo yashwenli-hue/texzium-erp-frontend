@@ -11,7 +11,7 @@ import {
 } from "../../types/domain";
 import { ID } from "../../types/common";
 import { IContentRepository } from "../interfaces";
-import { ApiError, apiFetch, apiUpload, backendUrl } from "../../api/httpClient";
+import { ApiError, apiFetch, apiPutBinary, backendUrl } from "../../api/httpClient";
 
 /**
  * VERIFIED (backend 2026-10-18): /content-assets and the signed /content-files route.
@@ -44,20 +44,27 @@ export class RealContentRepository implements IContentRepository {
   }
 
   async create(input: ContentUploadInput, file: File, onProgress?: (fraction: number) => void): Promise<ContentAssetDetail> {
-    const form = new FormData();
-    form.append("title", input.title);
-    form.append("kind", input.kind);
-    if (input.description?.trim()) form.append("description", input.description.trim());
-    if (input.tags?.length) form.append("tags", input.tags.join(","));
-    if (input.inventoryItemId) form.append("inventoryItemId", input.inventoryItemId);
-    form.append("file", file, file.name);
-    return this.upload("/content-assets", form, onProgress);
+    const uploadId = await this.uploadInPieces(file, onProgress);
+    return this.call(
+      "/content-assets",
+      {
+        method: "POST",
+        body: {
+          title: input.title,
+          kind: input.kind,
+          ...(input.description?.trim() ? { description: input.description.trim() } : {}),
+          ...(input.tags?.length ? { tags: input.tags.join(",") } : {}),
+          ...(input.inventoryItemId ? { inventoryItemId: input.inventoryItemId } : {}),
+          uploadId,
+        },
+      },
+      "You don't have permission to manage sales content."
+    );
   }
 
-  addVersion(id: ID, file: File, onProgress?: (fraction: number) => void): Promise<ContentAssetDetail> {
-    const form = new FormData();
-    form.append("file", file, file.name);
-    return this.upload(`/content-assets/${encodeURIComponent(id)}/versions`, form, onProgress);
+  async addVersion(id: ID, file: File, onProgress?: (fraction: number) => void): Promise<ContentAssetDetail> {
+    const uploadId = await this.uploadInPieces(file, onProgress);
+    return this.call(`/content-assets/${encodeURIComponent(id)}/versions`, { method: "POST", body: { uploadId } }, "You don't have permission to manage sales content.");
   }
 
   update(id: ID, input: ContentUpdateInput): Promise<ContentAssetDetail> {
@@ -94,11 +101,49 @@ export class RealContentRepository implements IContentRepository {
     return this.call(`/content-assets/${encodeURIComponent(id)}/shares`, {}, "You don't have permission to view sales content.");
   }
 
-  private async upload(path: string, form: FormData, onProgress?: (fraction: number) => void): Promise<ContentAssetDetail> {
+  /**
+   * Uploads a file in pieces of at most 4 MB (POST /content-uploads, then PUT each piece at
+   * its offset). One request for a whole video can outlast the servers' 5-minute request
+   * limit on a slow connection; a piece takes seconds. A piece that fails on the network
+   * is sent again (up to 4 times, waiting longer each time); when the backend says the
+   * upload continues elsewhere (409 with the offset it expects), it resumes from there.
+   * On failure the upload is cancelled so nothing is left behind. Returns the upload id.
+   */
+  private async uploadInPieces(file: File, onProgress?: (fraction: number) => void): Promise<string> {
+    const started = await this.call<{ id: string; chunkBytes: number }>(
+      "/content-uploads",
+      { method: "POST", body: { fileName: file.name, sizeBytes: file.size } },
+      "You don't have permission to manage sales content."
+    );
+    let offset = 0;
     try {
-      return await apiUpload<ContentAssetDetail>(path, form, onProgress);
+      while (offset < file.size) {
+        const piece = file.slice(offset, offset + started.chunkBytes);
+        for (let attempt = 1; ; attempt++) {
+          try {
+            const at = offset;
+            const r = await apiPutBinary<{ received: number }>(`/content-uploads/${started.id}/chunks?offset=${at}`, piece, (f) =>
+              onProgress?.(Math.min(1, (at + f * piece.size) / file.size))
+            );
+            offset = r.received;
+            break;
+          } catch (err) {
+            const expected = err instanceof ApiError && err.status === 409 ? (err.details as { received?: unknown } | undefined)?.received : undefined;
+            if (typeof expected === "number") {
+              offset = expected;
+              break;
+            }
+            const retryable = err instanceof ApiError && (err.status === 0 || err.status === 408 || err.status === 429 || err.status >= 500);
+            if (!retryable) throw err;
+            if (attempt >= 4) throw new ApiError("The upload was interrupted: the connection to RevenueOS was lost several times. Check the connection and try again.", 0);
+            await new Promise((resolve) => setTimeout(resolve, 1000 * 2 ** attempt));
+          }
+        }
+      }
+      onProgress?.(1);
+      return started.id;
     } catch (err) {
-      if (err instanceof ApiError && err.status === 403) throw new ApiError("You don't have permission to manage sales content.", 403, err.details);
+      void apiFetch(`/content-uploads/${started.id}`, { method: "DELETE" }).catch(() => undefined);
       throw err;
     }
   }
