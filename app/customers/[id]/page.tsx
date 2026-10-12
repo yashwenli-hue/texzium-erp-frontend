@@ -35,6 +35,7 @@ import { CollectionsStatementSection } from "../../../components/collections/Col
 import { LedgerStatementSection } from "../../../components/collections/LedgerStatementSection";
 import { QUOTATION_PERMISSIONS } from "../../../lib/repository/shared/quotationLifecycle";
 import { CustomerGstRegistration } from "../../../lib/types/domain";
+import { ShareContentDialog } from "../../../components/content/ShareContentDialog";
 
 type Dialog =
   | { kind: "edit" }
@@ -65,6 +66,7 @@ export default function CustomerCockpitPage() {
   const id = params?.id;
   const d = useCustomerDetail(id);
   const [dialog, setDialog] = useState<Dialog | null>(null);
+  const [showShare, setShowShare] = useState(false);
   const close = () => setDialog(null);
   // Bumped after a change that can alter the ledger statement (an opportunity linked, a payment recorded).
   const [ledgerVersion, setLedgerVersion] = useState(0);
@@ -282,10 +284,28 @@ export default function CustomerCockpitPage() {
             }}
           />
           <DetailsPanel customer={customer} />
+          {hasPermission("content.view") && hasPermission("content.share") && (
+            <section className="card panel" aria-labelledby="sales-content-title" data-testid="sales-content-panel">
+              <div className="panel-head">
+                <h3 id="sales-content-title">Sales content</h3>
+              </div>
+              <div className="panel-body">
+                <Button variant="ghost" icon="share" onClick={() => setShowShare(true)} disabled={!customer.isActive} aria-describedby={!customer.isActive ? "share-why" : undefined}>
+                  Share content
+                </Button>
+                <p id="share-why" className="content-dialog-note">
+                  {customer.isActive ? "Share a catalogue, photo or video from the Content Library; it is recorded on the activity." : "Reactivate the customer before sharing content with it."}
+                </p>
+              </div>
+            </section>
+          )}
           <ActivityPanel events={d.events} loading={d.eventsLoading} error={d.eventsError} onRetry={d.refreshAll} />
         </aside>
       </div>
 
+      {showShare && (
+        <ShareContentDialog target={{ type: "CUSTOMER", id: customer.id, name: customer.customerName, phone: customer.phone }} onShared={d.refreshAll} onClose={() => setShowShare(false)} />
+      )}
       {dialog?.kind === "edit" && <CustomerForm mode="edit" customer={customer} onClose={close} onSubmit={(input) => d.editCustomer(input)} />}
       {dialog?.kind === "delete" && (
         <DeleteRecordDialog

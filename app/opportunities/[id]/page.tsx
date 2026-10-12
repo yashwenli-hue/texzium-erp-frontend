@@ -23,6 +23,7 @@ import { useOpportunityDetail } from "../../../lib/hooks/useOpportunities";
 import { useQuotations } from "../../../lib/hooks/useQuotations";
 import { useToast } from "../../../components/ui/Toast";
 import { useAuth } from "../../../lib/auth/AuthContext";
+import { ShareContentDialog } from "../../../components/content/ShareContentDialog";
 import { initials } from "../../../components/ui/Who";
 import { formatInr, formatDate } from "../../../lib/format";
 import { OPPORTUNITY_STEPS, OpportunityStage, Quotation, formatOpportunityStage } from "../../../lib/types/domain";
@@ -52,6 +53,7 @@ export default function OpportunityDetailPage() {
   const { quotations, createQuotation, refetch: refetchQuotations } = useQuotations();
   const [pendingMove, setPendingMove] = useState<PendingMove | null>(null);
   const [showQuotationForm, setShowQuotationForm] = useState(false);
+  const [showShare, setShowShare] = useState(false);
   const [customerDialog, setCustomerDialog] = useState<null | "link" | "remove">(null);
 
   if (loading && !opportunity) {
@@ -173,6 +175,25 @@ export default function OpportunityDetailPage() {
               )}
             </div>
             {lead && <QuickActions phone={lead.phone} email={lead.email} contactName={opportunity.customerName} country={lead.country ?? null} />}
+            {lead && hasPermission("content.view") && hasPermission("content.share") && (
+              <div className="content-share-row">
+                <Button
+                  variant="ghost"
+                  icon="share"
+                  onClick={() => setShowShare(true)}
+                  disabled={!lead.isActive || opportunity.customer?.isActive === false}
+                  title={
+                    !lead.isActive
+                      ? "Reactivate the lead before sharing content for this opportunity"
+                      : opportunity.customer?.isActive === false
+                        ? "Reactivate the customer before sharing content for this opportunity"
+                        : "Share a catalogue, photo or video from the Content Library"
+                  }
+                >
+                  Share content
+                </Button>
+              </div>
+            )}
           </div>
 
           <div style={{ padding: "16px 19px", borderBottom: "1px solid var(--line-2)" }}>
@@ -367,6 +388,13 @@ export default function OpportunityDetailPage() {
             refetch();
             return q;
           }}
+        />
+      )}
+      {showShare && lead && (
+        <ShareContentDialog
+          target={{ type: "OPPORTUNITY", id: opportunity.id, name: opportunity.customerName, phone: lead.phone, country: lead.country ?? null }}
+          onShared={refetch}
+          onClose={() => setShowShare(false)}
         />
       )}
     </div>

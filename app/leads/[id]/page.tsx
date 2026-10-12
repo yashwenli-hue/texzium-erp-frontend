@@ -28,6 +28,7 @@ import { EditLeadDialog } from "../../../components/forms/EditLeadDialog";
 import { QualifyLeadDialog } from "../../../components/forms/QualifyLeadDialog";
 import { FollowupForm } from "../../../components/forms/FollowupForm";
 import { OpportunityForm } from "../../../components/forms/OpportunityForm";
+import { ShareContentDialog } from "../../../components/content/ShareContentDialog";
 import { ConfirmDialog } from "../../../components/ui/ConfirmDialog";
 import { EmptyState } from "../../../components/ui/Button";
 import { useLeadDetail } from "../../../lib/hooks/useLeads";
@@ -82,6 +83,7 @@ export default function LeadDetailPage() {
   const [showQualify, setShowQualify] = useState(false);
   const [showReject, setShowReject] = useState(false);
   const [showDeactivate, setShowDeactivate] = useState(false);
+  const [showShare, setShowShare] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
   const [reactivating, setReactivating] = useState(false);
   const [showConvert, setShowConvert] = useState(false);
@@ -301,6 +303,17 @@ export default function LeadDetailPage() {
                     title="Move this lead to the Recycle Bin (only for a lead that was entered by mistake and has had no real work done on it)"
                   >
                     Delete
+                  </Button>
+                )}
+                {hasPermission("content.view") && hasPermission("content.share") && (
+                  <Button
+                    variant="ghost"
+                    icon="share"
+                    onClick={() => setShowShare(true)}
+                    disabled={inactive}
+                    title={inactive ? "Reactivate this lead before sharing content with it" : "Share a catalogue, photo or video from the Content Library"}
+                  >
+                    Share content
                   </Button>
                 )}
                 {!inactive && (
@@ -657,6 +670,13 @@ export default function LeadDetailPage() {
           defaultLeadId={lead.id}
           onClose={() => setShowConvert(false)}
           onSubmit={(input) => createOpportunity(input)}
+        />
+      )}
+      {showShare && (
+        <ShareContentDialog
+          target={{ type: "LEAD", id: lead.id, name: lead.customerName, phone: lead.phone, country: lead.country ?? null }}
+          onShared={refetch}
+          onClose={() => setShowShare(false)}
         />
       )}
       {followupDialog && (

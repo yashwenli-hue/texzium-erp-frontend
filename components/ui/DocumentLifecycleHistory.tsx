@@ -287,6 +287,7 @@ const CUSTOMER_ICON: Record<string, string> = {
   GST_DEFAULT_CHANGED: "pin",
   OPPORTUNITY_LINKED: "target",
   OPPORTUNITY_UNLINKED: "close",
+  CONTENT_SHARED: "share",
 };
 
 const CUSTOMER_FIELD_LABEL: Record<string, string> = {
