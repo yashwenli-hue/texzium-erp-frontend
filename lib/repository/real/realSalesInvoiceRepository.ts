@@ -77,6 +77,6 @@ export class RealSalesInvoiceRepository implements ISalesInvoiceRepository {
   }
 
   downloadPdf(id: ID): Promise<DownloadedFile> {
-    return downloadDocument(`/sales-invoices/${encodeURIComponent(id)}/document.pdf`, "invoice.pdf", "You don't have permission to view invoices.");
+    return downloadDocument(`/sales-invoices/${encodeURIComponent(id)}/document.pdf`, "invoice.pdf", "Tax-invoice printing is not enabled for you: it needs the invoices.document.view permission, which is granted only once the accountant has confirmed the e-invoicing requirements.");
   }
 }

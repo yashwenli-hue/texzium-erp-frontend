@@ -36,6 +36,9 @@ export default function SalesInvoiceDetailPage() {
   const repo = useRepository();
   const { downloading, download } = useDocumentDownload();
   const canViewInvoices = hasPermission("invoices.view");
+  // VERIFIED (backend 2026-10-16): the tax-invoice PDF also needs invoices.document.view,
+  // which is granted to nobody until the accountant has confirmed e-invoicing applicability.
+  const canPrintTaxInvoice = hasPermission("invoices.document.view");
   const canView = hasPermission("collections.view");
   const canRecord = hasPermission("collections.record");
   const collectionsQuery = useReceivableCollections(id, canView);
@@ -129,20 +132,27 @@ export default function SalesInvoiceDetailPage() {
             </div>
           </div>
 
-          <DocumentActions
-            testId="invoice-actions"
-            actions={[
-              {
-                key: "pdf",
-                label: downloading ? "Preparing PDF…" : "Download tax invoice (PDF)",
-                icon: "file",
-                state: invoice.numbered
-                  ? { enabled: !downloading }
-                  : { enabled: false, reason: "Issued before invoices were numbered: it can't be printed as a tax invoice." },
-                onClick: () => download(() => repo.salesInvoices.downloadPdf(invoice.id), `${invoice.invoiceNumber} downloaded`),
-              },
-            ]}
-          />
+          {canPrintTaxInvoice ? (
+            <DocumentActions
+              testId="invoice-actions"
+              actions={[
+                {
+                  key: "pdf",
+                  label: downloading ? "Preparing PDF…" : "Download tax invoice (PDF)",
+                  icon: "file",
+                  state: invoice.numbered
+                    ? { enabled: !downloading }
+                    : { enabled: false, reason: "Issued before invoices were numbered: it can't be printed as a tax invoice." },
+                  onClick: () => download(() => repo.salesInvoices.downloadPdf(invoice.id), `${invoice.invoiceNumber} downloaded`),
+                },
+              ]}
+            />
+          ) : (
+            <p className="dc-why" style={{ padding: "0 19px 12px", margin: 0 }} data-testid="tax-invoice-disabled">
+              Tax-invoice printing is not enabled yet: it is switched on once the accountant has confirmed the e-invoicing
+              requirements.
+            </p>
+          )}
 
           <div style={{ padding: "16px 19px", borderBottom: "1px solid var(--line-2)" }}>
             <DocumentTrail

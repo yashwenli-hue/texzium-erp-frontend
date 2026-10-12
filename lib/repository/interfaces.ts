@@ -641,7 +641,7 @@ export interface ISalesInvoiceRepository {
   list(query?: ListQuery<SalesInvoiceSortField>): Promise<Page<SalesInvoice>>;
   getById(id: ID): Promise<SalesInvoice | null>;
   create(input: CreateSalesInvoiceInput): Promise<SalesInvoice>;
-  /** VERIFIED: `GET /:id/document.pdf` (invoices.view): the tax invoice as a PDF; 409 (with the reason) for an invoice that cannot be printed as one. */
+  /** VERIFIED: `GET /:id/document.pdf` (invoices.view AND invoices.document.view, the latter granted to nobody until the e-invoicing question is settled): the tax invoice as a PDF; 409 (with the reason) for an invoice that cannot be printed as one. */
   downloadPdf(id: ID): Promise<DownloadedFile>;
 }
 
