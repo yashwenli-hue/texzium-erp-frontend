@@ -68,7 +68,7 @@ export default function LeadDetailPage() {
   const router = useRouter();
   const toast = useToast();
   const id = params?.id;
-  const { lead, timeline, loading, error, refetch, logActivity, deactivateLead, reactivateLead, assignLead, unassignLead, qualifyLead, rejectLead, updateLead } = useLeadDetail(id);
+  const { lead, timeline, loading, error, refetch, refreshAll, logActivity, deactivateLead, reactivateLead, assignLead, unassignLead, qualifyLead, rejectLead, updateLead } = useLeadDetail(id);
   const { notes, refetch: refetchNotes } = useNotesByRelated(id);
   const { followups, createFollowup, completeFollowup, rescheduleFollowup, cancelFollowup, refetch: refetchFollowups } = useLeadFollowups(id);
   const { quotations } = useQuotations();
@@ -675,7 +675,7 @@ export default function LeadDetailPage() {
       {showShare && (
         <ShareContentDialog
           target={{ type: "LEAD", id: lead.id, name: lead.customerName, phone: lead.phone, country: lead.country ?? null }}
-          onShared={refetch}
+          onShared={refreshAll}
           onClose={() => setShowShare(false)}
         />
       )}

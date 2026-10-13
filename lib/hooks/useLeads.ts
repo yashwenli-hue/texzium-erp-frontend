@@ -101,6 +101,13 @@ export function useLeadDetail(id: string | undefined) {
     [repo, id]
   );
 
+  // Reloads the lead and its history together: for changes made elsewhere that add a
+  // history entry (sharing content records one in the same backend transaction).
+  const refreshAll = useCallback(() => {
+    refetch();
+    refetchTimeline();
+  }, [refetch, refetchTimeline]);
+
   // Employee sales activity. Never changes the lead's status; the backend
   // records the signed-in user as the actor. Errors propagate so the form can
   // show them — nothing is faked locally.
@@ -198,6 +205,7 @@ export function useLeadDetail(id: string | undefined) {
     rejectLead,
     updateLead,
     refetch,
+    refreshAll,
   };
 }
 
