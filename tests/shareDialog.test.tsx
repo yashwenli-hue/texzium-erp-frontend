@@ -8,7 +8,7 @@ import { PDF, PHOTO, VIDEO } from "./helpers/fixtures";
 // The dialog's pieces rendered to HTML (no browser). The library repository is replaced: rendering
 // on the server runs no effects, so nothing is fetched.
 mock.module(new URL("../lib/repository/RepositoryProvider.tsx", import.meta.url).href, { namedExports: { useRepository: () => ({}) } });
-const { ContentThumbView, SelectedContent, ShareResult } = await import("../components/content/ShareContentDialog");
+const { ContentThumbView, SelectedContent, ShareResult, hasMediaPreview } = await import("../components/content/ShareContentDialog");
 
 const TARGET = { type: "LEAD" as const, id: "lead-1", name: "Testing Lead", phone: "9876543210", country: "IN" };
 const WA = "https://wa.me/919876543210";
@@ -27,17 +27,51 @@ test("photo preview: a thumbnail of the photo itself", () => {
   assert.match(html(<ContentThumbView kind="PHOTO" url={null} />), /content-thumb-photo/, "icon until the signed URL arrives");
 });
 
-test("video and PDF previews: their kind's icon (the library has no video poster frame)", () => {
-  const video = html(<ContentThumbView kind="VIDEO" url="/should-not-be-used" />);
-  assert.match(video, /content-thumb content-thumb-video/);
-  assert.doesNotMatch(video, /<img|<video/);
-  const pdf = html(<ContentThumbView kind="CATALOGUE" url={null} />);
-  assert.match(pdf, /content-thumb content-thumb-catalogue/);
+test("video thumbnail: a frame from the start of the video, never played, no controls", () => {
+  const out = html(<ContentThumbView kind="VIDEO" url="/api/backend/content-files/v?sig=1" />);
+  assert.match(out, /^<video class="content-thumb" src="\/api\/backend\/content-files\/v\?sig=1#t=0\.1" preload="metadata"[^>]*aria-hidden="true"[^>]*><\/video>$/);
+  assert.doesNotMatch(out, /controls|autoplay/i);
+  assert.match(html(<ContentThumbView kind="VIDEO" url={null} />), /content-thumb content-thumb-video/, "icon until the signed URL arrives");
+});
+
+test("catalogue (PDF): its kind's icon, small or large", () => {
+  assert.match(html(<ContentThumbView kind="CATALOGUE" url="/ignored" />), /content-thumb content-thumb-catalogue/);
+  const large = html(<ContentThumbView kind="CATALOGUE" size="large" url={null} />);
+  assert.match(large, /content-large-icon content-thumb-catalogue/);
+  assert.doesNotMatch(large, /<img|<video|<iframe/);
+});
+
+test("large previews: the photo itself, or the video with controls that plays only when asked", () => {
+  const photo = html(<ContentThumbView kind="PHOTO" size="large" title="DH-4" url="/p?sig=1" />);
+  assert.match(photo, /^<img class="content-large-media" src="\/p\?sig=1" alt="DH-4"\/>$/);
+  const video = html(<ContentThumbView kind="VIDEO" size="large" title="Loom" url="/v?sig=1" />);
+  assert.match(video, /^<video class="content-large-media" src="\/v\?sig=1" controls="" preload="metadata"[^>]*aria-label="Loom"/);
+  assert.doesNotMatch(video, /autoplay|#t=/i);
+});
+
+test("only photos and videos fetch a picture of the file", () => {
+  assert.equal(hasMediaPreview(PHOTO), true);
+  assert.equal(hasMediaPreview(VIDEO), true);
+  assert.equal(hasMediaPreview(PDF), false);
+  assert.equal(hasMediaPreview({ ...VIDEO, currentVersion: null }), false);
+});
+
+test("one item selected: the larger preview, with its details and remove button", () => {
+  const out = html(<SelectedContent selection={[VIDEO]} onRemove={noop} />);
+  assert.match(out, /class="content-selected content-selected-single"/);
+  assert.match(out, /<b>1 selected<\/b>/);
+  assert.match(out, /content-selected-large/);
+  assert.match(out, /content-large-icon content-thumb-video/, "large placeholder until the signed URL arrives");
+  assert.doesNotMatch(out, /content-selected-list/, "no compact list for one item");
+  assert.ok(out.includes(`aria-label="Remove ${VIDEO.title} from the selection"`));
+  assert.match(out, /Video · v1 · loom\.mp4/);
 });
 
 test("the preview lists every selected item with its title, kind, version, file and a remove button", () => {
   const out = html(<SelectedContent selection={[VIDEO, PHOTO, PDF]} onRemove={noop} />);
   assert.match(out, /<b>3 selected<\/b>/);
+  assert.match(out, /class="content-selected"/, "several items: the compact list, not the large preview");
+  assert.doesNotMatch(out, /content-selected-large|content-large-/);
   for (const [a, file] of [[VIDEO, "loom.mp4"], [PHOTO, "dh4.jpg"], [PDF, "braiding.pdf"]] as const) {
     assert.ok(out.includes(a.title), a.title);
     assert.ok(out.includes(file), file);
@@ -100,7 +134,7 @@ test("WhatsApp is only ever a link the person opens: nothing navigates or sends 
   const dialog = readFileSync(new URL("../components/content/ShareContentDialog.tsx", import.meta.url), "utf8");
   const batch = readFileSync(new URL("../lib/content/shareBatch.ts", import.meta.url), "utf8");
   for (const src of [dialog, batch]) {
-    assert.doesNotMatch(src, /window\.open|location\.(assign|replace|href\s*=)|\.click\(\)|fetch\(/);
+    assert.doesNotMatch(src, /window\.open|location\.(assign|replace|href\s*=)|\.click\(\)|fetch\(|autoPlay|\.play\(\)/);
   }
   // the only calls the batch makes are the backend's share, share history and signed download URL
   assert.deepEqual([...batch.matchAll(/api\.(\w+)\(/g)].map((m) => m[1]).sort(), ["accessUrl", "listShares", "share"]);

@@ -267,30 +267,37 @@ export function ShareContentDialog({ target, onShared, onClose }: { target: Shar
   );
 }
 
-/** The picked items, under the search field: a thumbnail or icon, what it is, and a way to unpick it. */
+/** Whether an item's preview shows its file (a photo, or a frame of a video) rather than its kind's icon. */
+export function hasMediaPreview(asset: ContentAsset): boolean {
+  return (asset.kind === "PHOTO" || asset.kind === "VIDEO") && !!asset.currentVersion;
+}
+
+/**
+ * The picked items, under the search field. One item gets a larger preview (the photo, or the
+ * video with its controls); several are listed compactly with thumbnails. Each can be unpicked here.
+ */
 export function SelectedContent({ selection, onRemove }: { selection: readonly ContentAsset[]; onRemove: (assetId: string) => void }) {
+  const single = selection.length === 1 ? selection[0] : null;
   return (
-    <section className="content-selected" aria-label="Selected content">
+    <section className={`content-selected${single ? " content-selected-single" : ""}`} aria-label="Selected content">
       <div className="content-selected-head">
         <b>{selection.length === 0 ? "Nothing selected" : `${selection.length} selected`}</b>
         {selection.length === 0 && <span>Choose one or more items below.</span>}
       </div>
-      {selection.length > 0 && (
+      {single && (
+        <div className="content-selected-large">
+          <ContentThumb asset={single} size="large" />
+          <div className="content-selected-row">
+            <SelectedDetails asset={single} onRemove={onRemove} />
+          </div>
+        </div>
+      )}
+      {selection.length > 1 && (
         <ul className="content-selected-list">
           {selection.map((a) => (
             <li key={a.id} className="content-selected-item">
-              <ContentThumb asset={a} />
-              <span className="content-selected-text">
-                <span className="content-selected-title">{a.title}</span>
-                <span className="content-selected-meta">
-                  {CONTENT_KIND_META[a.kind].label} · v{a.currentVersion?.version ?? 1}
-                  {selectionFileName(a) ? ` · ${selectionFileName(a)}` : ""}
-                  {a.currentVersion ? ` · ${formatFileSize(a.currentVersion.sizeBytes)}` : ""}
-                </span>
-              </span>
-              <button type="button" className="icon-btn sm" aria-label={`Remove ${a.title} from the selection`} title="Remove from the selection" onClick={() => onRemove(a.id)}>
-                <Icon name="close" size={14} />
-              </button>
+              <ContentThumb asset={a} size="small" />
+              <SelectedDetails asset={a} onRemove={onRemove} />
             </li>
           ))}
         </ul>
@@ -299,19 +306,40 @@ export function SelectedContent({ selection, onRemove }: { selection: readonly C
   );
 }
 
+function SelectedDetails({ asset: a, onRemove }: { asset: ContentAsset; onRemove: (assetId: string) => void }) {
+  return (
+    <>
+      <span className="content-selected-text">
+        <span className="content-selected-title">{a.title}</span>
+        <span className="content-selected-meta">
+          {CONTENT_KIND_META[a.kind].label} · v{a.currentVersion?.version ?? 1}
+          {selectionFileName(a) ? ` · ${selectionFileName(a)}` : ""}
+          {a.currentVersion ? ` · ${formatFileSize(a.currentVersion.sizeBytes)}` : ""}
+        </span>
+      </span>
+      <button type="button" className="icon-btn sm" aria-label={`Remove ${a.title} from the selection`} title="Remove from the selection" onClick={() => onRemove(a.id)}>
+        <Icon name="close" size={14} />
+      </button>
+    </>
+  );
+}
+
 /**
- * A small picture of an item. Photos show the photo itself (a signed, expiring inline URL);
- * videos and catalogues show their kind's icon, since the library keeps no video poster frame.
+ * An item's picture, from a signed, expiring inline URL of its current version: the photo, or the
+ * video (only its opening bytes are fetched for a thumbnail; nothing plays until the person presses
+ * play). If the media fails (e.g. the signature expired) the URL is renewed once; after that, or for
+ * a catalogue, the kind's icon is shown.
  */
-export function ContentThumb({ asset }: { asset: ContentAsset }) {
+export function ContentThumb({ asset, size }: { asset: ContentAsset; size: "small" | "large" }) {
   const repo = useRepository();
   const [url, setUrl] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
   const [failed, setFailed] = useState(false);
   const version = asset.currentVersion?.version;
-  const photo = asset.kind === "PHOTO" && !!asset.currentVersion;
+  const media = hasMediaPreview(asset);
 
   useEffect(() => {
-    if (!photo) return;
+    if (!media) return;
     let alive = true;
     repo.content
       .accessUrl(asset.id, "inline", version)
@@ -320,20 +348,32 @@ export function ContentThumb({ asset }: { asset: ContentAsset }) {
     return () => {
       alive = false;
     };
-  }, [repo, asset.id, version, photo]);
+  }, [repo, asset.id, version, media, attempt]);
 
-  return <ContentThumbView kind={asset.kind} url={photo && !failed ? url : null} onError={() => setFailed(true)} />;
+  const onError = () => (attempt === 0 ? setAttempt(1) : setFailed(true));
+  return <ContentThumbView kind={asset.kind} size={size} title={asset.title} url={media && !failed ? url : null} onError={onError} />;
 }
 
-/** The thumbnail itself: the photo when there is a URL for it, otherwise the kind's icon. */
-export function ContentThumbView({ kind, url, onError }: { kind: ContentKind; url: string | null; onError?: () => void }) {
+/** The picture itself: the photo or video when there is a URL for it, otherwise the kind's icon. */
+export function ContentThumbView({ kind, size = "small", title = "", url, onError }: { kind: ContentKind; size?: "small" | "large"; title?: string; url: string | null; onError?: () => void }) {
+  const large = size === "large";
   if (kind === "PHOTO" && url) {
     // eslint-disable-next-line @next/next/no-img-element -- a signed, expiring URL served by the backend
-    return <img className="content-thumb" src={url} alt="" onError={onError} />;
+    return <img className={large ? "content-large-media" : "content-thumb"} src={url} alt={large ? title : ""} onError={onError} />;
+  }
+  if (kind === "VIDEO" && url) {
+    return large ? (
+      <video className="content-large-media" src={url} controls preload="metadata" playsInline aria-label={title} onError={onError}>
+        Your browser can&apos;t play this video.
+      </video>
+    ) : (
+      // a frame from the start of the video; muted, never played
+      <video className="content-thumb" src={`${url}#t=0.1`} preload="metadata" muted playsInline tabIndex={-1} aria-hidden="true" onError={onError} />
+    );
   }
   return (
-    <span className={`content-thumb content-thumb-${kind.toLowerCase()}`} aria-hidden="true">
-      <Icon name={CONTENT_KIND_META[kind].icon} size={18} />
+    <span className={`${large ? "content-large-icon" : "content-thumb"} content-thumb-${kind.toLowerCase()}`} aria-hidden="true">
+      <Icon name={CONTENT_KIND_META[kind].icon} size={large ? 40 : 18} />
     </span>
   );
 }
