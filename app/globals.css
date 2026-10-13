@@ -1475,6 +1475,7 @@ th[aria-sort] .th-sort{color:var(--ink)}
 .content-versions b{margin-right:8px}
 .content-share-log li{flex-direction:column;align-items:flex-start;gap:2px}
 .content-share-tools{display:flex;flex-direction:column;gap:10px;margin-bottom:10px}
+.content-share-tools .cust-search{flex:0 0 auto}
 .content-pick{list-style:none;margin:0 0 12px;padding:0;max-height:300px;overflow:auto;border:1px solid var(--line);border-radius:11px}
 .content-pick-item{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:10px;width:100%;text-align:left;padding:10px 12px;background:none;border:0;border-top:1px solid var(--line-2);color:var(--text);font:inherit;cursor:pointer}
 .content-pick li:first-child .content-pick-item{border-top:0}

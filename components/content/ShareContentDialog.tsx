@@ -148,7 +148,7 @@ export function ShareContentDialog({ target, onShared, onClose }: { target: Shar
         </>
       }
     >
-      {!wa.ok && <p className="content-dialog-note" role="note">WhatsApp: {wa.message}. You can still share by download.</p>}
+      {!wa.ok && <p className="content-dialog-note" role="note">WhatsApp: {wa.message.replace(/\.$/, "")}. You can still share by download.</p>}
       {loadError && (
         <p role="alert" className="content-error">
           {loadError}
