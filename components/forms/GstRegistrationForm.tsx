@@ -184,7 +184,7 @@ export function GstRegistrationForm({
           pincode: pincode.trim(),
           ...(hasActive && makeDefault ? { isDefault: true } : {}),
         });
-        toast.show("GST registration added", "check");
+        toast.success("GST registration added");
       }
       onClose();
     } catch (err) {

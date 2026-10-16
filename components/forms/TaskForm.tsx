@@ -58,7 +58,7 @@ export function TaskForm({
         linkedName: linkedName.trim(),
         assigneeName: assigneeName.trim(),
       });
-      toast.show("Task created", "check");
+      toast.success("Task created");
       onClose();
     } catch {
       setErrors({ form: "Something went wrong creating the task. Please try again." });

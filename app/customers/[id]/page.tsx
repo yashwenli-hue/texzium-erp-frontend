@@ -279,8 +279,8 @@ export default function CustomerCockpitPage() {
             onReactivate={(reg) => setDialog({ kind: "gstReactivate", reg })}
             onMakeDefault={(reg) => {
               d.makeDefaultRegistration(reg.id)
-                .then(() => toast.show(`${reg.gstin} is now the default`, "check"))
-                .catch((err) => toast.show(err instanceof Error ? err.message : "Couldn't change the default.", "alert"));
+                .then(() => toast.success(`${reg.gstin} is now the default`))
+                .catch((err) => toast.error(err instanceof Error ? err.message : "Couldn't change the default."));
             }}
           />
           <DetailsPanel customer={customer} />
@@ -331,7 +331,7 @@ export default function CustomerCockpitPage() {
           onClose={close}
           onConfirm={async (reason) => {
             await d.deactivateCustomer(reason ?? "");
-            toast.show(`${customer.customerName} deactivated`, "check");
+            toast.success(`${customer.customerName} deactivated`);
           }}
         >
           <DeactivationImpact impact={impact} loading={d.overviewLoading} error={d.overviewError} />
@@ -346,7 +346,7 @@ export default function CustomerCockpitPage() {
           onClose={close}
           onConfirm={async (remarks) => {
             await d.reactivateCustomer(remarks);
-            toast.show(`${customer.customerName} reactivated`, "check");
+            toast.success(`${customer.customerName} reactivated`);
           }}
         />
       )}
@@ -363,7 +363,7 @@ export default function CustomerCockpitPage() {
           onClose={close}
           onConfirm={async (reason) => {
             await d.deactivateRegistration(dialog.reg.id, reason ?? "");
-            toast.show(`${dialog.reg.gstin} deactivated`, "check");
+            toast.success(`${dialog.reg.gstin} deactivated`);
           }}
         />
       )}
@@ -376,7 +376,7 @@ export default function CustomerCockpitPage() {
           onClose={close}
           onConfirm={async (remarks) => {
             await d.reactivateRegistration(dialog.reg.id, remarks);
-            toast.show(`${dialog.reg.gstin} reactivated`, "check");
+            toast.success(`${dialog.reg.gstin} reactivated`);
           }}
         />
       )}
@@ -411,7 +411,7 @@ export default function CustomerCockpitPage() {
           onConfirm={async () => {
             await d.linkOpportunity(dialog.opp.id);
             ledgerChanged();
-            toast.show("Opportunity linked", "check");
+            toast.success("Opportunity linked");
           }}
         />
       )}

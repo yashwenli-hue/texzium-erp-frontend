@@ -1,3 +1,4 @@
+import { Icon } from "./Icon";
 import { LeadStatus, OPPORTUNITY_STAGES, formatOpportunityStage, formatLeadStatus, formatQuotationStatus, formatProformaInvoiceStatus, formatSalesOrderStatus, formatSalesInvoiceStatus, formatAccountsReceivableStatus, formatDispatchOrderStatus } from "../../lib/types/domain";
 
 export type TagColor = "g" | "w" | "b" | "i" | "n";
@@ -173,47 +174,49 @@ export function AccountsReceivableStatusTag({ status }: { status: string }) {
   return <Tag color={ACCOUNTS_RECEIVABLE_STATUS_STYLE[status] ?? "n"}>{formatAccountsReceivableStatus(status)}</Tag>;
 }
 
-// Dedicated lifecycle palette for the verified backend LeadStatus enum
-// (LEAD_STATUSES in lib/types/domain.ts) — its own hue per stage, separate
-// from the shared STAGE_COLOR palette above and from Score's own red/amber/
-// blue (see LEAD_SCORE_STYLE below). Blue/entry, teal/in-progress, green/
-// qualified-success, amber/proposal, violet/negotiation, red/lost and
-// indigo/rejected read as natural cues; every stage uses the same
-// restrained light-tint-with-dark-text construction as the rest of the
-// app's badges (design review Stage 1.3 patch 05 §3 explicitly rules out a
-// large solid saturated fill, even for a terminal state). No new status
-// values are introduced, only presentation color — text always renders
-// alongside it so nothing depends on color alone.
-// Theme-aware token references, not literal hex — this map is also passed
-// as KanbanBoard's colorMap for the Lead Pipeline board (app/pipeline/page.tsx),
-// so it paints full column backgrounds, not just this badge. ASSIGNED/
-// CONTACTED/PRE_SALES_ASSIGNED and REJECTED reuse the shared --stage-teal/
-// --stage-indigo hue tokens (their light values were already an exact
-// match for this map's original hex). NEW/QUALIFIED/SALES_ASSIGNED/
-// PROPOSAL_SENT/NEGOTIATION/WON/LOST use dedicated --lead-* tokens instead
-// of the shared --info/--good/--warn/--bad/--m tokens, since those shared
-// tokens' light-mode values don't equal this map's original per-status hex
-// (see app/globals.css's "Version A light-theme restoration" block) — each
-// --lead-* token carries its own exact original light hex while keeping
-// today's already-shipped dark-v1/dark-v2 appearance unchanged.
+// Lead lifecycle palette: one hue per stage, so neighbouring stages never look
+// the same, on the restrained light-tint-with-dark-text badge used everywhere
+// (no solid fills, even for a terminal state). Every pair is theme-aware
+// (--lead-* tokens in app/globals.css, light and dark-v4) and at least 4.5:1.
+//   blue      New
+//   indigo    Assigned / Pre-Sales Assigned  (an assignment, not a verdict)
+//   cyan      Contacted
+//   teal      Qualified / Sales Assigned
+//   amber     Proposal Sent
+//   violet    Negotiation
+//   green     Won    + tick
+//   red       Lost   + cross
+//   slate     Rejected + cross   (closed as not a fit; not the same as Lost)
+// The label is always shown, and the closed states carry an icon in place of the
+// dot, so nothing depends on colour alone. This map is also KanbanBoard's
+// colorMap on the Lead Pipeline board (app/pipeline/page.tsx).
 export const LEAD_STATUS_STYLE: Record<LeadStatus, { bg: string; fg: string }> = {
   NEW: { bg: "var(--lead-new-bg)", fg: "var(--lead-new-fg)" },
-  ASSIGNED: { bg: "var(--stage-teal-bg)", fg: "var(--stage-teal)" },
-  CONTACTED: { bg: "var(--stage-teal-bg)", fg: "var(--stage-teal)" },
-  PRE_SALES_ASSIGNED: { bg: "var(--stage-teal-bg)", fg: "var(--stage-teal)" },
-  QUALIFIED: { bg: "var(--lead-good-bg)", fg: "var(--lead-good-fg)" },
-  SALES_ASSIGNED: { bg: "var(--lead-good-bg)", fg: "var(--lead-good-fg)" },
+  ASSIGNED: { bg: "var(--lead-assigned-bg)", fg: "var(--lead-assigned-fg)" },
+  PRE_SALES_ASSIGNED: { bg: "var(--lead-assigned-bg)", fg: "var(--lead-assigned-fg)" },
+  CONTACTED: { bg: "var(--lead-contacted-bg)", fg: "var(--lead-contacted-fg)" },
+  QUALIFIED: { bg: "var(--lead-qualified-bg)", fg: "var(--lead-qualified-fg)" },
+  SALES_ASSIGNED: { bg: "var(--lead-qualified-bg)", fg: "var(--lead-qualified-fg)" },
   PROPOSAL_SENT: { bg: "var(--lead-proposal-bg)", fg: "var(--lead-proposal-fg)" },
   NEGOTIATION: { bg: "var(--lead-negotiation-bg)", fg: "var(--lead-negotiation-fg)" },
   WON: { bg: "var(--lead-good-bg)", fg: "var(--lead-good-fg)" },
   LOST: { bg: "var(--lead-lost-bg)", fg: "var(--lead-lost-fg)" },
-  REJECTED: { bg: "var(--stage-indigo-bg)", fg: "var(--stage-indigo)" },
+  REJECTED: { bg: "var(--lead-rejected-bg)", fg: "var(--lead-rejected-fg)" },
+};
+
+/** The icon a closed status shows in place of the dot. */
+export const LEAD_STATUS_MARK: Partial<Record<LeadStatus, string>> = {
+  WON: "check",
+  LOST: "close",
+  REJECTED: "close",
 };
 
 export function LeadStatusTag({ status }: { status: string }) {
-  const style = LEAD_STATUS_STYLE[status as LeadStatus] ?? { bg: "var(--line-2)", fg: "var(--muted)" };
+  const style = LEAD_STATUS_STYLE[status as LeadStatus] ?? { bg: "var(--line-2)", fg: "var(--text-2)" };
+  const mark = LEAD_STATUS_MARK[status as LeadStatus];
   return (
-    <span className="tag" style={{ background: style.bg, color: style.fg }}>
+    <span className={mark ? "tag tag-mark" : "tag"} style={{ background: style.bg, color: style.fg }}>
+      {mark && <Icon name={mark} size={11} />}
       {formatLeadStatus(status)}
     </span>
   );
@@ -222,7 +225,7 @@ export function LeadStatusTag({ status }: { status: string }) {
 /** Shown next to (never instead of) the lead's pipeline status. Neutral on purpose: it is a record state, not a stage. */
 export function LeadDeactivatedTag() {
   return (
-    <span className="tag" style={{ background: "var(--line-2)", color: "var(--muted)" }}>
+    <span className="tag" style={{ background: "var(--line-2)", color: "var(--text-2)" }}>
       Deactivated
     </span>
   );

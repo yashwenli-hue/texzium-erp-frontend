@@ -611,7 +611,7 @@ export default function SalesOrderDetailPage() {
           onClose={() => setReceiptAction(null)}
           onConfirm={async (note) => {
             await verifyAdvanceReceipt(receiptAction.receipt.id, receiptAction.kind === "verify" ? "VERIFIED" : "REJECTED", note);
-            toast.show(receiptAction.kind === "verify" ? "Advance receipt verified" : "Advance receipt rejected", receiptAction.kind === "verify" ? "check" : "close");
+            toast.success(receiptAction.kind === "verify" ? "Advance receipt verified" : "Advance receipt rejected");
           }}
         />
       )}
@@ -625,7 +625,7 @@ export default function SalesOrderDetailPage() {
           onClose={() => setShowApprove(false)}
           onConfirm={async (note) => {
             await approveCommercially(note);
-            toast.show("Accounts commercial approval given", "check");
+            toast.success("Accounts commercial approval given");
           }}
         />
       )}
@@ -640,7 +640,7 @@ export default function SalesOrderDetailPage() {
           onClose={() => setRetractReceipt(null)}
           onConfirm={async (note) => {
             await retractVerification(retractReceipt.id, note ?? "");
-            toast.show("Advance verification retracted", "check");
+            toast.success("Advance verification retracted");
           }}
         />
       )}
@@ -655,7 +655,7 @@ export default function SalesOrderDetailPage() {
           onClose={() => setRetractApprovalTarget(null)}
           onConfirm={async (note) => {
             await retractApproval(retractApprovalTarget.id, note ?? "");
-            toast.show("Accounts approval retracted", "check");
+            toast.success("Accounts approval retracted");
           }}
         />
       )}
@@ -673,7 +673,7 @@ export default function SalesOrderDetailPage() {
           onClose={() => setShowCancel(false)}
           onConfirm={async (note) => {
             await cancelSalesOrder(note ?? "");
-            toast.show("Sales Order cancelled", "close");
+            toast.success("Sales Order cancelled");
           }}
         />
       )}

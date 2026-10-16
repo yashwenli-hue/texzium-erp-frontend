@@ -71,7 +71,7 @@ export function LeadForm({
           remarks: remarks.trim() || undefined,
         },
       });
-      toast.show(`Lead "${customerName.trim()}" created`, "check");
+      toast.success(`Lead "${customerName.trim()}" created`);
       onClose();
     } catch (err) {
       setErrors({ form: err instanceof Error ? err.message : "Something went wrong creating the lead. Please try again." });

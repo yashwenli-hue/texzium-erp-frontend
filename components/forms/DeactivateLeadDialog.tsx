@@ -55,7 +55,7 @@ export function DeactivateLeadDialog({
     setError(null);
     try {
       await onSubmit(clean);
-      toast.show(`${customerName} deactivated`, "check");
+      toast.success(`${customerName} deactivated`);
       onClose();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not deactivate this lead. Please try again.");

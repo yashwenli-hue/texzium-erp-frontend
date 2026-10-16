@@ -37,7 +37,7 @@ export function AssignLeadDialog({
     setError(null);
     try {
       await onSubmit(user.id, user.name);
-      toast.show(`Lead assigned to ${user.name}`, "check");
+      toast.success(`Lead assigned to ${user.name}`);
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not assign the lead. Please try again.");

@@ -172,7 +172,7 @@ export default function DashboardPage() {
     try {
       validateOpportunityStageMove(o.stage, stage);
     } catch (err) {
-      toast.show(err instanceof Error ? err.message : "That move isn't allowed.", "alert");
+      toast.error(err instanceof Error ? err.message : "That move isn't allowed.");
     }
   }
 

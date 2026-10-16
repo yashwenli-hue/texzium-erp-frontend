@@ -15,6 +15,7 @@ import { Button, EmptyState } from "../../../components/ui/Button";
 import { DocumentTrail } from "../../../components/ui/DocumentTrail";
 import { LifecycleStepper } from "../../../components/ui/LifecycleStepper";
 import { QuickActions } from "../../../components/ui/QuickActions";
+import { BackLink } from "../../../components/ui/BackLink";
 import { DataTable, Column } from "../../../components/ui/DataTable";
 import { ConfirmDialog } from "../../../components/ui/ConfirmDialog";
 import { OpportunityStageDialog } from "../../../components/opportunities/OpportunityStageDialog";
@@ -30,14 +31,6 @@ import { OPPORTUNITY_STEPS, OpportunityStage, Quotation, formatOpportunityStage 
 import { canMoveOpportunityStage, isOpportunityStageFinal } from "../../../lib/repository/shared/opportunityStage";
 import { QUOTATION_PERMISSIONS } from "../../../lib/repository/shared/quotationLifecycle";
 import { OPPORTUNITY_EDIT_PERMISSION, opportunityCustomerActions } from "../../../lib/repository/shared/customerLifecycle";
-
-function goBackOrTo(router: ReturnType<typeof useRouter>, fallback: string) {
-  if (typeof window !== "undefined" && window.history.length > 1) {
-    router.back();
-  } else {
-    router.push(fallback);
-  }
-}
 
 /** The move being confirmed: captured when the person asks for it, so the dialog keeps saying what it was asked about even if the page reloads behind it. */
 type PendingMove = { from: OpportunityStage; to: OpportunityStage };
@@ -74,9 +67,7 @@ export default function OpportunityDetailPage() {
   if (error) {
     return (
       <div className="page">
-        <a className="back-link" onClick={() => goBackOrTo(router, "/opportunities")}>
-          <Icon name="back" size={14} /> Back to Opportunities
-        </a>
+        <BackLink fallback="/opportunities">Back to Opportunities</BackLink>
         <Panel title="Couldn't load this opportunity">
           <EmptyState
             icon="alert"
@@ -96,9 +87,7 @@ export default function OpportunityDetailPage() {
   if (!opportunity) {
     return (
       <div className="page">
-        <a className="back-link" onClick={() => goBackOrTo(router, "/opportunities")}>
-          <Icon name="back" size={14} /> Back to Opportunities
-        </a>
+        <BackLink fallback="/opportunities">Back to Opportunities</BackLink>
         <Panel title="Opportunity not found">
           <p style={{ color: "var(--muted)", fontSize: 13.5 }}>
             This opportunity may have been removed, or the link is out of date.
@@ -149,9 +138,7 @@ export default function OpportunityDetailPage() {
 
   return (
     <div className="page">
-      <a className="back-link" onClick={() => goBackOrTo(router, "/opportunities")}>
-        <Icon name="back" size={14} /> Back to Opportunities
-      </a>
+      <BackLink fallback="/opportunities">Back to Opportunities</BackLink>
       <div className="crm-grid">
         <div className="card panel">
           <div className="profile-head">
@@ -174,25 +161,25 @@ export default function OpportunityDetailPage() {
                 </a>
               )}
             </div>
-            {lead && <QuickActions phone={lead.phone} email={lead.email} contactName={opportunity.customerName} country={lead.country ?? null} />}
-            {lead && hasPermission("content.view") && hasPermission("content.share") && (
-              <div className="content-share-row">
-                <Button
-                  variant="ghost"
-                  icon="share"
-                  onClick={() => setShowShare(true)}
-                  disabled={!lead.isActive || opportunity.customer?.isActive === false}
-                  title={
-                    !lead.isActive
-                      ? "Reactivate the lead before sharing content for this opportunity"
-                      : opportunity.customer?.isActive === false
-                        ? "Reactivate the customer before sharing content for this opportunity"
-                        : "Share a catalogue, photo or video from the Content Library"
-                  }
-                >
-                  Share content
-                </Button>
-              </div>
+            {lead && (
+              <QuickActions
+                phone={lead.phone}
+                email={lead.email}
+                contactName={opportunity.customerName}
+                country={lead.country ?? null}
+                share={
+                  hasPermission("content.view") && hasPermission("content.share")
+                    ? {
+                        onShare: () => setShowShare(true),
+                        unavailable: !lead.isActive
+                          ? "Reactivate the lead before sharing content for this opportunity."
+                          : opportunity.customer?.isActive === false
+                            ? "Reactivate the customer before sharing content for this opportunity."
+                            : undefined,
+                      }
+                    : undefined
+                }
+              />
             )}
           </div>
 
@@ -369,7 +356,7 @@ export default function OpportunityDetailPage() {
           onClose={() => setCustomerDialog(null)}
           onConfirm={async () => {
             await linkCustomer(null);
-            toast.show("Customer removed", "check");
+            toast.success("Customer removed");
           }}
         />
       )}

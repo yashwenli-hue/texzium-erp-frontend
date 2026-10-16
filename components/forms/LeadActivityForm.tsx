@@ -58,7 +58,7 @@ export function LeadActivityForm({
     setError(null);
     try {
       await onSubmit(input);
-      toast.show(`${leadActivityMeta(activityType).label} logged`, "check");
+      toast.success(`${leadActivityMeta(activityType).label} logged`);
       onClose();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong logging the activity. Please try again.");

@@ -65,7 +65,7 @@ export function LinkCustomerDialog({
     setMessage(null);
     try {
       await onSubmit(selectedId);
-      toast.show(currentCustomerId ? "Customer changed" : "Customer linked", "check");
+      toast.success(currentCustomerId ? "Customer changed" : "Customer linked");
       onClose();
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "Something went wrong linking the customer. Please try again.");

@@ -8,6 +8,7 @@ import { OpportunityStageTag, QuotationStatusTag, LeadStatusTag, LeadDeactivated
 import { SourceBadge } from "../../../components/ui/SourceBadge";
 import { FollowupTag } from "../../../components/ui/FollowupTag";
 import { QuickActions } from "../../../components/ui/QuickActions";
+import { BackLink } from "../../../components/ui/BackLink";
 import { DataTable, Column } from "../../../components/ui/DataTable";
 import { Button } from "../../../components/ui/Button";
 import { DesignNote } from "../../../components/ui/PageHeader";
@@ -48,14 +49,6 @@ import { formatLeadLocation, formatLeadLocationShort } from "../../../lib/geo/le
 import { canAssignLeadFrom, canQualifyLeadFrom, canRejectLeadFrom, isQualifiedLeadStatus, leadActionBlockedReason, leadActivityMeta, LeadActivityType, LeadFollowup, Quotation, Opportunity, Note } from "../../../lib/types/domain";
 
 const SUMMARY_TYPES: LeadActivityType[] = ["CALL", "MEETING", "EMAIL", "WHATSAPP"];
-
-function goBackOrTo(router: ReturnType<typeof useRouter>, fallback: string) {
-  if (typeof window !== "undefined" && window.history.length > 1) {
-    router.back();
-  } else {
-    router.push(fallback);
-  }
-}
 
 const FOLLOWUP_STATUS_STYLE: Record<LeadFollowup["status"], { bg: string; fg: string }> = {
   PENDING: { bg: "var(--info-bg)", fg: "var(--info)" },
@@ -121,9 +114,7 @@ export default function LeadDetailPage() {
   if (error) {
     return (
       <div className="page">
-        <a className="back-link" onClick={() => goBackOrTo(router, "/leads")}>
-          <Icon name="back" size={14} /> Back to Leads
-        </a>
+        <BackLink fallback="/leads">Back to Leads</BackLink>
         <Panel title="Couldn't load this lead">
           <EmptyState
             icon="alert"
@@ -143,9 +134,7 @@ export default function LeadDetailPage() {
   if (!lead) {
     return (
       <div className="page">
-        <a className="back-link" onClick={() => goBackOrTo(router, "/leads")}>
-          <Icon name="back" size={14} /> Back to Leads
-        </a>
+        <BackLink fallback="/leads">Back to Leads</BackLink>
         <DeletedRecordNotice entityType="LEAD" id={id ?? ""} onRestored={() => {
           refetch();
           refetchFollowups();
@@ -183,9 +172,9 @@ export default function LeadDetailPage() {
     setReactivating(true);
     try {
       await reactivateLead();
-      toast.show(`${lead!.customerName} reactivated`, "check");
+      toast.success(`${lead!.customerName} reactivated`);
     } catch (err) {
-      toast.show(err instanceof Error ? err.message : "Could not reactivate this lead. Please try again.", "alert");
+      toast.error(err instanceof Error ? err.message : "Could not reactivate this lead. Please try again.");
     } finally {
       setReactivating(false);
     }
@@ -212,9 +201,7 @@ export default function LeadDetailPage() {
 
   return (
     <div className="page">
-      <a className="back-link" onClick={() => goBackOrTo(router, "/leads")}>
-        <Icon name="back" size={14} /> Back to Leads
-      </a>
+      <BackLink fallback="/leads">Back to Leads</BackLink>
       <div className="crm-grid">
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           {inactive && (
@@ -253,7 +240,17 @@ export default function LeadDetailPage() {
                 <Tag color="n">{lead.assignedToName ? `Assigned: ${lead.assignedToName}` : "Unassigned"}</Tag>
                 {lead.score && <LeadScoreTag score={lead.score} suffix="lead" />}
               </div>
-              <QuickActions phone={lead.phone} email={lead.email} contactName={lead.customerName} country={lead.country ?? null} />
+              <QuickActions
+                phone={lead.phone}
+                email={lead.email}
+                contactName={lead.customerName}
+                country={lead.country ?? null}
+                share={
+                  hasPermission("content.view") && hasPermission("content.share")
+                    ? { onShare: () => setShowShare(true), unavailable: inactive ? "Reactivate this lead before sharing content with it." : undefined }
+                    : undefined
+                }
+              />
               <div className="lead-action-row">
                 <Button
                   variant="ghost"
@@ -303,17 +300,6 @@ export default function LeadDetailPage() {
                     title="Move this lead to the Recycle Bin (only for a lead that was entered by mistake and has had no real work done on it)"
                   >
                     Delete
-                  </Button>
-                )}
-                {hasPermission("content.view") && hasPermission("content.share") && (
-                  <Button
-                    variant="ghost"
-                    icon="share"
-                    onClick={() => setShowShare(true)}
-                    disabled={inactive}
-                    title={inactive ? "Reactivate this lead before sharing content with it" : "Share a catalogue, photo or video from the Content Library"}
-                  >
-                    Share content
                   </Button>
                 )}
                 {!inactive && (
@@ -423,9 +409,9 @@ export default function LeadDetailPage() {
                               e.preventDefault();
                               try {
                                 await completeFollowup(f.id);
-                                toast.show("Follow-up completed", "check");
+                                toast.success("Follow-up completed");
                               } catch (err) {
-                                toast.show(err instanceof Error ? err.message : "Could not complete this follow-up. Please try again.", "alert");
+                                toast.error(err instanceof Error ? err.message : "Could not complete this follow-up. Please try again.");
                               }
                             }}
                           >
@@ -441,9 +427,9 @@ export default function LeadDetailPage() {
                               e.preventDefault();
                               try {
                                 await cancelFollowup(f.id);
-                                toast.show("Follow-up cancelled", "close");
+                                toast.success("Follow-up cancelled");
                               } catch (err) {
-                                toast.show(err instanceof Error ? err.message : "Could not cancel this follow-up. Please try again.", "alert");
+                                toast.error(err instanceof Error ? err.message : "Could not cancel this follow-up. Please try again.");
                               }
                             }}
                           >
@@ -599,7 +585,7 @@ export default function LeadDetailPage() {
             }
             // The assignee shown here: if the lead was reassigned meanwhile, the backend refuses (409).
             await unassignLead(lead.assignedToId!, remark);
-            toast.show(`${lead.customerName} unassigned`, "user");
+            toast.success(`${lead.customerName} unassigned`);
           }}
         />
       )}
@@ -631,7 +617,7 @@ export default function LeadDetailPage() {
               throw new Error(`The reason can be at most ${LEAD_REJECT_REASON_MAX_LENGTH} characters.`);
             }
             await rejectLead(reason!);
-            toast.show(`${lead.customerName} rejected`, "close");
+            toast.success(`${lead.customerName} rejected`);
           }}
         />
       )}

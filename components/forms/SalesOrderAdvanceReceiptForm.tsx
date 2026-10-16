@@ -54,7 +54,7 @@ export function SalesOrderAdvanceReceiptForm({
         referenceNo: referenceNo.trim() || undefined,
         remarks: remarks.trim() || undefined,
       });
-      toast.show("Advance receipt recorded", "check");
+      toast.success("Advance receipt recorded");
       onClose();
     } catch (err) {
       setErrors({ form: err instanceof Error ? err.message : "Something went wrong recording the receipt. Please try again." });

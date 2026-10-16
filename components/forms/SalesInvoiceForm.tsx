@@ -67,7 +67,7 @@ export function SalesInvoiceForm({
         invoiceDate,
         remarks: remarks.trim() || undefined,
       });
-      toast.show("Sales invoice created", "check");
+      toast.success("Sales invoice created");
       onClose();
     } catch (err) {
       setErrors({ form: err instanceof Error ? err.message : "Something went wrong creating the sales invoice. Please try again." });

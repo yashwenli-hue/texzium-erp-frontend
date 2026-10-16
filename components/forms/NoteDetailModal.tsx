@@ -38,10 +38,10 @@ export function NoteDetailModal({
     setSaving(true);
     try {
       await onUpdate(note.id, { text: text.trim(), pinned });
-      toast.show("Note updated", "check");
+      toast.success("Note updated");
       setEditing(false);
     } catch {
-      toast.show("Could not save this note — please try again", "alert");
+      toast.error("Could not save this note — please try again");
     } finally {
       setSaving(false);
     }

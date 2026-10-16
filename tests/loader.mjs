@@ -23,6 +23,12 @@ export async function resolve(specifier, context, next) {
     const file = candidate(local);
     if (file && /\.tsx?$/.test(file)) return { url: pathToFileURL(file).href, format: "module", shortCircuit: true };
   }
+  // "next/navigation" and the like: Next's entry points are plain .js files without an
+  // exports map, which Node's ESM resolution does not find without the extension.
+  if (/^next\/[a-z-]+$/.test(specifier)) {
+    const file = path.join(ROOT, "node_modules", `${specifier}.js`);
+    if (existsSync(file)) return { url: pathToFileURL(file).href, shortCircuit: true };
+  }
   return next(specifier, context);
 }
 

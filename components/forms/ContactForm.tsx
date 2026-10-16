@@ -53,7 +53,7 @@ export function ContactForm({
         phone: phone.trim(),
         ownerName: ownerName.trim(),
       });
-      toast.show(`Contact "${name.trim()}" created`, "check");
+      toast.success(`Contact "${name.trim()}" created`);
       onClose();
     } catch {
       setErrors({ form: "Something went wrong creating the contact. Please try again." });

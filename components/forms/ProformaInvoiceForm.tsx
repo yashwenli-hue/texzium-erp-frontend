@@ -57,7 +57,7 @@ export function ProformaInvoiceForm({
         validityDate: validityDate ? new Date(validityDate).toISOString() : undefined,
         remarks: remarks.trim() || undefined,
       });
-      toast.show("Proforma invoice created — it needs approval", "check");
+      toast.success("Proforma invoice created — it needs approval");
       onClose();
     } catch (err) {
       setErrors({ form: err instanceof Error ? err.message : "Something went wrong creating the proforma invoice. Please try again." });

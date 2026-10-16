@@ -66,7 +66,7 @@ export function NoteForm({
         authorName: "You",
         pinned,
       });
-      toast.show("Note added", "check");
+      toast.success("Note added");
       onClose();
     } catch {
       setErrors({ form: "Something went wrong saving the note. Please try again." });

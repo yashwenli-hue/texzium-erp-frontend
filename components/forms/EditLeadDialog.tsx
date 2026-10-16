@@ -82,7 +82,7 @@ export function EditLeadDialog({
           remarks: showRemarks ? remarks.trim() || undefined : undefined,
         },
       });
-      toast.show("Lead updated", "check");
+      toast.success("Lead updated");
       onClose();
     } catch (err) {
       setErrors({ form: err instanceof Error ? err.message : "Something went wrong saving these changes. Please try again." });

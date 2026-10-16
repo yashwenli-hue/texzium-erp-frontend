@@ -41,7 +41,7 @@ export function QualifyLeadDialog({
     setError(null);
     try {
       await onSubmit(effectiveUserId);
-      toast.show(`${customerName} qualified`, "check");
+      toast.success(`${customerName} qualified`);
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not qualify this lead. Please try again.");

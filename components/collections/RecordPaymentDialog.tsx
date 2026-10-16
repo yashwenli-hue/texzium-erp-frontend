@@ -79,7 +79,7 @@ export function RecordPaymentDialog({ target: opened, liveBalance, onClose, onRe
         remarks: remarks.trim() || undefined,
       });
       setResult(res);
-      toast.show(`Payment of ${formatRupees(toPaise(res.paymentRecord.amount))} recorded`, "check");
+      toast.success(`Payment of ${formatRupees(toPaise(res.paymentRecord.amount))} recorded`);
       onRecorded?.(res);
     } catch (err) {
       const f = paymentFailure(err);
@@ -142,7 +142,7 @@ export function RecordPaymentDialog({ target: opened, liveBalance, onClose, onRe
             onConfirm={async () => {
               const v = await generate(p.id);
               setVoucher(v);
-              toast.show(`Receipt ${v.receiptNumber} generated`, "check");
+              toast.success(`Receipt ${v.receiptNumber} generated`);
             }}
             onClose={() => setConfirmReceipt(false)}
           />

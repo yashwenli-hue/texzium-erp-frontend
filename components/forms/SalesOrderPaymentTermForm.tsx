@@ -60,7 +60,7 @@ export function SalesOrderPaymentTermForm({
         dueDate: dueDate || undefined,
         remarks: remarks.trim() || undefined,
       });
-      toast.show("Payment terms saved", "check");
+      toast.success("Payment terms saved");
       onClose();
     } catch (err) {
       setErrors({ form: err instanceof Error ? err.message : "Something went wrong saving the payment terms. Please try again." });

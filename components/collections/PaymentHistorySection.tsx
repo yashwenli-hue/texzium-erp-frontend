@@ -84,7 +84,7 @@ export function PaymentHistorySection({
           onConfirm={async () => {
             const v = await generate(asking.id);
             setVouchers((m) => ({ ...m, [asking.id]: v }));
-            toast.show(`Receipt ${v.receiptNumber} generated`, "check");
+            toast.success(`Receipt ${v.receiptNumber} generated`);
           }}
           onClose={() => setAsking(null)}
         />

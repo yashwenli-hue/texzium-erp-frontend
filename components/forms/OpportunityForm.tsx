@@ -89,7 +89,7 @@ export function OpportunityForm({
         expectedCloseDate: new Date(expectedCloseDate).toISOString(),
         ...(forCustomer ? { customerId: forCustomer.id } : customerId ? { customerId } : {}),
       });
-      toast.show(`Opportunity "${title.trim()}" created`, "check");
+      toast.success(`Opportunity "${title.trim()}" created`);
       onClose();
     } catch (err) {
       setErrors({ form: err instanceof Error ? err.message : "Something went wrong creating the opportunity. Please try again." });

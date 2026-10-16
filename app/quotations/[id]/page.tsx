@@ -307,7 +307,7 @@ export default function QuotationDetailPage() {
           onClose={() => setDialog(null)}
           onConfirm={async (reason) => {
             await rejectQuotation(reason ?? "");
-            toast.show(`${quotation.quoteNo} rejected`, "check");
+            toast.success(`${quotation.quoteNo} rejected`);
           }}
         />
       )}

@@ -54,7 +54,7 @@ export function ActivityForm({
         ownerName: ownerName.trim(),
         note: note.trim(),
       });
-      toast.show(`${type} logged`, "check");
+      toast.success(`${type} logged`);
       onClose();
     } catch {
       setErrors({ form: "Something went wrong logging the activity. Please try again." });

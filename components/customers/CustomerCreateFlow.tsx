@@ -168,7 +168,7 @@ export function CustomerCreateFlow({
       setGstErrors({});
       setStep("partial");
     } else {
-      toast.show(outcome.registration ? `Customer "${outcome.customer.customerName}" created with its GST registration` : `Customer "${outcome.customer.customerName}" created`, "check");
+      toast.success(outcome.registration ? `Customer "${outcome.customer.customerName}" created with its GST registration` : `Customer "${outcome.customer.customerName}" created`);
       onOpenCustomer(outcome.customer);
     }
   }
@@ -182,7 +182,7 @@ export function CustomerCreateFlow({
     const outcome = await retryRegistration(api, created.id, toRegistration(gst));
     setSubmitting(false);
     if (outcome.kind === "done") {
-      toast.show("GST registration added", "check");
+      toast.success("GST registration added");
       onOpenCustomer(created);
     } else {
       setPartialError(outcome.error.message);

@@ -95,7 +95,7 @@ export function SalesOrderForm({
         sellerGstId: effectiveSellerGstId,
         buyerGstId: effectiveBuyerGstId,
       });
-      toast.show("Sales order created", "check");
+      toast.success("Sales order created");
       onClose();
     } catch (err) {
       setErrors({ form: err instanceof Error ? err.message : "Something went wrong creating the sales order. Please try again." });

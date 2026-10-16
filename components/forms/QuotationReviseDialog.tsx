@@ -73,7 +73,7 @@ export function QuotationReviseDialog({
     setFormError(null);
     try {
       await onSubmit(byRate ? { unitPrice: parsed.value } : { taxableAmount: parsed.value }, remarks.trim() || undefined);
-      toast.show(`${quoteNo} revised — it needs approval again`, "check");
+      toast.success(`${quoteNo} revised — it needs approval again`);
       onClose();
     } catch (err) {
       setFormError(err instanceof Error ? err.message : "Something went wrong. Please try again.");

@@ -127,7 +127,7 @@ export function QuotationForm({
         sellerGstId: effectiveSellerGstId,
         buyerGstId: effectiveBuyerGstId,
       });
-      toast.show("Quotation created as Draft", "check");
+      toast.success("Quotation created as Draft");
       onClose();
     } catch (err) {
       setErrors({ form: err instanceof Error ? err.message : "Something went wrong creating the quotation. Please try again." });

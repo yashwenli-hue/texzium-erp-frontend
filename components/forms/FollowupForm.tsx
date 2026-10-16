@@ -38,7 +38,7 @@ export function FollowupForm({
     setError(null);
     try {
       await onSubmit(new Date(followupDate).toISOString(), mode === "create" ? remarks.trim() || undefined : undefined);
-      toast.show(mode === "create" ? "Follow-up scheduled" : "Follow-up rescheduled", "cal");
+      toast.success(mode === "create" ? "Follow-up scheduled" : "Follow-up rescheduled");
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");

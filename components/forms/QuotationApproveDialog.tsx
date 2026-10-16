@@ -35,7 +35,7 @@ export function QuotationApproveDialog({
     setError(null);
     try {
       await onSubmit(remarks.trim() || undefined);
-      toast.show(`${quoteNo} approved`, "check");
+      toast.success(`${quoteNo} approved`);
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");

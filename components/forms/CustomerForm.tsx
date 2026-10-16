@@ -198,7 +198,7 @@ export function CustomerForm(props: CustomerFormProps) {
           email: email.trim() || undefined,
           phone: phone.trim() || undefined,
         });
-        toast.show(`Customer "${customerName.trim()}" created`, "check");
+        toast.success(`Customer "${customerName.trim()}" created`);
       }
       onClose();
     } catch (err) {

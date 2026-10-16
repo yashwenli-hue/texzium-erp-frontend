@@ -22,6 +22,7 @@ export function QuickActions({
   contactName,
   country,
   include = ["call", "email", "meet", "whatsapp"],
+  share,
 }: {
   phone?: string;
   email?: string;
@@ -34,6 +35,12 @@ export function QuickActions({
   country?: string | null;
   /** Which actions to offer. A customer has no calendar to schedule against, so its row leaves "meet" out. */
   include?: Array<"call" | "email" | "meet" | "whatsapp">;
+  /**
+   * A fifth action, "Share", that opens the content-sharing dialog. Leave it out where the
+   * person may not share. When sharing is not possible right now, `unavailable` says why:
+   * the button stays focusable and says so when pressed, instead of silently doing nothing.
+   */
+  share?: { onShare: () => void; unavailable?: string };
 }) {
   const toast = useToast();
 
@@ -70,7 +77,19 @@ export function QuickActions({
     toast.info("Calendar isn't connected yet — this will open your scheduling tool once integrated.", { icon: "cal" });
   }
 
+  function shareContent() {
+    if (!share) return;
+    if (share.unavailable) {
+      toast.info(share.unavailable);
+      return;
+    }
+    share.onShare();
+  }
+
+  // The wrapper is a size container: on a narrow card the five actions become two rows
+  // (3 + 2) instead of squeezing their labels.
   return (
+    <div className="qa-wrap">
     <div className="qa-row">
       {include.includes("call") && (
         <button className="qa" onClick={call} aria-label={`Call ${contactName}`}>
@@ -96,6 +115,19 @@ export function QuickActions({
           WhatsApp
         </button>
       )}
+      {share && (
+        <button
+          className="qa"
+          onClick={shareContent}
+          aria-label={`Share content with ${contactName}`}
+          aria-disabled={share.unavailable ? true : undefined}
+          title={share.unavailable ?? "Share a catalogue, photo or video from the Content Library"}
+        >
+          <Icon name="share" size={16} />
+          Share
+        </button>
+      )}
+    </div>
     </div>
   );
 }

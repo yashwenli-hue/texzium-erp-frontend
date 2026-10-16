@@ -51,6 +51,12 @@
   --lead-proposal-bg:#FEF3C7; --lead-proposal-fg:#92400E;
   --lead-negotiation-bg:#EDE9FE; --lead-negotiation-fg:#5B21B6;
   --lead-lost-bg:#FEE2E2; --lead-lost-fg:#991B1B;
+  /* Lead lifecycle stages that need their own hue (see LEAD_STATUS_STYLE in
+     components/ui/Tag.tsx); each pair is at least 4.5:1 on its own tint. */
+  --lead-assigned-bg:#E0E7FF; --lead-assigned-fg:#3730A3;
+  --lead-contacted-bg:#CFFAFE; --lead-contacted-fg:#155E75;
+  --lead-qualified-bg:#CCFBF1; --lead-qualified-fg:#115E59;
+  --lead-rejected-bg:#E2E8F0; --lead-rejected-fg:#334155;
   --src-website-bg:#F1F2F4; --src-website-fg:#6B7280;
   --src-meta-bg:#E7EEFE; --src-meta-fg:#3457D5;
   --src-google-bg:#FDF6DC; --src-google-fg:#B8860B;
@@ -121,6 +127,10 @@
   --lead-good-bg:rgba(74,222,128,.14); --lead-good-fg:#4ADE80;
   --lead-proposal-bg:rgba(245,165,36,.14); --lead-proposal-fg:#F5A524;
   --lead-lost-bg:rgba(240,82,79,.14); --lead-lost-fg:#F0524F;
+  --lead-assigned-bg:rgba(124,140,248,.14); --lead-assigned-fg:#7C8CF8;
+  --lead-contacted-bg:rgba(34,211,238,.14); --lead-contacted-fg:#22D3EE;
+  --lead-qualified-bg:rgba(43,200,180,.14); --lead-qualified-fg:#2BC8B4;
+  --lead-rejected-bg:rgba(180,180,188,.16); --lead-rejected-fg:#B4B4BC;
   --src-website-bg:rgba(255,255,255,.05); --src-website-fg:#9A9AA2;
   --src-meta-bg:rgba(79,156,249,.14); --src-meta-fg:#4F9CF9;
   --src-google-bg:rgba(245,165,36,.14); --src-google-fg:#F5A524;
@@ -311,28 +321,39 @@ tr:last-child td{border-bottom:none}
 tbody tr{cursor:default}
 tbody tr.clickable{cursor:pointer}
 tbody tr.clickable:hover{background:var(--row-hover)}
+tbody tr.clickable:focus-visible{outline:2px solid var(--m);outline-offset:-2px;background:var(--row-hover)}
 .who{display:flex;align-items:center;gap:10px}
 .who .av{width:31px;height:31px;border-radius:9px;background:var(--m-soft);color:var(--m);display:grid;place-items:center;font-weight:700;font-size:12px;font-family:var(--display);flex:none}
 .who small{display:block;color:var(--muted);font-size:11.5px;margin-top:1px}
-/* Lead Master's identity column needs more breathing room than other .who
-   usages (Contacts/Customers/Notes) so names like "Sterling Pumps" don't
-   wrap word-by-word — scoped modifier, not a global .who change. The table
-   already scrolls horizontally (.table-scroll) if this pushes it past the
-   viewport, which is preferable to a cramped identity column (design
-   review Stage 1.3.2 §1). */
-.lead-id{min-width:172px}
-.lead-id b,.lead-id small{white-space:nowrap}
-/* Lead Master specifically (9 columns) needed a broader rebalance, not
-   just a narrower identity column — tighter cell padding and a slightly
-   smaller avatar recover width across every column so Last Activity fits
-   at normal desktop width, without touching the shared td/th/.who rules
-   every other table on the site also uses (design review Stage 1.3
-   patch 04 §1). */
-.lead-table td,.lead-table th{padding-left:14px;padding-right:14px}
-.lead-table .who{gap:8px}
-.lead-table .who .av{width:27px;height:27px;font-size:11px}
+/* Lead Master: the identity column (name over company · place) has a FIXED width, so
+   a long value is cut short with "…" instead of widening the table or making the
+   columns jump from page to page. The full text is in the cell's tooltip, in the row
+   link's accessible name, and on the lead's page. Tighter cell padding and a smaller
+   avatar keep every column visible at normal desktop width. */
+.lead-list .who{gap:8px;min-width:0}
+.lead-list .who.is-inactive{opacity:.65}
+.lead-list .who .av{width:27px;height:27px;font-size:11px}
+.lead-id{width:200px;min-width:0}
+.lead-id b,.lead-id small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lead-list td,.lead-list th{padding-left:14px;padding-right:14px}
+/* Nine columns need more room than most lists: switch to cards a little earlier. */
+@container (max-width:960px){
+  .lead-list .rl-table{display:none}
+  .lead-list .rl-cards{display:flex}
+  .lead-list .rl-sort{display:flex}
+}
+
+/* Shared table-cell helpers */
+.cell-clip{display:block;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cell-nowrap{white-space:nowrap}
+.cell-tags{display:flex;gap:6px;flex-wrap:wrap}
+/* "—" / "Unassigned": quieter than real values, still readable (--text-2 is AA). */
+.cell-none{color:var(--text-2)}
 .tag{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:700;padding:4px 10px;border-radius:20px;white-space:nowrap}
 .tag::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+/* A closed status shows an icon (tick or cross) in place of the dot. */
+.tag.tag-mark{gap:5px}
+.tag.tag-mark::before{content:none}
 .tag.g{color:var(--good);background:var(--good-bg)} .tag.w{color:var(--warn);background:var(--warn-bg)}
 .tag.b{color:var(--bad);background:var(--bad-bg)} .tag.i{color:var(--info);background:var(--info-bg)}
 .tag.n{color:var(--muted);background:var(--line-2)}
@@ -439,9 +460,15 @@ tbody tr.clickable:hover{background:var(--row-hover)}
 .profile-head h3{font-family:var(--display);font-size:16px;font-weight:700}
 .profile-head .co{color:var(--muted);font-size:12.5px;margin-top:1px}
 .profile-head .tagrow{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
-.qa-row{display:flex;gap:8px;margin-top:14px}
-.qa{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;padding:10px 6px;border:1px solid var(--line);border-radius:11px;font-size:11px;font-weight:600;color:var(--text)}
+/* Quick actions (Call, Email, Meet, WhatsApp, Share): one row of equal buttons; on a
+   card too narrow for five labels they become rows of three. */
+.qa-wrap{container-type:inline-size;margin-top:14px}
+.qa-row{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:8px}
+@container (max-width:340px){.qa-row{grid-auto-flow:row;grid-template-columns:repeat(3,minmax(0,1fr))}}
+.qa{min-width:0;min-height:44px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;padding:10px 6px;border:1px solid var(--line);border-radius:11px;font-size:11px;font-weight:600;color:var(--text);background:transparent;cursor:pointer}
 .qa:hover{background:var(--m-soft);border-color:var(--m);color:var(--m)}
+.qa[aria-disabled="true"]{color:var(--text-2);cursor:not-allowed}
+.qa[aria-disabled="true"]:hover{background:transparent;border-color:var(--line);color:var(--text-2)}
 .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:16px 19px;border-bottom:1px solid var(--line-2)}
 .info-grid .f{font-size:12px}
 /* Same reasoning as th above — a detail-page field label (e.g. "PHONE",
@@ -1047,11 +1074,11 @@ a.doc-trail-node:hover{border-color:var(--m);background:var(--m-soft)}
 .dup a{text-decoration:underline;text-underline-offset:2px}
 
 /* Customer filter bar */
-.cust-toolbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
-.cust-search{flex:1 1 260px;min-width:0;display:flex;align-items:center;gap:9px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:0 13px;color:var(--muted)}
-.cust-search:focus-within{border-color:var(--m);box-shadow:var(--focus-ring, 0 0 0 3px var(--m-soft))}
-.cust-search input{border:none;background:none;outline:none;flex:1;min-width:0;font-family:inherit;font-size:13.5px;color:var(--text);padding:10px 0}
-@media(max-width:720px){.cust-search input{min-height:24px;font-size:16px}.chips{flex-wrap:wrap}}
+.cust-toolbar,.list-toolbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+.cust-search,.list-search{flex:1 1 260px;min-width:0;display:flex;align-items:center;gap:9px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:0 13px;color:var(--muted)}
+.cust-search:focus-within,.list-search:focus-within{border-color:var(--m);box-shadow:var(--focus-ring, 0 0 0 3px var(--m-soft))}
+.cust-search input,.list-search input{border:none;background:none;outline:none;flex:1;min-width:0;font-family:inherit;font-size:13.5px;color:var(--text);padding:10px 0}
+@media(max-width:720px){.cust-search input,.list-search input{min-height:24px;font-size:16px}.chips{flex-wrap:wrap}}
 .doc-head .ident h1{font-family:var(--display);font-size:18px;font-weight:700;color:var(--ink);overflow-wrap:anywhere}
 .reg .why-not{font-size:11.5px;color:var(--muted);margin-top:6px;flex-basis:100%}
 .panel-head .panel-act{margin-left:auto}
@@ -1280,7 +1307,7 @@ a.sc-link:hover .sc-summary{color:var(--m)}
   .reg .doc-actions.compact{justify-content:flex-start}
 }
 .details-contact{padding:0 19px 19px}
-.details-contact .qa-row{margin-top:0}
+.details-contact .qa-wrap{margin-top:0}
 .hist-filter{display:flex;gap:6px;flex-wrap:wrap;padding:4px 21px 10px}
 button.chip{font:inherit;cursor:pointer}
 .activity-more{padding:6px 19px 16px}
@@ -1511,7 +1538,6 @@ video.content-large-media{background:#000}
 .content-steps{margin:8px 0 0;padding-left:20px;display:flex;flex-direction:column;gap:14px}
 .content-steps li{display:flex;flex-direction:column;align-items:flex-start;gap:4px}
 .content-step-hint{font-size:12px;color:var(--muted)}
-.content-share-row{margin-top:10px}
 @media(max-width:640px){
   .content-actions{width:100%}
   .content-actions .btn{flex:1 1 auto;min-height:44px;justify-content:center}

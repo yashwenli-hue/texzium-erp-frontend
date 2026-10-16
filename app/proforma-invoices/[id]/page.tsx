@@ -284,7 +284,7 @@ export default function ProformaInvoiceDetailPage() {
           onClose={() => setDialog(null)}
           onConfirm={async (remarks) => {
             await approveProformaInvoice(remarks);
-            toast.show(`${proforma.proformaNumber} approved`, "check");
+            toast.success(`${proforma.proformaNumber} approved`);
           }}
         />
       )}
@@ -299,7 +299,7 @@ export default function ProformaInvoiceDetailPage() {
           onClose={() => setDialog(null)}
           onConfirm={async (reason) => {
             await cancelProformaInvoice(reason ?? "");
-            toast.show(`${proforma.proformaNumber} cancelled`, "check");
+            toast.success(`${proforma.proformaNumber} cancelled`);
           }}
         />
       )}

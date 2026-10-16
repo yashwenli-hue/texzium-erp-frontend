@@ -79,6 +79,25 @@ function placementFor(input: HTMLElement): Placement {
   };
 }
 
+/**
+ * Where the list must scroll to (its scrollTop) so a row is fully in view, or null when
+ * it already is. Only the list scrolls: scrollIntoView() would also scroll the page
+ * (smoothly, since the page sets scroll-behavior: smooth), which moved the page under the
+ * list while a phone keyboard was open.
+ */
+export function scrollTopToReveal(row: { top: number; height: number }, list: { scrollTop: number; clientHeight: number }, pad = 4): number | null {
+  if (row.top - pad < list.scrollTop) return Math.max(0, row.top - pad);
+  const bottom = row.top + row.height + pad;
+  if (bottom > list.scrollTop + list.clientHeight) return bottom - list.clientHeight;
+  return null;
+}
+
+/** True when two placements would draw the list in the same place (nothing to re-render). */
+export function samePlacement(a: Placement | null, b: Placement | null): boolean {
+  if (!a || !b) return a === b;
+  return a.left === b.left && a.width === b.width && a.top === b.top && a.bottom === b.bottom && a.maxHeight === b.maxHeight;
+}
+
 export function Combobox({ id, options, value, onChange, listLabel, placeholder, disabled, invalid, required, describedBy, noMatchText = "No matches" }: ComboboxProps) {
   const listId = `${id}-list`;
   const inputRef = useRef<HTMLInputElement>(null);
@@ -89,6 +108,10 @@ export function Combobox({ id, options, value, onChange, listLabel, placeholder,
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
   const [placement, setPlacement] = useState<Placement | null>(null);
+  // Whether the highlight was last moved from the keyboard (or by opening the list), the
+  // only times the list scrolls to it. A highlight that follows the pointer must not
+  // scroll the list: that fights a wheel or touch scroll and makes the list jump.
+  const revealHighlight = useRef(true);
 
   const selected = useMemo(() => options.find((o) => o.value === value), [options, value]);
   // A stored value that is not in the list is shown as it is, so it is never hidden.
@@ -108,6 +131,7 @@ export function Combobox({ id, options, value, onChange, listLabel, placeholder,
 
   const openList = useCallback(() => {
     if (disabled) return;
+    revealHighlight.current = true;
     setOpen(true);
     if (!typing) {
       const at = options.findIndex((o) => o.value === value);
@@ -130,28 +154,46 @@ export function Combobox({ id, options, value, onChange, listLabel, placeholder,
   useBrowserLayoutEffect(() => {
     if (!open || !inputRef.current) return;
     const input = inputRef.current;
-    const update = () => setPlacement(placementFor(input));
+    const update = () => {
+      const next = placementFor(input);
+      setPlacement((current) => (samePlacement(current, next) ? current : next));
+    };
+    // Scrolling the list itself does not move it; only a scroll of the page or of a
+    // container around the box (a dialog's body) does.
+    const onScroll = (e: Event) => {
+      if (e.target instanceof Node && listRef.current?.contains(e.target)) return;
+      update();
+    };
     update();
     window.addEventListener("resize", update);
-    window.addEventListener("scroll", update, true);
+    window.addEventListener("scroll", onScroll, true);
     window.visualViewport?.addEventListener("resize", update);
     window.visualViewport?.addEventListener("scroll", update);
     return () => {
       window.removeEventListener("resize", update);
-      window.removeEventListener("scroll", update, true);
+      window.removeEventListener("scroll", onScroll, true);
       window.visualViewport?.removeEventListener("resize", update);
       window.visualViewport?.removeEventListener("scroll", update);
     };
   }, [open]);
 
-  // The highlighted row stays in view as the arrows move it.
+  // The highlighted row stays in view as the arrows move it, and the chosen row is in
+  // view when the list opens (the list is drawn once it has a place: `shown`).
+  const shown = open && placement !== null;
   useEffect(() => {
-    if (!open || act < 0) return;
-    listRef.current?.querySelector<HTMLElement>(`#${CSS.escape(optionId(act))}`)?.scrollIntoView({ block: "nearest" });
+    if (!shown || act < 0 || !revealHighlight.current) return;
+    const list = listRef.current;
+    const row = list?.querySelector<HTMLElement>(`#${CSS.escape(optionId(act))}`);
+    if (!list || !row) return;
+    // The list is position: fixed, so it is the offset parent of its rows.
+    const to = scrollTopToReveal({ top: row.offsetTop, height: row.offsetHeight }, list);
+    if (to !== null) list.scrollTop = to;
+    // `results`: a new search starts the list again from its top match.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, act, placement]);
+  }, [shown, act, results]);
 
   function move(m: ListMove) {
+    revealHighlight.current = true;
     setActive(moveHighlight(act, results.length, m));
   }
 
@@ -201,6 +243,7 @@ export function Combobox({ id, options, value, onChange, listLabel, placeholder,
   function onInput(e: ChangeEvent<HTMLInputElement>) {
     setTyping(true);
     setQuery(e.target.value);
+    revealHighlight.current = true;
     setActive(0);
     if (!open) setOpen(true);
   }
@@ -286,7 +329,9 @@ export function Combobox({ id, options, value, onChange, listLabel, placeholder,
                     aria-selected={o.value === value}
                     className={`cbx-opt${i === act ? " active" : ""}${o.value === value ? " chosen" : ""}`}
                     onMouseMove={() => {
-                      if (i !== act) setActive(i);
+                      if (i === act) return;
+                      revealHighlight.current = false;
+                      setActive(i);
                     }}
                     onClick={() => choose(o)}
                   >
