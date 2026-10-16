@@ -385,6 +385,7 @@ export function quotingBlockerText(blocker: QuotingBlocker): string {
 }
 
 export const MATCH_REASON_LABEL: Record<CustomerMatchReason, string> = {
+  GSTIN: "same GSTIN",
   PAN: "same PAN",
   NAME: "same name",
   PHONE: "same phone",

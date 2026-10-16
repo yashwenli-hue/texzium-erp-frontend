@@ -32,7 +32,9 @@ import { OpportunityForm } from "../../../components/forms/OpportunityForm";
 import { ShareContentDialog } from "../../../components/content/ShareContentDialog";
 import { ConfirmDialog } from "../../../components/ui/ConfirmDialog";
 import { EmptyState } from "../../../components/ui/Button";
-import { useLeadDetail } from "../../../lib/hooks/useLeads";
+import { useLeadDetail, useLeadDuplicates } from "../../../lib/hooks/useLeads";
+import { StatusMoveDialog } from "../../../components/forms/StatusMoveDialog";
+import { LeadDuplicatesPanel } from "../../../components/ui/LeadDuplicatesPanel";
 import { useNotesByRelated } from "../../../lib/hooks/useNotes";
 import { useLeadFollowups } from "../../../lib/hooks/useLeadFollowups";
 import { useQuotations } from "../../../lib/hooks/useQuotations";
@@ -46,7 +48,7 @@ import { initials } from "../../../components/ui/Who";
 import { formatInr, formatDateTime } from "../../../lib/format";
 import { nextPendingFollowup } from "../../../lib/followup";
 import { formatLeadLocation, formatLeadLocationShort } from "../../../lib/geo/leadLocation";
-import { canAssignLeadFrom, canQualifyLeadFrom, canRejectLeadFrom, isQualifiedLeadStatus, leadActionBlockedReason, leadActivityMeta, LeadActivityType, LeadFollowup, Quotation, Opportunity, Note } from "../../../lib/types/domain";
+import { canAssignLeadFrom, canQualifyLeadFrom, canRejectLeadFrom, isQualifiedLeadStatus, leadActionBlockedReason, leadActivityMeta, LeadActivityType, LeadFollowup, Quotation, Opportunity, Note, canReopenLeadFrom, canMoveLeadStatus, LEAD_STATUS_MOVE_TARGETS, CallOutcome, formatLeadStatus } from "../../../lib/types/domain";
 
 const SUMMARY_TYPES: LeadActivityType[] = ["CALL", "MEETING", "EMAIL", "WHATSAPP"];
 
@@ -61,7 +63,11 @@ export default function LeadDetailPage() {
   const router = useRouter();
   const toast = useToast();
   const id = params?.id;
-  const { lead, timeline, loading, error, refetch, refreshAll, logActivity, deactivateLead, reactivateLead, assignLead, unassignLead, qualifyLead, rejectLead, updateLead } = useLeadDetail(id);
+  const { lead, timeline, loading, error, refetch, refreshAll, logActivity, deactivateLead, reactivateLead, assignLead, unassignLead, qualifyLead, rejectLead, updateLead, moveStatus, reopenLead } = useLeadDetail(id);
+  const { duplicates } = useLeadDuplicates(id);
+  const [showStatusMove, setShowStatusMove] = useState(false);
+  const [showReopen, setShowReopen] = useState(false);
+  const [activityPreset, setActivityPreset] = useState<{ outcome?: CallOutcome } | null>(null);
   const { notes, refetch: refetchNotes } = useNotesByRelated(id);
   const { followups, createFollowup, completeFollowup, rescheduleFollowup, cancelFollowup, refetch: refetchFollowups } = useLeadFollowups(id);
   const { quotations } = useQuotations();
@@ -291,6 +297,28 @@ export default function LeadDetailPage() {
                 >
                   Reject
                 </Button>
+                {canReopenLeadFrom(lead.status) && (
+                  <Button
+                    variant="ghost"
+                    icon="restore"
+                    onClick={() => setShowReopen(true)}
+                    disabled={inactive || !hasPermission("leads.reopen")}
+                    title={inactive ? INACTIVE_HINT : hasPermission("leads.reopen") ? "Take this rejected lead back to Contacted (the rejection stays in its history)" : "You don't have permission to reopen leads"}
+                  >
+                    Reopen
+                  </Button>
+                )}
+                {LEAD_STATUS_MOVE_TARGETS.some((t) => canMoveLeadStatus(lead.status, t)) && (
+                  <Button
+                    variant="ghost"
+                    icon="pulse"
+                    onClick={() => setShowStatusMove(true)}
+                    disabled={inactive || !hasPermission("leads.status.update")}
+                    title={inactive ? INACTIVE_HINT : hasPermission("leads.status.update") ? "Mark New, Contacted or Underqualified" : "You don't have permission to update lead status"}
+                  >
+                    Update status
+                  </Button>
+                )}
                 {hasPermission("leads.delete") && (
                   <Button
                     variant="ghost"
@@ -447,14 +475,21 @@ export default function LeadDetailPage() {
             )}
           </Panel>
 
+          <LeadDuplicatesPanel result={duplicates} canResolve={hasPermission("leads.deactivate") || hasPermission("leads.delete")} />
+
           <Panel
             title="Activity & History"
             flush
             extraHead={
               hasPermission("leads.edit") && !inactive ? (
-                <a className="more" href="#" onClick={(e) => { e.preventDefault(); setShowActivityForm(true); }}>
-                  <Icon name="plus" size={14} /> Log Activity
-                </a>
+                <span className="panel-acts">
+                  <button type="button" className="more" onClick={() => { setActivityPreset({ outcome: "NOT_CONNECTED" }); setShowActivityForm(true); }}>
+                    <Icon name="phone" size={14} /> Log CNC
+                  </button>
+                  <button type="button" className="more" onClick={() => { setActivityPreset(null); setShowActivityForm(true); }}>
+                    <Icon name="plus" size={14} /> Log Activity
+                  </button>
+                </span>
               ) : undefined
             }
           >
@@ -560,6 +595,7 @@ export default function LeadDetailPage() {
       {showActivityForm && (
         <LeadActivityForm
           customerName={lead.customerName}
+          initialOutcome={activityPreset?.outcome}
           onClose={() => setShowActivityForm(false)}
           onSubmit={(input) => logActivity(input)}
         />
@@ -618,6 +654,34 @@ export default function LeadDetailPage() {
             }
             await rejectLead(reason!);
             toast.success(`${lead.customerName} rejected`);
+          }}
+        />
+      )}
+      {showStatusMove && (
+        <StatusMoveDialog
+          current={lead.status}
+          customerName={lead.customerName}
+          onClose={() => setShowStatusMove(false)}
+          onSubmit={async (status, remark) => {
+            await moveStatus(status, remark);
+            toast.success(`${lead.customerName} marked ${formatLeadStatus(status)}`);
+          }}
+        />
+      )}
+      {showReopen && (
+        <ConfirmDialog
+          title="Reopen Lead"
+          body={`Reopen ${lead.customerName}? It goes back to Contacted so it can be worked and qualified again. The rejection stays in its history.`}
+          confirmLabel="Reopen Lead"
+          noteLabel="Why it is being reopened"
+          noteRequired
+          onClose={() => setShowReopen(false)}
+          onConfirm={async (reason) => {
+            if (reason && reason.length > LEAD_REJECT_REASON_MAX_LENGTH) {
+              throw new Error(`The reason can be at most ${LEAD_REJECT_REASON_MAX_LENGTH} characters.`);
+            }
+            await reopenLead(reason!);
+            toast.success(`${lead.customerName} reopened`);
           }}
         />
       )}

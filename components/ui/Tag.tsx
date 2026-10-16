@@ -181,6 +181,7 @@ export function AccountsReceivableStatusTag({ status }: { status: string }) {
 //   blue      New
 //   indigo    Assigned / Pre-Sales Assigned  (an assignment, not a verdict)
 //   cyan      Contacted
+//   orange    Underqualified (contacted, not yet a fit)
 //   teal      Qualified / Sales Assigned
 //   amber     Proposal Sent
 //   violet    Negotiation
@@ -195,6 +196,7 @@ export const LEAD_STATUS_STYLE: Record<LeadStatus, { bg: string; fg: string }> =
   ASSIGNED: { bg: "var(--lead-assigned-bg)", fg: "var(--lead-assigned-fg)" },
   PRE_SALES_ASSIGNED: { bg: "var(--lead-assigned-bg)", fg: "var(--lead-assigned-fg)" },
   CONTACTED: { bg: "var(--lead-contacted-bg)", fg: "var(--lead-contacted-fg)" },
+  UNDERQUALIFIED: { bg: "var(--lead-underqualified-bg)", fg: "var(--lead-underqualified-fg)" },
   QUALIFIED: { bg: "var(--lead-qualified-bg)", fg: "var(--lead-qualified-fg)" },
   SALES_ASSIGNED: { bg: "var(--lead-qualified-bg)", fg: "var(--lead-qualified-fg)" },
   PROPOSAL_SENT: { bg: "var(--lead-proposal-bg)", fg: "var(--lead-proposal-fg)" },

@@ -6,7 +6,12 @@ import {
   canAssignLeadFrom,
   canQualifyLeadFrom,
   canRejectLeadFrom,
+  canReopenLeadFrom,
+  canMoveLeadStatus,
+  formatLeadStatus,
   leadActionBlockedReason,
+  LEAD_CLOSED_STATUSES,
+  LEAD_STATUS_MOVE_TARGETS,
   leadActivityMeta,
 } from "../../types/domain";
 import {
@@ -28,6 +33,9 @@ import { applyListQuery } from "./queryUtils";
 import { mockId } from "./entityStore";
 import { MOCK_ASSIGNABLE_USERS } from "./mockUserRepository";
 import { OPPORTUNITY_STAGE_REMARK_MAX_LENGTH as LEAD_REJECT_REASON_MAX_LENGTH } from "../shared/opportunityStage";
+import { LeadSearchQuery, LeadSearchResult, phoneMatches } from "../shared/leadSearch";
+import { searchLeadsLocally } from "../shared/leadSearchLocal";
+import { LeadDuplicate, LeadDuplicateProbe, LeadDuplicateResult } from "../shared/leadDuplicates";
 
 // Like the backend: only an existing, active user can take a lead.
 function activeAssignee(userId: ID) {
@@ -136,22 +144,80 @@ export class MockLeadRepository implements ILeadRepository {
     return delay(updated);
   }
 
-  async updateStatus(id: ID, status: LeadStatus): Promise<Lead> {
+  // Same rules as the backend: only the pre-qualification moves, from before qualification.
+  async updateStatus(id: ID, status: LeadStatus, options?: { expectedStatus?: LeadStatus; remarks?: string }): Promise<Lead> {
     assertMockLeadActive(id);
+    const lead = db.leads.getById(id);
+    if (!lead) throw new Error(`Lead ${id} not found`);
+    if (options?.expectedStatus && options.expectedStatus !== lead.status) {
+      throw new Error(`This lead's status has changed (it is now ${formatLeadStatus(lead.status)}). Reload the lead and try again.`);
+    }
+    if (!canMoveLeadStatus(lead.status, status)) {
+      throw new Error(
+        lead.status === status
+          ? `This lead is already ${formatLeadStatus(status)}.`
+          : !LEAD_STATUS_MOVE_TARGETS.includes(status)
+            ? `${formatLeadStatus(status)} is not set here: use Assign, Qualify, Reject or the opportunity's stage instead.`
+            : LEAD_CLOSED_STATUSES.includes(lead.status)
+              ? `This lead is closed (${formatLeadStatus(lead.status)}); reopen it first.`
+              : `This lead has already been qualified (${formatLeadStatus(lead.status)}), so its pre-qualification status cannot be changed.`,
+      );
+    }
     const now = new Date().toISOString();
     const updated = db.leads.update(id, { status, updatedAt: now, lastActivityAt: now });
     if (!updated) throw new Error(`Lead ${id} not found`);
+    const userRemark = options?.remarks?.trim() || undefined;
     db.leadTimeline.add({
       source: "SYSTEM",
       id: mockId("T"),
       leadId: id,
       icon: "pulse",
-      title: `STATUS_UPDATED — moved to ${status}`,
-      detail: "",
+      title: "Status Updated",
+      detail: `Status changed from ${formatLeadStatus(lead.status)} to ${formatLeadStatus(status)}.`,
+      ...(userRemark ? { userRemark } : {}),
       actorName: "You",
       occurredAt: now,
     });
     return delay(updated);
+  }
+
+  async reopen(id: ID, reason: string): Promise<Lead> {
+    assertMockLeadActive(id);
+    const lead = db.leads.getById(id);
+    if (!lead) throw new Error(`Lead ${id} not found`);
+    if (!canReopenLeadFrom(lead.status)) throw new Error(leadActionBlockedReason("reopen", lead.status));
+    const userRemark = (reason ?? "").trim();
+    if (!userRemark) throw new Error("Say why the lead is being reopened.");
+    if (userRemark.length > LEAD_REJECT_REASON_MAX_LENGTH) throw new Error(`The reason can be at most ${LEAD_REJECT_REASON_MAX_LENGTH} characters.`);
+    const now = new Date().toISOString();
+    const updated = db.leads.update(id, { status: "CONTACTED", updatedAt: now, lastActivityAt: now });
+    if (!updated) throw new Error(`Lead ${id} not found`);
+    db.leadTimeline.add({
+      source: "SYSTEM",
+      id: mockId("T"),
+      leadId: id,
+      icon: "restore",
+      title: "Lead Reopened",
+      detail: "Lead reopened; status returned to Contacted.",
+      userRemark,
+      actorName: "You",
+      occurredAt: now,
+    });
+    return delay(updated);
+  }
+
+  async search(query: LeadSearchQuery): Promise<LeadSearchResult> {
+    return delay(searchLeadsLocally(db.leads.getAll(), query));
+  }
+
+  async duplicateCheck(probe: LeadDuplicateProbe): Promise<LeadDuplicateResult> {
+    return delay(mockDuplicates(db.leads.getAll(), probe, null));
+  }
+
+  async duplicatesOf(id: ID): Promise<LeadDuplicateResult> {
+    const lead = db.leads.getById(id);
+    if (!lead) throw new Error("Lead not found.");
+    return delay(mockDuplicates(db.leads.getAll(), lead, lead));
   }
 
   // Same rules and sentence as the backend (lead-transitions.ts there).
@@ -165,7 +231,9 @@ export class MockLeadRepository implements ILeadRepository {
       throw new Error(`This lead is already assigned to ${assignee.name}.`);
     }
     const now = new Date().toISOString();
-    const updated = db.leads.update(id, { assignedToId: assignee.id, assignedToName: assignee.name, status: "PRE_SALES_ASSIGNED", updatedAt: now, lastActivityAt: now });
+    // Like the backend's recorded subjectUserId: the person is kept as pre-sales on the lead.
+    const presales = [...(lead.presales ?? []).filter((p) => p.id !== assignee.id), { id: assignee.id, name: assignee.name }];
+    const updated = db.leads.update(id, { assignedToId: assignee.id, assignedToName: assignee.name, status: "PRE_SALES_ASSIGNED", presales, updatedAt: now, lastActivityAt: now });
     if (!updated) throw new Error(`Lead ${id} not found`);
     db.leadTimeline.add({
       source: "SYSTEM",
@@ -213,7 +281,15 @@ export class MockLeadRepository implements ILeadRepository {
     if (!canQualifyLeadFrom(lead.status)) throw new Error(leadActionBlockedReason("qualify", lead.status));
     const salesUser = activeAssignee(salesUserId);
     const now = new Date().toISOString();
-    const updated = db.leads.update(id, { status: "SALES_ASSIGNED", assignedToId: salesUser.id, assignedToName: salesUser.name, updatedAt: now, lastActivityAt: now });
+    const updated = db.leads.update(id, {
+      status: "SALES_ASSIGNED",
+      assignedToId: salesUser.id,
+      assignedToName: salesUser.name,
+      salesOwnerId: salesUser.id,
+      salesOwnerName: salesUser.name,
+      updatedAt: now,
+      lastActivityAt: now,
+    });
     if (!updated) throw new Error(`Lead ${id} not found`);
     db.leadTimeline.add({
       source: "SYSTEM",
@@ -278,14 +354,15 @@ export class MockLeadRepository implements ILeadRepository {
       activityType: valid.activityType,
       icon: meta.icon,
       title: meta.label,
-      detail: valid.remarks,
+      detail: valid.remarks ?? "",
+      ...(valid.outcome ? { outcome: valid.outcome } : {}),
       actorName: "You",
       occurredAt: valid.occurredAt ?? now,
       recordedAt: now,
     };
     db.leadTimeline.add(row);
     // Same as the backend: logging activity touches the lead's last-activity time, never its status.
-    db.leads.update(leadId, { lastActivityAt: now, updatedAt: now });
+    db.leads.update(leadId, { lastActivityAt: now, updatedAt: now, ...(valid.outcome ? { lastCallOutcome: valid.outcome } : {}) });
     return delay(row);
   }
 
@@ -358,4 +435,38 @@ export class MockLeadRepository implements ILeadRepository {
     });
     return delay(updated);
   }
+}
+
+// Same matching as the backend's lead-duplicates.ts (every mock lead is visible).
+function mockDuplicates(all: readonly Lead[], probe: LeadDuplicateProbe, self: Lead | null): LeadDuplicateResult {
+  const norm = (v?: string | null) => (v ?? "").trim().replace(/\s+/g, " ").toLowerCase();
+  const phones = [probe.phone, probe.alternatePhone].map((p) => (p ?? "").replace(/\D+/g, "")).filter((d) => d.length >= 10);
+  const leads: LeadDuplicate[] = [];
+  for (const l of all) {
+    if (self && l.id === self.id) continue;
+    const phone = phones.some((d) => phoneMatches(l.phone, d) || phoneMatches(l.alternatePhone, d));
+    const email = !!norm(probe.email) && norm(l.email) === norm(probe.email);
+    const name = !!norm(probe.customerName) && !!norm(probe.companyName) && norm(l.customerName) === norm(probe.customerName) && norm(l.companyName) === norm(probe.companyName);
+    const place = !!norm(probe.companyName) && !!norm(probe.city) && norm(l.companyName) === norm(probe.companyName) && norm(l.city) === norm(probe.city);
+    if (!phone && !email && !name && !place) continue;
+    leads.push({
+      id: l.id,
+      customerName: l.customerName,
+      companyName: l.companyName ?? null,
+      status: l.status,
+      isActive: l.isActive,
+      createdAt: l.createdAt,
+      sourceName: l.sourceName,
+      relation: self ? (l.createdAt < self.createdAt ? "EARLIER" : "LATER") : null,
+      strength: phone || email ? "EXACT" : "POSSIBLE",
+      reasons: [...(phone ? ["PHONE" as const] : []), ...(email ? ["EMAIL" as const] : []), ...(name ? ["NAME_AND_COMPANY" as const] : []), ...(place ? ["COMPANY_AND_CITY" as const] : [])],
+    });
+  }
+  return {
+    leads,
+    customers: [],
+    exact: leads.filter((l) => l.strength === "EXACT").length,
+    possible: leads.filter((l) => l.strength === "POSSIBLE").length,
+    productComparison: "unavailable",
+  };
 }

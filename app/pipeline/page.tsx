@@ -25,8 +25,10 @@ export default function PipelinePage() {
   const canUpdateStatus = hasPermission("leads.status.update");
 
   async function handleMove(id: string, status: LeadStatus) {
+    const from = leads.find((l) => l.id === id)?.status;
     try {
-      await updateStatus(id, status);
+      // The status the card showed: a board that is out of date is refused, not applied.
+      await updateStatus(id, status, from ? { expectedStatus: from } : undefined);
       toast.success(`Moved to ${formatLeadStatus(status)}`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not move this lead. Please try again.");
@@ -36,6 +38,7 @@ export default function PipelinePage() {
   const boardLeads = leads.filter((l) => LEAD_BOARD_STATUSES.includes(l.status));
   const newCount = leads.filter((l) => l.status === "NEW").length;
   const contactedCount = leads.filter((l) => l.status === "CONTACTED").length;
+  const underqualifiedCount = leads.filter((l) => l.status === "UNDERQUALIFIED").length;
   const qualifiedCount = leads.filter((l) => isQualifiedLeadStatus(l.status)).length;
   const rejectedCount = leads.filter((l) => l.status === "REJECTED").length;
   const qualificationRate = leads.length ? Math.round((qualifiedCount / leads.length) * 100) : 0;
@@ -62,12 +65,12 @@ export default function PipelinePage() {
       <PageHeader
         eyebrow="RevenueOS · Pipeline · Lead Pipeline"
         title="Lead Pipeline"
-        subtitle="Pre-qualification board — move a lead from New to Contacted here; Qualify or Reject from its detail page."
+        subtitle="Pre-qualification board — move a lead between New, Contacted and Underqualified here; Qualify, Reject or Reopen from its detail page."
       />
 
       <StatRow>
         <StatCard label="New" value={String(newCount)} note="not yet contacted" />
-        <StatCard label="Contacted" value={String(contactedCount)} note="in progress" />
+        <StatCard label="Contacted" value={String(contactedCount)} note={`in progress · ${underqualifiedCount} underqualified`} />
         <StatCard label="Qualification Rate" value={`${qualificationRate}%`} note={`${qualifiedCount} of ${leads.length} leads`} />
         <StatCard label="Rejected" value={String(rejectedCount)} note="did not qualify" />
       </StatRow>
@@ -84,7 +87,7 @@ export default function PipelinePage() {
             items={boardLeads}
             getStage={(l) => l.status}
             renderCard={renderCard}
-            gridColumns={2}
+            gridColumns={3}
             colorMap={LEAD_STATUS_STYLE}
             onMove={canUpdateStatus ? handleMove : undefined}
             onCardClick={(id) => router.push(`/leads/${id}`)}

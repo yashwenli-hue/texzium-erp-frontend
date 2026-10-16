@@ -146,10 +146,10 @@ export function useCustomerDuplicateCheck(query: CustomerDuplicateQuery, enabled
   const [checking, setChecking] = useState(false);
   const latest = useRef(0);
 
-  const key = useMemo(() => JSON.stringify([query.customerName, query.panNumber, query.phone, query.email, query.excludeCustomerId]), [query.customerName, query.panNumber, query.phone, query.email, query.excludeCustomerId]);
+  const key = useMemo(() => JSON.stringify([query.gstin, query.customerName, query.panNumber, query.phone, query.email, query.excludeCustomerId]), [query.gstin, query.customerName, query.panNumber, query.phone, query.email, query.excludeCustomerId]);
 
   useEffect(() => {
-    const hasInput = [query.customerName, query.panNumber, query.phone, query.email].some((v) => v && v.trim());
+    const hasInput = [query.gstin, query.customerName, query.panNumber, query.phone, query.email].some((v) => v && v.trim());
     if (!enabled || !hasInput) {
       setResult(EMPTY);
       setChecking(false);

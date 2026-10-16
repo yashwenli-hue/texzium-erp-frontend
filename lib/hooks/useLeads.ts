@@ -7,6 +7,8 @@ import { CreateLeadInput, UpdateLeadInput, LogLeadActivityInput, LeadListOptions
 import { LeadStatus } from "../types/domain";
 import { FilterMap, SortState } from "../types/common";
 import { LeadSortField } from "../repository/interfaces";
+import { EMPTY_FACETS, LeadSearchQuery } from "../repository/shared/leadSearch";
+import { NO_DUPLICATES } from "../repository/shared/leadDuplicates";
 
 // Normal lists leave deactivated leads out. Pass { includeInactive: true } only
 // where they are explicitly wanted (e.g. the Leads list's "Show deactivated").
@@ -37,8 +39,8 @@ export function useLeads(options?: LeadListOptions) {
   );
 
   const updateStatus = useCallback(
-    async (id: string, status: LeadStatus) => {
-      await repo.leads.updateStatus(id, status);
+    async (id: string, status: LeadStatus, options?: { expectedStatus?: LeadStatus; remarks?: string }) => {
+      await repo.leads.updateStatus(id, status, options);
       refetch();
     },
     [repo, refetch]
@@ -191,6 +193,28 @@ export function useLeadDetail(id: string | undefined) {
     [id, repo, refetch, refetchTimeline]
   );
 
+  // A pre-qualification move (New / Contacted / Underqualified) with an optional remark;
+  // expectedStatus refuses the move if the lead changed since it was loaded.
+  const moveStatus = useCallback(
+    async (status: LeadStatus, remarks?: string) => {
+      if (!id || !lead) return;
+      await repo.leads.updateStatus(id, status, { expectedStatus: lead.status, remarks });
+      refetch();
+      refetchTimeline();
+    },
+    [id, lead, repo, refetch, refetchTimeline]
+  );
+
+  const reopenLead = useCallback(
+    async (reason: string) => {
+      if (!id) return;
+      await repo.leads.reopen(id, reason);
+      refetch();
+      refetchTimeline();
+    },
+    [id, repo, refetch, refetchTimeline]
+  );
+
   return {
     lead,
     timeline: timeline ?? [],
@@ -204,9 +228,35 @@ export function useLeadDetail(id: string | undefined) {
     qualifyLead,
     rejectLead,
     updateLead,
+    moveStatus,
+    reopenLead,
     refetch,
     refreshAll,
   };
+}
+
+/** GET /leads/search for the Leads list and the Pre-Sales panel. Keeps the last page while the next loads. */
+export function useLeadSearch(query: LeadSearchQuery) {
+  const repo = useRepository();
+  const key = JSON.stringify(query);
+  const { data, loading, error, refetch } = useAsyncList(() => repo.leads.search(query), [repo, key]);
+  return {
+    result: data ?? { items: [], total: 0, page: query.page ?? 1, pageSize: query.pageSize ?? 25, facets: EMPTY_FACETS },
+    loaded: data !== undefined,
+    loading,
+    error,
+    refetch,
+  };
+}
+
+/** Likely duplicates of an existing lead (read only). */
+export function useLeadDuplicates(id: string | undefined) {
+  const repo = useRepository();
+  const { data, loading, error, refetch } = useAsyncList(
+    () => (id ? repo.leads.duplicatesOf(id) : Promise.resolve(NO_DUPLICATES)),
+    [repo, id]
+  );
+  return { duplicates: data ?? NO_DUPLICATES, loading, error, refetch };
 }
 
 export function useLeadSources() {

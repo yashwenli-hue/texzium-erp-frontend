@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Modal } from "../ui/Modal";
 import { TextField, TextAreaField, SelectField, FieldRow } from "../ui/FormField";
 import { Button } from "../ui/Button";
@@ -8,6 +8,9 @@ import { useToast } from "../ui/Toast";
 import { CreateLeadInput } from "../../lib/repository/interfaces";
 import { useLeadSources } from "../../lib/hooks/useLeads";
 import { LeadLocationFields } from "./LeadLocationFields";
+import { LeadDuplicatesPanel } from "../ui/LeadDuplicatesPanel";
+import { useRepository } from "../../lib/repository/RepositoryProvider";
+import { LeadDuplicateResult, NO_DUPLICATES, probeIsWorthChecking } from "../../lib/repository/shared/leadDuplicates";
 import { DraftErrors, EMPTY_LOCATION_DRAFT, LocationDraft, createFieldsFromDraft, draftErrors } from "../../lib/geo/leadLocation";
 
 /**
@@ -41,6 +44,31 @@ export function LeadForm({
   const [submitting, setSubmitting] = useState(false);
 
   const effectiveSourceId = sourceId || sources[0]?.id || "";
+
+  // Likely duplicates, asked once typing pauses: the same number or email (possibly from
+  // another source), or the same name and company. A warning only: nothing is blocked
+  // or merged, and a lookup that fails just shows nothing.
+  const repo = useRepository();
+  const [duplicates, setDuplicates] = useState<LeadDuplicateResult>(NO_DUPLICATES);
+  const city = location.city;
+  useEffect(() => {
+    const probe = { phone, alternatePhone, email, customerName, companyName, city };
+    if (!probeIsWorthChecking(probe)) {
+      setDuplicates(NO_DUPLICATES);
+      return;
+    }
+    let cancelled = false;
+    const t = setTimeout(() => {
+      repo.leads
+        .duplicateCheck(probe)
+        .then((r) => !cancelled && setDuplicates(r))
+        .catch(() => !cancelled && setDuplicates(NO_DUPLICATES));
+    }, 400);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [repo, phone, alternatePhone, email, customerName, companyName, city]);
 
   function validate(): boolean {
     const e: Record<string, string> = {};
@@ -125,6 +153,7 @@ export function LeadForm({
         <TextField label="Phone" required value={phone} onChange={(e) => setPhone(e.target.value)} error={errors.phone} placeholder="+91 …" />
         <TextField label="Email" value={email} onChange={(e) => setEmail(e.target.value)} error={errors.email} placeholder="name@company.com (optional)" />
       </FieldRow>
+      <LeadDuplicatesPanel result={duplicates} compact />
 
       <LeadLocationFields
         draft={location}

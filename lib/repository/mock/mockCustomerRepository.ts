@@ -1,3 +1,4 @@
+import { MockCustomerGstRepository } from "./mockCustomerGstRepository";
 import { ID, ListQuery, Page } from "../../types/common";
 import { Customer, CustomerDuplicateCheck, CustomerEvent, CustomerOverview } from "../../types/domain";
 import {
@@ -31,11 +32,14 @@ import {
   gstinMatchesPan,
   normalizeCustomerName,
   normalizeEmail,
+  normalizeGstin,
   normalizePan,
   quotingBlockers,
   sortRegistrations,
   validateCustomerFields,
+  validateGstFields,
 } from "../shared/customerLifecycle";
+import { ApiError } from "../../api/httpClient";
 import { roundMoney } from "../shared/quotationLifecycle";
 
 const SEARCHABLE: (keyof Customer)[] = ["customerName", "customerCode", "email", "phone", "panNumber"];
@@ -71,6 +75,24 @@ export class MockCustomerRepository implements ICustomerRepository {
     const pan = input.panNumber?.trim() ? normalizePan(input.panNumber) : undefined;
     this.assertNoDuplicate({ name, pan });
 
+    // Like the backend: the first registration is checked before anything is created, so
+    // the customer and its registration are created together or not at all.
+    const reg = input.gstRegistration;
+    if (reg) {
+      const regError = Object.values(validateGstFields(reg))[0];
+      if (regError) throw new Error(regError);
+      const gstin = normalizeGstin(reg.gstin);
+      if (pan && !gstinMatchesPan(gstin, pan)) throw new ApiError(`The GSTIN ${gstin} carries a different PAN from this customer's (${pan}).`, 400);
+      const owner = db.customers.getAll().find((c) => c.gstRegistrations.some((g) => g.gstin === gstin));
+      if (owner) {
+        throw new CustomerConflictError(`This GSTIN is already registered to ${owner.customerName} (${owner.customerCode}). Use that customer instead of creating another.`, "DUPLICATE_GSTIN", {
+          id: owner.id,
+          customerCode: owner.customerCode,
+          customerName: owner.customerName,
+        });
+      }
+    }
+
     const now = new Date().toISOString();
     const customer: Customer = {
       id: mockId("C"),
@@ -88,6 +110,10 @@ export class MockCustomerRepository implements ICustomerRepository {
     };
     db.customers.add(customer);
     recordMockCustomerEvent({ customerId: customer.id, action: "CUSTOMER_CREATED", toStatus: "ACTIVE" });
+    if (reg) {
+      await new MockCustomerGstRepository().create({ ...reg, customerId: customer.id });
+      return delay(db.customers.getById(customer.id) ?? customer);
+    }
     return delay(customer);
   }
 
@@ -290,7 +316,17 @@ export class MockCustomerRepository implements ICustomerRepository {
       email: query.email?.trim() || undefined,
       excludeId: query.excludeCustomerId,
     };
-    if (!probe.name && !probe.pan && !probe.phone && !probe.email) return delay({ blocking: [], warnings: [] });
+    const gstin = query.gstin ? query.gstin.replace(/[\s./-]+/g, "").toUpperCase() : "";
+    const gstinOwner = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/.test(gstin)
+      ? db.customers.getAll().find((c) => c.id !== query.excludeCustomerId && c.gstRegistrations.some((g) => g.gstin === gstin))
+      : undefined;
+    if (!probe.name && !probe.pan && !probe.phone && !probe.email && !gstinOwner) return delay({ blocking: [], warnings: [] });
+    if (gstinOwner) {
+      return delay({
+        blocking: [{ id: gstinOwner.id, customerCode: gstinOwner.customerCode, customerName: gstinOwner.customerName, isActive: gstinOwner.isActive, reasons: ["GSTIN"], strength: "EXACT" }],
+        warnings: [],
+      });
+    }
     const matches = findMockMatches(probe);
     const view = (m: (typeof matches)[number]) => ({
       id: m.customer.id,

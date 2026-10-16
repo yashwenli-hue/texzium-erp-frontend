@@ -1,14 +1,14 @@
 import type { Lead, LeadStatus } from "../../types/domain";
-import { formatLeadStatus } from "../../types/domain";
+import { LEAD_STATUSES, formatLeadStatus } from "../../types/domain";
 import type { FilterMap, SortState } from "../../types/common";
-import type { FollowupInfo } from "../../followup";
+import type { FollowupUrgency } from "../../followup";
 import { countryName } from "../../geo/countries";
-import { locationSearchText } from "../../geo/leadLocation";
+import { LEAD_SEARCH_SORTS, LastCallFilter, LeadSearchQuery, LeadSearchSort, NOT_SET_COUNTRY } from "./leadSearch";
 
 /**
- * How the Leads list reads, filters and orders leads. Pure functions over the list the
- * backend returns (GET /leads has no query parameters, so search, filter, sort and
- * paging are done here, on what was fetched), plus the list's remembered view.
+ * The remembered view of a lead list (the Leads list and the Pre-Sales panel), and how it
+ * becomes a GET /leads/search query. Filtering, sorting, paging and counting all happen on
+ * the server; this module only keeps the person's choices and turns them into a query.
  */
 
 /** The statuses in lifecycle order, the order the Status filter offers them in. */
@@ -17,6 +17,7 @@ export const LEAD_STATUS_ORDER: readonly LeadStatus[] = [
   "ASSIGNED",
   "PRE_SALES_ASSIGNED",
   "CONTACTED",
+  "UNDERQUALIFIED",
   "QUALIFIED",
   "SALES_ASSIGNED",
   "PROPOSAL_SENT",
@@ -26,20 +27,15 @@ export const LEAD_STATUS_ORDER: readonly LeadStatus[] = [
   "REJECTED",
 ];
 
-/** The Status filter's choices: the statuses the loaded leads have, in lifecycle order. */
-export function leadStatusOptions(leads: readonly Pick<Lead, "status">[]): string[] {
-  const present = new Set(leads.map((l) => l.status));
-  const known = LEAD_STATUS_ORDER.filter((s) => present.has(s));
-  // A status the frontend does not know yet still gets a choice, after the known ones.
-  const unknown = [...present].filter((s) => !LEAD_STATUS_ORDER.includes(s)).sort();
-  return [...known, ...unknown].map(formatLeadStatus);
-}
+export type LeadSortField = LeadSearchSort;
 
-export const LEAD_SORT_FIELDS = ["customerName", "createdAt", "lastActivityAt"] as const;
-export type LeadSortField = (typeof LEAD_SORT_FIELDS)[number];
+/** The filter keys a list keeps, each a list of values sent to the server. */
+export const LEAD_FILTER_KEYS = ["status", "assignment", "presales", "sales", "followup", "lastCall", "source", "country", "state", "city"] as const;
+export type LeadFilterKey = (typeof LEAD_FILTER_KEYS)[number];
 
-export const NOT_SET = "Not set";
-export const ASSIGNMENT_OPTIONS = ["Assigned", "Unassigned"] as const;
+export const ASSIGNMENT_LABEL: Record<"assigned" | "unassigned", string> = { assigned: "Assigned", unassigned: "Unassigned" };
+export const LAST_CALL_LABEL: Record<LastCallFilter, string> = { CNC: "Not connected (CNC)", CONNECTED: "Connected", NONE: "No call logged" };
+export const FOLLOWUP_OPTIONS: readonly FollowupUrgency[] = ["Overdue", "Due Today", "Tomorrow", "Scheduled", "None"];
 
 export interface LeadListView {
   search: string;
@@ -59,9 +55,11 @@ export const DEFAULT_LEAD_LIST_VIEW: LeadListView = {
   showDeactivated: false,
 };
 
-export const LEAD_LIST_VIEW_KEY = "revenueos.leads.view.v1";
+/** v2: filters hold server values (status codes, user ids, country codes), not labels. */
+export const LEAD_LIST_VIEW_KEY = "revenueos.leads.view.v2";
+export const PRESALES_VIEW_KEY = "revenueos.presales.view.v1";
 
-const MAX_SEARCH = 200;
+const MAX_SEARCH = 100;
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
 /** A remembered view, checked field by field: anything malformed falls back to the default for that field. */
@@ -73,15 +71,15 @@ export function sanitizeLeadListView(raw: unknown): LeadListView | null {
   const filters: FilterMap = {};
   if (r.filters && typeof r.filters === "object" && !Array.isArray(r.filters)) {
     for (const [key, value] of Object.entries(r.filters as Record<string, unknown>)) {
-      if (typeof value === "string") filters[key] = value;
-      else if (Array.isArray(value) && value.every((v) => typeof v === "string") && value.length > 0) filters[key] = value as string[];
+      if (!(LEAD_FILTER_KEYS as readonly string[]).includes(key)) continue;
+      if (Array.isArray(value) && value.length > 0 && value.every((v) => typeof v === "string" && v.length <= 100)) filters[key] = value as string[];
     }
   }
 
   const range = r.dateRange as Record<string, unknown> | undefined;
   const day = (v: unknown) => (typeof v === "string" && DAY.test(v) ? v : "");
   const sort = r.sort as Record<string, unknown> | undefined;
-  const sortOk = !!sort && LEAD_SORT_FIELDS.includes(sort.field as LeadSortField) && (sort.direction === "asc" || sort.direction === "desc");
+  const sortOk = !!sort && (LEAD_SEARCH_SORTS as readonly string[]).includes(sort.field as string) && (sort.direction === "asc" || sort.direction === "desc");
 
   return {
     search: typeof r.search === "string" ? r.search.slice(0, MAX_SEARCH) : d.search,
@@ -99,73 +97,58 @@ export function clampPage(page: number, total: number, pageSize: number): number
   return Math.min(Math.max(1, page), last);
 }
 
-const valuesOf = (filters: FilterMap, key: string): string[] => {
+const valuesOf = (filters: FilterMap, key: LeadFilterKey): string[] => {
   const v = filters[key];
   if (!v) return [];
   return Array.isArray(v) ? v : [v];
 };
 
-export interface LeadListContext {
-  followupById: ReadonlyMap<string, FollowupInfo>;
-  categoryBySourceId: ReadonlyMap<string, string | undefined>;
+/** The view as a GET /leads/search query. `search` is the (debounced) text to send. */
+export function toSearchQuery(view: LeadListView, search: string, pageSize: number): LeadSearchQuery {
+  const f = view.filters;
+  const list = (key: LeadFilterKey) => (valuesOf(f, key).length ? valuesOf(f, key) : undefined);
+  const status = valuesOf(f, "status").filter((s): s is LeadStatus => (LEAD_STATUSES as string[]).includes(s));
+  const assignment = valuesOf(f, "assignment");
+  return {
+    q: search.trim() || undefined,
+    status: status.length ? status : undefined,
+    // Both choices together are the same as neither.
+    assignment: assignment.length === 1 && (assignment[0] === "assigned" || assignment[0] === "unassigned") ? assignment[0] : undefined,
+    presalesUserId: list("presales"),
+    salesUserId: list("sales"),
+    followup: list("followup") as FollowupUrgency[] | undefined,
+    lastCall: list("lastCall") as LastCallFilter[] | undefined,
+    source: list("source"),
+    country: list("country"),
+    state: list("state"),
+    city: list("city"),
+    createdFrom: view.dateRange.from || undefined,
+    createdTo: view.dateRange.to || undefined,
+    includeInactive: view.showDeactivated || undefined,
+    sort: view.sort.field,
+    dir: view.sort.direction,
+    page: view.page,
+    pageSize,
+  };
 }
 
-export function filterAndSortLeads(leads: readonly Lead[], view: Pick<LeadListView, "search" | "filters" | "dateRange" | "sort">, ctx: LeadListContext): Lead[] {
-  const { filters, dateRange, search, sort } = view;
-  let rows = [...leads];
-  const statusF = valuesOf(filters, "status");
-  const sourceF = valuesOf(filters, "source");
-  const sourceTypeF = valuesOf(filters, "sourceType");
-  const followupF = valuesOf(filters, "followup");
-  const countryF = valuesOf(filters, "country");
-  const stateF = valuesOf(filters, "state");
-  const cityF = valuesOf(filters, "city");
-  const assignmentF = valuesOf(filters, "assignment");
-
-  if (statusF.length) rows = rows.filter((l) => statusF.includes(formatLeadStatus(l.status)));
-  if (sourceF.length) rows = rows.filter((l) => sourceF.includes(l.sourceName));
-  if (sourceTypeF.length) rows = rows.filter((l) => sourceTypeF.includes(ctx.categoryBySourceId.get(l.sourceId) ?? ""));
-  if (followupF.length) rows = rows.filter((l) => followupF.includes(ctx.followupById.get(l.id)?.urgency ?? "None"));
-  if (countryF.length) rows = rows.filter((l) => countryF.includes(l.country ? countryName(l.country) : NOT_SET));
-  if (stateF.length) rows = rows.filter((l) => stateF.includes(l.state ?? ""));
-  if (cityF.length) rows = rows.filter((l) => cityF.includes(l.city ?? ""));
-  // Both choices together are the same as neither.
-  const wantAssigned = assignmentF.includes("Assigned");
-  const wantUnassigned = assignmentF.includes("Unassigned");
-  if (wantAssigned !== wantUnassigned) rows = rows.filter((l) => (wantAssigned ? !!l.assignedToId : !l.assignedToId));
-
-  // The same createdAt that the Received column shows and sorts by, as local calendar days.
-  if (dateRange.from) {
-    const fromTs = new Date(`${dateRange.from}T00:00:00`).getTime();
-    rows = rows.filter((l) => new Date(l.createdAt).getTime() >= fromTs);
+/** What a filter value is called on screen. */
+export function filterValueLabel(key: LeadFilterKey, value: string, names: Record<string, string> = {}): string {
+  switch (key) {
+    case "status":
+      return formatLeadStatus(value);
+    case "assignment":
+      return ASSIGNMENT_LABEL[value as "assigned"] ?? value;
+    case "lastCall":
+      return LAST_CALL_LABEL[value as LastCallFilter] ?? value;
+    case "country":
+      return value === NOT_SET_COUNTRY ? "Not set" : countryName(value);
+    case "presales":
+    case "sales":
+      return names[value] || "Former user";
+    default:
+      return value;
   }
-  if (dateRange.to) {
-    const toTs = new Date(`${dateRange.to}T23:59:59.999`).getTime();
-    rows = rows.filter((l) => new Date(l.createdAt).getTime() <= toTs);
-  }
-
-  const q = search.trim().toLowerCase();
-  // A phone number matches on its digits, however it was typed, once there are enough to mean something.
-  const qDigits = q.replace(/\D/g, "");
-  if (q) {
-    rows = rows.filter(
-      (l) =>
-        l.customerName.toLowerCase().includes(q) ||
-        (l.companyName ?? "").toLowerCase().includes(q) ||
-        (l.uiContext?.productInterest ?? "").toLowerCase().includes(q) ||
-        locationSearchText(l).includes(q) ||
-        (l.assignedToName ?? "").toLowerCase().includes(q) ||
-        (qDigits.length >= 3 && l.phone.replace(/\D/g, "").includes(qDigits)) ||
-        (l.email ?? "").toLowerCase().includes(q)
-    );
-  }
-
-  const key = (l: Lead) => (sort.field === "customerName" ? l.customerName.toLowerCase() : l[sort.field] ?? "");
-  rows.sort((a, b) => {
-    const cmp = key(a).localeCompare(key(b));
-    return sort.direction === "asc" ? cmp : -cmp;
-  });
-  return rows;
 }
 
 /** "Asha Rao, Sterling Pumps, Pune": what a row's link is called, with everything the row may cut short. */

@@ -7,7 +7,17 @@ import { FilterMap } from "../../lib/types/common";
 export interface FilterGroupConfig {
   key: string;
   label: string;
+  /** The values that are filtered on (sent to the server, kept in the URL/state). */
   options: string[];
+  /** What a value is called on screen, when that differs from the value (a user's name for an id). */
+  labels?: Record<string, string>;
+  /** How many records each value would give with the other filters as they are (server facets). */
+  counts?: Record<string, number>;
+}
+
+/** The text shown for a value of a group. */
+export function optionLabel(group: FilterGroupConfig, value: string): string {
+  return group.labels?.[value] ?? value;
 }
 
 export function valuesOf(value: FilterMap, key: string): string[] {
@@ -53,8 +63,8 @@ function FilterDropdown({
   }, [open]);
 
   const filteredOptions = useMemo(
-    () => group.options.filter((o) => o.toLowerCase().includes(query.toLowerCase())),
-    [group.options, query]
+    () => group.options.filter((o) => optionLabel(group, o).toLowerCase().includes(query.toLowerCase())),
+    [group, query]
   );
 
   function toggle(option: string) {
@@ -63,7 +73,13 @@ function FilterDropdown({
 
   return (
     <div className="fd" ref={ref}>
-      <button className={`fd-trigger ${active.length ? "active" : ""}`} onClick={() => setOpen((o) => !o)}>
+      <button
+        type="button"
+        className={`fd-trigger ${active.length ? "active" : ""}`}
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        aria-label={active.length ? `${group.label}: ${active.length} selected` : group.label}
+      >
         {group.label}
         {active.length > 0 && <span className="fd-count">{active.length}</span>}
         <Icon name="down" size={12} />
@@ -84,7 +100,8 @@ function FilterDropdown({
             {filteredOptions.map((opt) => (
               <label className="fd-opt" key={opt}>
                 <input type="checkbox" checked={active.includes(opt)} onChange={() => toggle(opt)} />
-                {opt}
+                <span className="fd-opt-label">{optionLabel(group, opt)}</span>
+                {group.counts && <span className="fd-opt-count">{group.counts[opt] ?? 0}</span>}
               </label>
             ))}
           </div>
@@ -262,7 +279,7 @@ export function ActiveFilterChips({
   value: FilterMap;
   onChange: (next: FilterMap) => void;
 }) {
-  const active = groups.flatMap((g) => valuesOf(value, g.key).map((v) => ({ groupKey: g.key, groupLabel: g.label, value: v })));
+  const active = groups.flatMap((g) => valuesOf(value, g.key).map((v) => ({ groupKey: g.key, groupLabel: g.label, value: v, label: optionLabel(g, v) })));
   if (active.length === 0) return null;
 
   function remove(groupKey: string, v: string) {
@@ -274,14 +291,14 @@ export function ActiveFilterChips({
     <div className="active-filter-chips">
       {active.map((a) => (
         <span className="af-chip" key={`${a.groupKey}:${a.value}`}>
-          <span className="af-chip-label">{a.groupLabel}:</span> {a.value}
-          <button onClick={() => remove(a.groupKey, a.value)} aria-label={`Remove ${a.groupLabel} filter ${a.value}`}>
+          <span className="af-chip-label">{a.groupLabel}:</span> {a.label}
+          <button type="button" onClick={() => remove(a.groupKey, a.value)} aria-label={`Remove ${a.groupLabel} filter ${a.label}`}>
             <Icon name="close" size={11} />
           </button>
         </span>
       ))}
       {active.length > 1 && (
-        <button className="af-clear" onClick={() => onChange({})}>
+        <button type="button" className="af-clear" onClick={() => onChange({})}>
           Clear all
         </button>
       )}

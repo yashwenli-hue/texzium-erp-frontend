@@ -2,9 +2,10 @@ import type { Customer, CustomerGstRegistration } from "../../types/domain";
 import type { CreateCustomerInput, CreateGstRegistrationInput } from "../interfaces";
 
 /**
- * Creating a customer and, optionally, its first GST registration, as the two
- * separate backend calls they are (POST /customers, then POST /customer-gst). There is
- * no transaction across them, so this says plainly which of the three outcomes happened:
+ * Creating a customer and, optionally, its first GST registration. With a registration the
+ * backend now creates both in ONE request and transaction (POST /customers with
+ * gstRegistration): either both exist or neither does, so "partial" no longer happens on a
+ * current backend. The outcomes stay as they were for the screens:
  *
  *  - "failed":  the customer was NOT created (a duplicate, a validation error, no
  *               permission). Nothing exists; the person fixes the details and tries again.
@@ -34,18 +35,15 @@ export async function createCustomerThenRegistration(
   details: CreateCustomerInput,
   registration: RegistrationInput | null
 ): Promise<CreateOutcome> {
-  let customer: Customer;
   try {
-    customer = await api.createCustomer(details);
+    if (!registration) return { kind: "done", customer: await api.createCustomer(details) };
+    const { isDefault: _ignored, ...first } = registration;
+    void _ignored;
+    const customer = await api.createCustomer({ ...details, gstRegistration: first });
+    return { kind: "done", customer, registration: customer.gstRegistrations.find((g) => g.gstin === first.gstin) };
   } catch (e) {
+    // Nothing was created: the customer and its registration go together.
     return { kind: "failed", error: asError(e, "The customer could not be created.") };
-  }
-  if (!registration) return { kind: "done", customer };
-  try {
-    const created = await api.addRegistration(customer.id, registration);
-    return { kind: "done", customer, registration: created };
-  } catch (e) {
-    return { kind: "partial", customer, registrationError: asError(e, "The registration could not be saved.") };
   }
 }
 

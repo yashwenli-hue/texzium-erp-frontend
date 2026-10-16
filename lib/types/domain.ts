@@ -31,7 +31,9 @@ export type LeadStatus =
   | "LOST"
   | "PRE_SALES_ASSIGNED"
   | "SALES_ASSIGNED"
-  | "REJECTED";
+  | "REJECTED"
+  // VERIFIED (backend lifecycle v2): contacted but not yet a fit; still pre-qualification.
+  | "UNDERQUALIFIED";
 
 export const LEAD_STATUSES: LeadStatus[] = [
   "NEW",
@@ -45,10 +47,11 @@ export const LEAD_STATUSES: LeadStatus[] = [
   "PRE_SALES_ASSIGNED",
   "SALES_ASSIGNED",
   "REJECTED",
+  "UNDERQUALIFIED",
 ];
 
-/** Freely draggable on the Lead Pipeline board — Qualify/Reject are gated actions, not drag targets. */
-export const LEAD_BOARD_STATUSES: LeadStatus[] = ["NEW", "CONTACTED"];
+/** Freely draggable on the Lead Pipeline board (the pre-qualification moves POST /lead-status accepts) — Qualify/Reject are gated actions, not drag targets. */
+export const LEAD_BOARD_STATUSES: LeadStatus[] = ["NEW", "CONTACTED", "UNDERQUALIFIED"];
 
 /** "PRE_SALES_ASSIGNED" -> "Pre Sales Assigned". Shared by status badges and timeline action labels. */
 export function titleCaseFromConstant(value: string): string {
@@ -69,14 +72,18 @@ export function isQualifiedLeadStatus(status: LeadStatus): boolean {
   return status === "QUALIFIED" || status === "SALES_ASSIGNED";
 }
 
-// Which statuses Assign, Qualify and Reject may start from. These mirror the
-// backend's lead-transitions.ts, which enforces them (409 otherwise); here they only
-// decide which buttons are enabled and what the hint says.
-//   before qualification   NEW, ASSIGNED, CONTACTED, PRE_SALES_ASSIGNED
+// Which statuses each lifecycle action may start from. These mirror the backend's
+// lead-transitions.ts, which enforces them (409 otherwise); here they only decide which
+// buttons are enabled and what the hint says.
+//   before qualification   NEW, ASSIGNED, CONTACTED, PRE_SALES_ASSIGNED, UNDERQUALIFIED
 //   qualified / in sales   QUALIFIED, SALES_ASSIGNED, PROPOSAL_SENT, NEGOTIATION
 //   closed                 WON, LOST, REJECTED
-export const LEAD_BEFORE_QUALIFICATION_STATUSES: LeadStatus[] = ["NEW", "ASSIGNED", "CONTACTED", "PRE_SALES_ASSIGNED"];
+// Qualify also works from QUALIFIED (a lead marked qualified without a hand-off to
+// sales); Reopen takes a REJECTED lead back to Contacted; the status moves are New,
+// Contacted and Underqualified, from before qualification.
+export const LEAD_BEFORE_QUALIFICATION_STATUSES: LeadStatus[] = ["NEW", "ASSIGNED", "CONTACTED", "PRE_SALES_ASSIGNED", "UNDERQUALIFIED"];
 export const LEAD_CLOSED_STATUSES: LeadStatus[] = ["WON", "LOST", "REJECTED"];
+export const LEAD_STATUS_MOVE_TARGETS: LeadStatus[] = ["NEW", "CONTACTED", "UNDERQUALIFIED"];
 
 /** Assign → Pre Sales Assigned (from Pre Sales Assigned only to a different user). */
 export function canAssignLeadFrom(status: LeadStatus): boolean {
@@ -85,7 +92,7 @@ export function canAssignLeadFrom(status: LeadStatus): boolean {
 
 /** Qualify → Sales Assigned. */
 export function canQualifyLeadFrom(status: LeadStatus): boolean {
-  return LEAD_BEFORE_QUALIFICATION_STATUSES.includes(status);
+  return LEAD_BEFORE_QUALIFICATION_STATUSES.includes(status) || status === "QUALIFIED";
 }
 
 /** Reject → Rejected, from anything that is not closed. */
@@ -93,8 +100,18 @@ export function canRejectLeadFrom(status: LeadStatus): boolean {
   return !LEAD_CLOSED_STATUSES.includes(status);
 }
 
-/** Why an assignment action is not available for this status (the same wording as the backend), or undefined. */
-export function leadActionBlockedReason(action: "assign" | "qualify" | "reject", status: LeadStatus): string | undefined {
+/** Reopen → Contacted, only from Rejected (with a reason). */
+export function canReopenLeadFrom(status: LeadStatus): boolean {
+  return status === "REJECTED";
+}
+
+/** A pre-qualification status move (POST /lead-status). */
+export function canMoveLeadStatus(from: LeadStatus, to: LeadStatus): boolean {
+  return from !== to && LEAD_BEFORE_QUALIFICATION_STATUSES.includes(from) && LEAD_STATUS_MOVE_TARGETS.includes(to);
+}
+
+/** Why a lifecycle action is not available for this status (the same wording as the backend), or undefined. */
+export function leadActionBlockedReason(action: "assign" | "qualify" | "reject" | "reopen", status: LeadStatus): string | undefined {
   const label = formatLeadStatus(status);
   const closed = LEAD_CLOSED_STATUSES.includes(status);
   if (action === "assign" && !canAssignLeadFrom(status)) {
@@ -107,6 +124,9 @@ export function leadActionBlockedReason(action: "assign" | "qualify" | "reject",
   }
   if (action === "reject" && !canRejectLeadFrom(status)) {
     return status === "REJECTED" ? "This lead has already been rejected." : `This lead is closed (${label}), so it cannot be rejected.`;
+  }
+  if (action === "reopen" && !canReopenLeadFrom(status)) {
+    return closed ? `Only a rejected lead can be reopened; this one is ${label}.` : `This lead is open (${label}); only a rejected lead can be reopened.`;
   }
   return undefined;
 }
@@ -231,6 +251,13 @@ export interface Lead {
   createdAt: string; // ISO 8601
   updatedAt: string; // ISO 8601
   lastActivityAt: string; // ISO 8601
+  /** VERIFIED (GET /leads/search rows only): who worked on it in pre-sales, from recorded ids. */
+  presales?: { id: ID; name: string }[];
+  /** VERIFIED (GET /leads/search rows only): the sales owner after qualification; absent before. */
+  salesOwnerId?: ID;
+  salesOwnerName?: string;
+  /** VERIFIED (GET /leads/search rows only): the outcome of the latest call that has one. */
+  lastCallOutcome?: CallOutcome | null;
   /**
    * VERIFIED (backend CP1): where the lead is. All three are absent for a lead recorded
    * without a location (every lead that existed before, and those the WhatsApp bot or a
@@ -281,6 +308,11 @@ export const LEAD_ACTIVITY_TYPES: { value: LeadActivityType; label: string; icon
   { value: "OTHER", label: "Other", icon: "pulse" },
 ];
 
+// VERIFIED (backend lifecycle v2): what a CALL came to. NOT_CONNECTED is a call that
+// did not connect ("CNC"). Only a call has one; with an outcome the remark is optional.
+export type CallOutcome = "CONNECTED" | "NOT_CONNECTED";
+export const CALL_OUTCOME_LABEL: Record<CallOutcome, string> = { CONNECTED: "Connected", NOT_CONNECTED: "Not connected (CNC)" };
+
 export function leadActivityMeta(type: LeadActivityType) {
   return LEAD_ACTIVITY_TYPES.find((t) => t.value === type) ?? LEAD_ACTIVITY_TYPES[LEAD_ACTIVITY_TYPES.length - 1];
 }
@@ -296,6 +328,8 @@ export interface LeadTimelineEntry {
   detail: string;
   /** What the person who performed the action wrote about it (today: the remark on a stage move). Apart from `detail`, which is the system's own sentence. Absent on every event recorded without one. */
   userRemark?: string;
+  /** The result of a CALL entry (CNC = NOT_CONNECTED); absent otherwise. */
+  outcome?: CallOutcome;
   /** Empty for system events, and for employee entries whose author was not recorded. */
   actorName: string;
   actorId?: ID;
@@ -431,14 +465,21 @@ export interface CustomerEvent {
   occurredAt: string;
 }
 
-export type CustomerMatchReason = "PAN" | "NAME" | "PHONE" | "EMAIL";
+export type CustomerMatchReason = "GSTIN" | "PAN" | "NAME" | "PHONE" | "EMAIL";
+
+/** EXACT: the same GSTIN. STRONG: the same PAN (incl. the PAN inside a GSTIN) or name; both refused. POSSIBLE: a shared phone or email. */
+export type CustomerMatchStrength = "EXACT" | "STRONG" | "POSSIBLE";
 
 export interface CustomerDuplicateMatch {
+  /** Empty for a hidden match. */
   id: ID;
   customerCode: string;
   customerName: string;
   isActive: boolean;
   reasons: CustomerMatchReason[];
+  strength?: CustomerMatchStrength;
+  /** VERIFIED (record scope): a customer the person may not open — no id, code or name is given. */
+  hidden?: boolean;
 }
 
 /** What GET /customers/duplicate-check found: PAN and name matches are refused by the backend, phone and email only warn. */
@@ -1486,7 +1527,8 @@ export interface ContentAsset {
   description: string | null;
   kind: ContentKind;
   tags: string[];
-  inventoryItem: { id: ID; sku: string; productName: string } | null;
+  /** VERIFIED (backend 8ca8dbd): the linked catalogue item, with its product category when it has one. */
+  inventoryItem: { id: ID; sku: string; productName: string; category?: string | null } | null;
   status: ContentStatus;
   archivedAt: string | null;
   archiveReason: string | null;

@@ -26,11 +26,17 @@ export function removeFromSelection(selection: readonly ContentAsset[], assetId:
 }
 
 /** The items the search and the kind filter leave in the list. The selection is not affected by either. */
-export function filterContent(items: readonly ContentAsset[], term: string, kind: ContentKind | "ALL"): ContentAsset[] {
+/** The product categories of the items' linked catalogue entries (real data only), sorted. */
+export function contentCategories(items: readonly ContentAsset[]): string[] {
+  return [...new Set(items.map((a) => a.inventoryItem?.category?.trim()).filter((c): c is string => !!c))].sort((a, b) => a.localeCompare(b));
+}
+
+export function filterContent(items: readonly ContentAsset[], term: string, kind: ContentKind | "ALL", category: string = "ALL"): ContentAsset[] {
   const q = term.trim().toLowerCase();
   return items.filter(
     (a) =>
       (kind === "ALL" || a.kind === kind) &&
+      (category === "ALL" || (a.inventoryItem?.category ?? "").trim().toLowerCase() === category.toLowerCase()) &&
       (!q || a.title.toLowerCase().includes(q) || a.tags.some((t) => t.includes(q)) || (a.description ?? "").toLowerCase().includes(q))
   );
 }

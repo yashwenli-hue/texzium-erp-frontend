@@ -22,15 +22,23 @@ type Prefill = { customerName?: string; email?: string; phone?: string };
 
 const same = (a: string | undefined, b: string | undefined) => (a ?? "").trim() === (b ?? "").trim();
 
-function MatchList({ matches }: { matches: CustomerDuplicateMatch[] }) {
+const STRENGTH_LABEL = { EXACT: "Same GSTIN", STRONG: "Same business", POSSIBLE: "Possible match" } as const;
+
+/** Each match, how sure it is, and why; a customer the person may not open is named only as such. */
+export function MatchList({ matches }: { matches: CustomerDuplicateMatch[] }) {
   return (
     <ul>
-      {matches.map((m) => (
-        <li key={m.id}>
-          <Link href={`/customers/${m.id}`}>
-            {m.customerName} ({m.customerCode})
-          </Link>
-          {!m.isActive && " · inactive"} — {m.reasons.map((r) => MATCH_REASON_LABEL[r]).join(", ")}
+      {matches.map((m, i) => (
+        <li key={m.id || `hidden-${i}`}>
+          {m.strength && <span className={`dup-strength ${m.strength === "EXACT" ? "exact" : ""}`}>{STRENGTH_LABEL[m.strength]}</span>}{" "}
+          {m.hidden ? (
+            <span>A customer you do not have access to. Ask an administrator for access instead of creating another.</span>
+          ) : (
+            <Link href={`/customers/${m.id}`}>
+              {m.customerName} ({m.customerCode})
+            </Link>
+          )}
+          {!m.hidden && !m.isActive && " · inactive"} — {m.reasons.map((r) => MATCH_REASON_LABEL[r]).join(", ")}
         </li>
       ))}
     </ul>
@@ -83,7 +91,7 @@ export function CustomerFields({
 
       {blocked && (
         <div className="dup block" role="alert" data-testid="dup-block">
-          <b>This customer already exists.</b> The system keeps one customer per PAN and per name. Use the existing one — another site of the same business is added as a GST registration of that customer.
+          <b>This customer already exists.</b> The system keeps one customer per GSTIN, per PAN and per name. Use the existing one — another site of the same business is added as a GST registration of that customer.
           <MatchList matches={dup.blocking} />
         </div>
       )}

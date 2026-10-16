@@ -7,6 +7,18 @@ import { validateLeadActivityInput } from "../shared/leadActivity";
 import { validateDeactivationReason } from "../shared/leadLifecycle";
 import { LeadLocationFields, locationChangeProblems, locationProblems, mergeLocation, EMPTY_STORED_LOCATION, normalizedLocationFields } from "../../geo/leadLocation";
 import { BackendLead, BackendLeadTimeline, mapLead, mapLeadTimeline } from "./mappers";
+import { LeadSearchQuery, LeadSearchResult, leadSearchParams } from "../shared/leadSearch";
+import { LeadDuplicateProbe, LeadDuplicateResult } from "../shared/leadDuplicates";
+
+type BackendFacet = { value: string | null; count: number; person?: { id: string; fullName: string | null } | null };
+type BackendLeadSearch = {
+  items: BackendLead[];
+  total: number;
+  page: number;
+  pageSize: number;
+  facets: Record<"status" | "assignment" | "presales" | "sales" | "source" | "country" | "state" | "city" | "followup" | "lastCall", BackendFacet[]>;
+};
+const hasValue = <T extends { value: string | null }>(f: T): f is T & { value: string } => typeof f.value === "string" && f.value !== "";
 
 const SEARCHABLE: (keyof Lead)[] = ["customerName", "companyName", "sourceName", "assignedToName", "email"];
 
@@ -93,12 +105,65 @@ export class RealLeadRepository implements ILeadRepository {
     return mapLead(row);
   }
 
-  async updateStatus(id: ID, status: LeadStatus): Promise<Lead> {
+  async updateStatus(id: ID, status: LeadStatus, options?: { expectedStatus?: LeadStatus; remarks?: string }): Promise<Lead> {
+    const remarks = options?.remarks?.trim();
     const row = await apiFetch<BackendLead>("/lead-status", {
       method: "POST",
-      body: { leadId: id, status },
+      body: {
+        leadId: id,
+        status,
+        ...(options?.expectedStatus ? { expectedStatus: options.expectedStatus } : {}),
+        ...(remarks ? { remarks } : {}),
+      },
     });
     return mapLead(row);
+  }
+
+  async reopen(id: ID, reason: string): Promise<Lead> {
+    const clean = reason.trim();
+    if (!clean) throw new ApiError("Say why the lead is being reopened.", 400);
+    const row = await apiFetch<BackendLead>(`/lead-assignments/${id}/reopen`, {
+      method: "PATCH",
+      body: { reason: clean },
+    });
+    return mapLead(row);
+  }
+
+  async search(query: LeadSearchQuery): Promise<LeadSearchResult> {
+    const res = await apiFetch<BackendLeadSearch>(`/leads/search?${leadSearchParams(query)}`);
+    const person = (f: { value: string; count: number; person?: { fullName: string | null } | null }) => ({
+      value: f.value,
+      count: f.count,
+      name: f.person?.fullName ?? "Former user",
+    });
+    return {
+      items: res.items.map(mapLead),
+      total: res.total,
+      page: res.page,
+      pageSize: res.pageSize,
+      facets: {
+        status: res.facets.status.filter(hasValue),
+        assignment: res.facets.assignment.filter(hasValue),
+        presales: res.facets.presales.filter(hasValue).map(person),
+        sales: res.facets.sales.filter(hasValue).map(person),
+        source: res.facets.source.filter(hasValue),
+        country: res.facets.country.filter(hasValue),
+        state: res.facets.state.filter(hasValue),
+        city: res.facets.city.filter(hasValue),
+        followup: res.facets.followup.filter(hasValue),
+        lastCall: res.facets.lastCall.filter(hasValue),
+      },
+    };
+  }
+
+  async duplicateCheck(probe: LeadDuplicateProbe): Promise<LeadDuplicateResult> {
+    const p = new URLSearchParams();
+    for (const [k, v] of Object.entries(probe)) if (typeof v === "string" && v.trim()) p.set(k, v.trim());
+    return apiFetch<LeadDuplicateResult>(`/leads/duplicate-check?${p.toString()}`);
+  }
+
+  async duplicatesOf(id: ID): Promise<LeadDuplicateResult> {
+    return apiFetch<LeadDuplicateResult>(`/leads/${id}/duplicates`);
   }
 
   async assign(id: ID, assignedToId: ID, _assignedToName: string): Promise<Lead> {
@@ -153,7 +218,8 @@ export class RealLeadRepository implements ILeadRepository {
       method: "POST",
       body: {
         activityType: valid.activityType,
-        remarks: valid.remarks,
+        ...(valid.remarks ? { remarks: valid.remarks } : {}),
+        ...(valid.outcome ? { outcome: valid.outcome } : {}),
         ...(valid.occurredAt ? { occurredAt: valid.occurredAt } : {}),
       },
     });

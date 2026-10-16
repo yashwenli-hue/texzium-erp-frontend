@@ -28,7 +28,7 @@ export function LeadHistoryTimeline({
   return (
     <div className="tl">
       {entries.length === 0 && (
-        <p style={{ color: "var(--muted)", fontSize: 13, padding: "4px 0 12px" }}>{emptyText}</p>
+        <p style={{ color: "var(--text-2)", fontSize: 13, padding: "4px 0 12px" }}>{emptyText}</p>
       )}
       {entries.map((t) => {
         const employee = t.source === "EMPLOYEE";
@@ -51,6 +51,11 @@ export function LeadHistoryTimeline({
               )}
               <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginTop: 4 }}>
                 <Tag color={employee ? "g" : "n"}>{employee ? "Employee" : "System"}</Tag>
+                {t.outcome && (
+                  <span className={`tag call-outcome ${t.outcome === "NOT_CONNECTED" ? "cnc" : "ok"}`} data-testid="call-outcome">
+                    {t.outcome === "NOT_CONNECTED" ? "Not connected (CNC)" : "Connected"}
+                  </span>
+                )}
                 {employee && (
                   <small style={{ color: "var(--muted)", fontSize: 11.5 }}>
                     {t.actorName ? `Logged by ${t.actorName}` : "Author not recorded"}

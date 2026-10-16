@@ -20,6 +20,8 @@ import { DataTable, Column } from "../../../components/ui/DataTable";
 import { ConfirmDialog } from "../../../components/ui/ConfirmDialog";
 import { OpportunityStageDialog } from "../../../components/opportunities/OpportunityStageDialog";
 import { QuotationForm } from "../../../components/forms/QuotationForm";
+import { LeadActivityForm } from "../../../components/forms/LeadActivityForm";
+import { useRepository } from "../../../lib/repository/RepositoryProvider";
 import { useOpportunityDetail } from "../../../lib/hooks/useOpportunities";
 import { useQuotations } from "../../../lib/hooks/useQuotations";
 import { useToast } from "../../../components/ui/Toast";
@@ -27,7 +29,7 @@ import { useAuth } from "../../../lib/auth/AuthContext";
 import { ShareContentDialog } from "../../../components/content/ShareContentDialog";
 import { initials } from "../../../components/ui/Who";
 import { formatInr, formatDate } from "../../../lib/format";
-import { OPPORTUNITY_STEPS, OpportunityStage, Quotation, formatOpportunityStage } from "../../../lib/types/domain";
+import { CallOutcome, OPPORTUNITY_STEPS, OpportunityStage, Quotation, formatOpportunityStage } from "../../../lib/types/domain";
 import { canMoveOpportunityStage, isOpportunityStageFinal } from "../../../lib/repository/shared/opportunityStage";
 import { QUOTATION_PERMISSIONS } from "../../../lib/repository/shared/quotationLifecycle";
 import { OPPORTUNITY_EDIT_PERMISSION, opportunityCustomerActions } from "../../../lib/repository/shared/customerLifecycle";
@@ -47,6 +49,9 @@ export default function OpportunityDetailPage() {
   const [pendingMove, setPendingMove] = useState<PendingMove | null>(null);
   const [showQuotationForm, setShowQuotationForm] = useState(false);
   const [showShare, setShowShare] = useState(false);
+  // The interaction form, open with this outcome preset ("" = none); null = closed.
+  const [activityOutcome, setActivityOutcome] = useState<CallOutcome | "" | null>(null);
+  const repo = useRepository();
   const [customerDialog, setCustomerDialog] = useState<null | "link" | "remove">(null);
 
   if (loading && !opportunity) {
@@ -246,7 +251,22 @@ export default function OpportunityDetailPage() {
             <div className="f"><label>Expected Value</label><div>{formatInr(opportunity.expectedValue)}</div></div>
           </div>
 
-          <Panel title="Pre-Sales History" flush>
+          <Panel
+            title="Activity & History"
+            flush
+            extraHead={
+              lead && lead.isActive && hasPermission("leads.edit") ? (
+                <span className="panel-acts">
+                  <button type="button" className="more" onClick={() => setActivityOutcome("NOT_CONNECTED")}>
+                    <Icon name="phone" size={14} /> Log CNC
+                  </button>
+                  <button type="button" className="more" onClick={() => setActivityOutcome("")}>
+                    <Icon name="plus" size={14} /> Log interaction
+                  </button>
+                </span>
+              ) : undefined
+            }
+          >
             {lead?.notes && lead.notes.length > 0 && (
               <div style={{ padding: "14px 19px", borderBottom: "1px solid var(--line-2)" }}>
                 <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8 }}>
@@ -374,6 +394,18 @@ export default function OpportunityDetailPage() {
             refetchQuotations();
             refetch();
             return q;
+          }}
+        />
+      )}
+      {activityOutcome !== null && lead && (
+        <LeadActivityForm
+          customerName={lead.customerName}
+          context={`Recorded on the lead's history, for the opportunity "${opportunity.title}".`}
+          initialOutcome={activityOutcome || undefined}
+          onClose={() => setActivityOutcome(null)}
+          onSubmit={async (input) => {
+            await repo.leads.logActivity(lead.id, input);
+            refetch();
           }}
         />
       )}

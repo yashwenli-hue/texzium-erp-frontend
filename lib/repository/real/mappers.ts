@@ -52,8 +52,11 @@ import {
   titleCaseFromConstant,
   leadActivityMeta,
   isOpportunityStage,
+  CustomerDuplicateMatch,
+  CustomerMatchStrength,
 } from "../../types/domain";
 import { isProformaExpired } from "../shared/proformaLifecycle";
+import { outcomeOfLastCall } from "../shared/leadSearch";
 
 /**
  * Raw shapes as the backend actually returns them (Stage 2A discovery
@@ -91,8 +94,10 @@ export interface BackendLeadTimeline {
   /** Absent on responses from a backend that predates attributed activity. */
   source?: LeadTimelineSource;
   activityType?: LeadActivityType | null;
-  /** The remark a person wrote on a stage move; null on every other event and on events recorded before it existed. */
+  /** The remark a person wrote on the event (stage move, status move, unassign, rejection, reopening); null otherwise. */
   userRemark?: string | null;
+  /** VERIFIED (lifecycle v2): a CALL's outcome. */
+  outcome?: "CONNECTED" | "NOT_CONNECTED" | null;
   actorId?: string | null;
   /** Selected as { id, fullName } only — never a full User row. */
   actor?: { id: string; fullName?: string | null } | null;
@@ -141,6 +146,10 @@ export interface BackendLead {
   notes?: BackendLeadNote[];
   timelines?: BackendLeadTimeline[];
   followups?: BackendLeadFollowup[];
+  /** GET /leads/search rows only. */
+  presales?: Array<{ id: string; fullName: string | null }>;
+  salesOwner?: { id: string; fullName: string | null } | null;
+  lastCallOutcome?: string | null;
 }
 
 export interface BackendOpportunity {
@@ -193,6 +202,7 @@ const TIMELINE_ICON_BY_ACTION: Record<string, string> = {
   LEAD_UNASSIGNED: "user",
   LEAD_QUALIFIED: "check",
   LEAD_REJECTED: "close",
+  LEAD_REOPENED: "restore",
   STATUS_UPDATED: "pulse",
   FOLLOWUP_CREATED: "cal",
   FOLLOWUP_COMPLETED: "checksq",
@@ -234,6 +244,7 @@ export function mapLeadTimeline(raw: BackendLeadTimeline): LeadTimelineEntry {
       icon: meta.icon,
       title: meta.label,
       detail: raw.remarks ?? "",
+      ...(raw.outcome ? { outcome: raw.outcome } : {}),
       actorName: raw.actor?.fullName ?? "",
       actorId: raw.actor?.id ?? undefined,
       occurredAt,
@@ -295,6 +306,9 @@ export function mapLead(raw: BackendLead): Lead {
     createdAt: raw.createdAt,
     updatedAt: raw.updatedAt,
     lastActivityAt: raw.updatedAt,
+    ...(raw.presales ? { presales: raw.presales.map((p) => ({ id: p.id, name: p.fullName ?? "Former user" })) } : {}),
+    ...(raw.salesOwner ? { salesOwnerId: raw.salesOwner.id, salesOwnerName: raw.salesOwner.fullName ?? "Former user" } : {}),
+    ...(raw.lastCallOutcome !== undefined ? { lastCallOutcome: outcomeOfLastCall(raw.lastCallOutcome) } : {}),
     followups: raw.followups?.map(mapLeadFollowup),
     notes: raw.notes?.map(mapLeadNote),
     timelines: raw.timelines?.map(mapLeadTimeline),
@@ -1220,20 +1234,24 @@ export function mapCustomerEvent(raw: BackendCustomerEvent): CustomerEvent {
 }
 
 export interface BackendDuplicateMatch {
-  id: string;
-  customerCode: string;
-  customerName: string;
-  isActive: boolean;
+  id: string | null;
+  customerCode: string | null;
+  customerName: string | null;
+  isActive: boolean | null;
   reasons: string[];
+  strength?: string;
+  hidden?: boolean;
 }
 
 export function mapDuplicateCheck(raw: { blocking: BackendDuplicateMatch[]; warnings: BackendDuplicateMatch[] }): CustomerDuplicateCheck {
-  const one = (m: BackendDuplicateMatch) => ({
-    id: m.id,
-    customerCode: m.customerCode,
-    customerName: m.customerName,
-    isActive: m.isActive,
-    reasons: m.reasons.filter((r): r is CustomerMatchReason => r === "PAN" || r === "NAME" || r === "PHONE" || r === "EMAIL"),
+  const one = (m: BackendDuplicateMatch): CustomerDuplicateMatch => ({
+    id: m.id ?? "",
+    customerCode: m.customerCode ?? "",
+    customerName: m.customerName ?? "",
+    isActive: m.isActive ?? true,
+    reasons: m.reasons.filter((r): r is CustomerMatchReason => ["GSTIN", "PAN", "NAME", "PHONE", "EMAIL"].includes(r)),
+    ...(m.strength === "EXACT" || m.strength === "STRONG" || m.strength === "POSSIBLE" ? { strength: m.strength as CustomerMatchStrength } : {}),
+    ...(m.hidden ? { hidden: true } : {}),
   });
   return { blocking: raw.blocking.map(one), warnings: raw.warnings.map(one) };
 }

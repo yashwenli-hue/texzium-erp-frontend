@@ -90,6 +90,7 @@ export class RealCustomerRepository implements ICustomerRepository {
           panNumber: clean(input.panNumber)?.toUpperCase(),
           email: clean(input.email),
           phone: clean(input.phone),
+          ...(input.gstRegistration ? { gstRegistration: input.gstRegistration } : {}),
         },
       });
       return mapCustomer(raw);

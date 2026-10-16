@@ -11,68 +11,10 @@ import type {
 } from "./shared/dataDeletion";
 import { ListQuery, Page, ID } from "../types/common";
 import type { DownloadedFile } from "../api/httpClient";
-import {
-  ContentAccessUrl,
-  ContentAsset,
-  ContentAssetDetail,
-  ContentListFilters,
-  ContentShare,
-  ContentShareInput,
-  ContentShareResult,
-  ContentUpdateInput,
-  ContentUploadInput,
-  DocumentProfile,
-  DocumentProfileFields,
-  Lead,
-  LeadStatus,
-  LeadSourceRecord,
-  LeadTimelineEntry,
-  LeadActivityType,
-  LeadUIContext,
-  LeadFollowup,
-  AssignableUser,
-  InventoryItemOption,
-  GstRegistrationOption,
-  Customer,
-  Contact,
-  Activity,
-  ActivityType,
-  Task,
-  Note,
-  Opportunity,
-  OpportunityStage,
-  Quotation,
-  QuotationEvent,
-  ProformaInvoice,
-  ProformaEvent,
-  SalesOrder,
-  SalesOrderEvent,
-  SalesOrderPaymentTerm,
-  SalesOrderAdvanceReceipt,
-  SalesOrderCommercialApproval,
-  AdvanceReceiptOutcome,
-  SalesInvoice,
-  DispatchOrderOption,
-  AccountsReceivable,
-  RecordPaymentResult,
-  PaymentCollection,
-  PaymentCollectionDetail,
-  InvoiceCollections,
-  CustomerStatement,
-  StatementPeriod,
-  PaymentLinkResult,
-  ReceiptVoucher,
-  SalesRevenueSummary,
-  CollectionsSummary,
-  CollectionsAging,
-  CollectionsEfficiency,
-  CollectionsRecoveryRate,
-  AppNotification,
-  CustomerEvent,
-  CustomerGstRegistration,
-  CustomerDuplicateCheck,
-  CustomerOverview,
-} from "../types/domain";
+import { ContentAccessUrl, ContentAsset, ContentAssetDetail, ContentListFilters, ContentShare, ContentShareInput, ContentShareResult, ContentUpdateInput, ContentUploadInput, DocumentProfile, DocumentProfileFields, Lead, LeadStatus, LeadSourceRecord, LeadTimelineEntry, LeadActivityType, LeadUIContext, LeadFollowup, AssignableUser, InventoryItemOption, GstRegistrationOption, Customer, Contact, Activity, ActivityType, Task, Note, Opportunity, OpportunityStage, Quotation, QuotationEvent, ProformaInvoice, ProformaEvent, SalesOrder, SalesOrderEvent, SalesOrderPaymentTerm, SalesOrderAdvanceReceipt, SalesOrderCommercialApproval, AdvanceReceiptOutcome, SalesInvoice, DispatchOrderOption, AccountsReceivable, RecordPaymentResult, PaymentCollection, PaymentCollectionDetail, InvoiceCollections, CustomerStatement, StatementPeriod, PaymentLinkResult, ReceiptVoucher, SalesRevenueSummary, CollectionsSummary, CollectionsAging, CollectionsEfficiency, CollectionsRecoveryRate, AppNotification, CustomerEvent, CustomerGstRegistration, CustomerDuplicateCheck, CustomerOverview, CallOutcome } from "../types/domain";
+import type { LeadSearchQuery, LeadSearchResult } from "./shared/leadSearch";
+import type { LeadDuplicateProbe, LeadDuplicateResult } from "./shared/leadDuplicates";
+import type { AccessAuditEntry, AccessPermission, AccessRole, AccessUser, AccessUserStatus, RolePermissionChange } from "./shared/access";
 
 /**
  * ============================================================================
@@ -142,7 +84,10 @@ export interface UpdateLeadInput {
 // Mirrors the VERIFIED CreateLeadActivityDto { activityType, remarks, occurredAt? }.
 export interface LogLeadActivityInput {
   activityType: LeadActivityType;
-  remarks: string;
+  /** Optional for a call with an outcome (a CNC is often just that); required otherwise. */
+  remarks?: string;
+  /** Only for a CALL: what it came to. NOT_CONNECTED is a "CNC". */
+  outcome?: CallOutcome;
   /** ISO 8601. Omit for "now"; may be in the past, never the future. */
   occurredAt?: string;
 }
@@ -157,8 +102,20 @@ export interface ILeadRepository {
   getById(id: ID): Promise<Lead | null>;
   create(input: CreateLeadInput): Promise<Lead>;
   update(id: ID, input: UpdateLeadInput): Promise<Lead>;
-  /** Lightweight status movement (NEW/CONTACTED) — mirrors the lead-status module. */
-  updateStatus(id: ID, status: LeadStatus): Promise<Lead>;
+  /**
+   * VERIFIED (lifecycle v2): POST /lead-status { leadId, status, expectedStatus?, remarks? }
+   * (leads.status.update) — only the pre-qualification moves New / Contacted / Underqualified,
+   * from before qualification; anything else is a 409. expectedStatus refuses a stale screen.
+   */
+  updateStatus(id: ID, status: LeadStatus, options?: { expectedStatus?: LeadStatus; remarks?: string }): Promise<Lead>;
+  /** VERIFIED: PATCH /lead-assignments/:id/reopen { reason } (leads.reopen) — a REJECTED lead back to Contacted; LEAD_REOPENED. */
+  reopen(id: ID, reason: string): Promise<Lead>;
+  /** VERIFIED: GET /leads/search — server-side filter, sort, page and facets (lib/repository/shared/leadSearch.ts). */
+  search(query: LeadSearchQuery): Promise<LeadSearchResult>;
+  /** VERIFIED: GET /leads/duplicate-check — likely duplicates of a lead being entered. */
+  duplicateCheck(probe: LeadDuplicateProbe): Promise<LeadDuplicateResult>;
+  /** VERIFIED: GET /leads/:id/duplicates — likely duplicates of an existing lead. */
+  duplicatesOf(id: ID): Promise<LeadDuplicateResult>;
   /** VERIFIED: AssignLeadDto { leadId, assignedToId } — writes PRE_SALES_ASSIGNED. */
   assign(id: ID, assignedToId: ID, assignedToName: string): Promise<Lead>;
   /**
@@ -233,6 +190,12 @@ export interface CreateCustomerInput {
   panNumber?: string;
   email?: string;
   phone?: string;
+  /**
+   * VERIFIED (backend 44bca2b): the customer's first GST registration, created in the SAME
+   * request and transaction (it becomes the default). A GSTIN already registered elsewhere
+   * refuses the whole request, so no customer is left without its registration.
+   */
+  gstRegistration?: Omit<CreateGstRegistrationInput, "customerId" | "isDefault">;
 }
 
 // Mirrors the VERIFIED UpdateCustomerDto: a field that is left out is unchanged,
@@ -247,6 +210,8 @@ export interface UpdateCustomerInput {
 }
 
 export interface CustomerDuplicateQuery {
+  /** Compared only when complete; spaces, dots, hyphens and case are ignored. */
+  gstin?: string;
   customerName?: string;
   panNumber?: string;
   phone?: string;
@@ -864,6 +829,22 @@ export interface IDataDeletionRepository {
 }
 
 /** The full set of repositories the app needs. Provided via RepositoryProvider. */
+/**
+ * VERIFIED (backend 1c701e3): GET /roles, GET /permissions (roles.view), GET /users (users.view),
+ * PATCH /roles/:id/permissions { grant, revoke, acknowledgeSensitive } (assign / revoke rights
+ * checked by the server), PATCH /users/:id/role (users.role.assign), PATCH /users/:id/status
+ * (users.status.manage), GET /identity-audit (roles.view).
+ */
+export interface IAccessRepository {
+  listRoles(): Promise<AccessRole[]>;
+  listPermissions(): Promise<AccessPermission[]>;
+  listUsers(): Promise<AccessUser[]>;
+  updateRolePermissions(roleId: ID, change: RolePermissionChange, acknowledgeSensitive: boolean): Promise<AccessRole>;
+  changeUserRole(userId: ID, roleId: ID): Promise<AccessUser>;
+  changeUserStatus(userId: ID, status: AccessUserStatus, reason?: string): Promise<AccessUser>;
+  listAudit(before?: string): Promise<AccessAuditEntry[]>;
+}
+
 export interface RevenueOSRepository {
   /** Which implementation is wired up — lets the few UI spots with a genuine backend
    * capability gap (note creation, activity logging) adapt honestly instead of
@@ -901,4 +882,5 @@ export interface RevenueOSRepository {
   notifications: INotificationRepository;
   search: ISearchRepository;
   dataDeletions: IDataDeletionRepository;
+  access: IAccessRepository;
 }

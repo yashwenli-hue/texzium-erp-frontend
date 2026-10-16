@@ -1,3 +1,4 @@
+import { RealAccessRepository } from "./realAccessRepository";
 import { RevenueOSRepository } from "../interfaces";
 import { RealContentRepository } from "./realContentRepository";
 import { RealLeadRepository } from "./realLeadRepository";
@@ -87,6 +88,7 @@ export function createRealRepository(): RevenueOSRepository {
     tasks: new MockTaskRepository(),
     notes: new MockNoteRepository(),
     notifications: new RealNotificationRepository(),
+    access: new RealAccessRepository(),
     dataDeletions: new RealDataDeletionRepository(),
     search: new RealSearchRepository(leads, customers, quotations, opportunities, proformaInvoices, salesOrders, salesInvoices),
   };

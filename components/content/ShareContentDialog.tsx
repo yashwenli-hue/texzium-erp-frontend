@@ -18,7 +18,7 @@ import {
   ContentShareTargetType,
   formatFileSize,
 } from "../../lib/types/domain";
-import { filterContent, isSelected, removeFromSelection, selectionFileName, shareActionState, suggestedShareMessage, toggleSelection } from "../../lib/content/shareSelection";
+import { contentCategories, filterContent, isSelected, removeFromSelection, selectionFileName, shareActionState, suggestedShareMessage, toggleSelection } from "../../lib/content/shareSelection";
 import { countBy, runShareBatch, ShareBatchState, ShareItemState } from "../../lib/content/shareBatch";
 import { ContentKindBadge, downloadFromUrl } from "./contentUi";
 
@@ -74,7 +74,9 @@ export function ShareContentDialog({ target, onShared, onClose }: { target: Shar
       .catch((err) => setLoadError(err instanceof Error ? err.message : "The content library couldn't be loaded."));
   }, [repo]);
 
-  const shown = useMemo(() => filterContent(items ?? [], term, kind), [items, term, kind]);
+  const [category, setCategory] = useState<string>("ALL");
+  const categories = useMemo(() => contentCategories(items ?? []), [items]);
+  const shown = useMemo(() => filterContent(items ?? [], term, kind, category), [items, term, kind, category]);
   const suggested = suggestedShareMessage(target.name, selection);
 
   function changeSelection(next: ContentAsset[]) {
@@ -207,6 +209,17 @@ export function ShareContentDialog({ target, onShared, onClose }: { target: Shar
               <input type="search" value={term} onChange={(e) => setTerm(e.target.value)} placeholder="Search title or tag" />
             </label>
             <SelectedContent selection={selection} onRemove={(id) => changeSelection(removeFromSelection(selection, id))} />
+            {categories.length > 0 && (
+              <label className="content-category">
+                <span>Machine / category</span>
+                <select value={category} onChange={(e) => setCategory(e.target.value)} aria-label="Filter content by machine or product category">
+                  <option value="ALL">All categories</option>
+                  {categories.map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              </label>
+            )}
             {kindsPresent.length > 1 && (
               <FilterChips
                 label="Filter content by kind"

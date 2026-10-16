@@ -40,6 +40,7 @@ export const NAV_SECTIONS: NavSection[] = [
     label: "Pipeline",
     items: [
       { href: "/leads", label: "Leads", icon: "funnel", countKey: "leadsCount" },
+      { href: "/presales", label: "Pre-Sales", icon: "users", permission: "leads.view" },
       { href: "/pipeline", label: "Lead Pipeline", icon: "target" },
       { href: "/opportunities", label: "Opportunities", icon: "brief", countKey: "opportunitiesCount" },
     ],
@@ -83,6 +84,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { href: "/notifications", label: "Notifications", icon: "bell", countKey: "unreadNotificationsCount" },
       { href: "/recycle-bin", label: "Recycle Bin", icon: "trash", permission: "governance.deletions.view" },
       { href: "/document-settings", label: "Document Settings", icon: "file", permission: "documents.profile.manage" },
+      { href: "/access", label: "Access", icon: "lock", permission: "roles.view" },
     ],
   },
 ];
@@ -93,6 +95,8 @@ export const PAGE_META: Record<string, { title: string; subtitle: string }> = {
     subtitle: "Your pipeline, today\u2019s activity and what needs attention across RevenueOS.",
   },
   leads: { title: "Leads", subtitle: "Every inbound and outbound lead, from first contact to qualification." },
+  presales: { title: "Pre-Sales", subtitle: "Leads by the pre-sales people who worked on them, their assignment and where they stand now." },
+  access: { title: "Access", subtitle: "Roles, the permissions they grant, who holds them, and every change." },
   pipeline: { title: "Lead Pipeline", subtitle: "Visual, stage-by-stage view of every open deal in motion." },
   customers: { title: "Customers", subtitle: "Converted accounts — lifetime value, order history and account health." },
   contacts: { title: "Contacts", subtitle: "Every individual you deal with, across leads and customer accounts." },

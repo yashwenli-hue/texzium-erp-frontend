@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Modal } from "../ui/Modal";
 import { Button } from "../ui/Button";
 import { useToast } from "../ui/Toast";
-import { CustomerFieldValues, CustomerFields } from "../forms/CustomerForm";
+import { CustomerFieldValues, CustomerFields, MatchList } from "../forms/CustomerForm";
 import { GstFieldValues, GstFields } from "../forms/GstRegistrationForm";
 import { useCustomerDuplicateCheck } from "../../lib/hooks/useCustomers";
 import type { CreateCustomerInput } from "../../lib/repository/interfaces";
@@ -115,6 +115,10 @@ export function CustomerCreateFlow({
   const body = useRef<HTMLDivElement>(null);
 
   const dup = useCustomerDuplicateCheck({ customerName: details.customerName, panNumber: details.panNumber, phone: details.phone, email: details.email });
+  // The GSTIN typed in the registration step, checked against every customer's registrations
+  // (and the PAN it carries) before anything is created; the server checks again on save.
+  const gstDup = useCustomerDuplicateCheck({ gstin: gst.gstin }, step === "registration");
+  const gstBlocked = gstDup.blocking.length > 0;
   const blocked = dup.blocking.length > 0;
   const pan = normalizePan(details.panNumber);
   const gstCustomer = { panNumber: created?.panNumber ?? (pan || undefined), gstRegistrations: [] as CustomerGstRegistration[] };
@@ -216,7 +220,7 @@ export function CustomerCreateFlow({
             <Button variant="ghost" onClick={() => save(false)} disabled={submitting}>
               {submitting ? "Saving…" : "Skip, create customer"}
             </Button>
-            <Button variant="primary" onClick={() => save(true)} disabled={submitting}>
+            <Button variant="primary" onClick={() => save(true)} disabled={submitting || gstBlocked}>
               {submitting ? "Saving…" : "Create customer and add registration"}
             </Button>
           </>
@@ -265,6 +269,12 @@ export function CustomerCreateFlow({
             <p className="create-lede">
               Add the customer&apos;s first GST registration now, so it can be quoted straight away. It becomes the default. You can skip this and add it later from the customer&apos;s page.
             </p>
+            {gstBlocked && (
+              <div className="dup block" role="alert" data-testid="gst-dup-block">
+                <b>This GSTIN or its PAN is already registered.</b> A business has one customer; another site is a GST registration of that customer. Use the existing customer.
+                <MatchList matches={gstDup.blocking} />
+              </div>
+            )}
             <GstFields values={gst} onChange={(f, v) => {
                 setGst((g) => ({ ...g, [f]: v }));
                 setGstErrors((e) => ({ ...e, [f]: "" }));

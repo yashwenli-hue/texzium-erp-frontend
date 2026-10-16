@@ -1,3 +1,4 @@
+import { MockAccessRepository } from "./mockAccessRepository";
 import { RevenueOSRepository } from "../interfaces";
 import { MockContentRepository } from "./mockContentRepository";
 import { MockLeadRepository } from "./mockLeadRepository";
@@ -72,6 +73,7 @@ export function createMockRepository(): RevenueOSRepository {
     sellerGstRegistrations: new MockSellerGstRepository(),
     buyerGstRegistrations: new MockBuyerGstRepository(),
     notifications: new MockNotificationRepository(),
+    access: new MockAccessRepository(),
     dataDeletions: new MockDataDeletionRepository(),
     search: new MockSearchRepository(),
   };
