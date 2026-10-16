@@ -3,6 +3,7 @@
 import { existsSync, statSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { createRequire } from "node:module";
 import path from "node:path";
 import ts from "typescript";
 
@@ -25,14 +26,26 @@ export async function resolve(specifier, context, next) {
   }
   // "next/navigation" and the like: Next's entry points are plain .js files without an
   // exports map, which Node's ESM resolution does not find without the extension.
+  // "next/link" is imported for its default export (the component), which comes out empty
+  // when the CommonJS file is loaded through these hooks: it is served by a small ES module
+  // that require()s it the ordinary way (default = module.exports, as the build does).
   if (/^next\/[a-z-]+$/.test(specifier)) {
     const file = path.join(ROOT, "node_modules", `${specifier}.js`);
+    if (existsSync(file) && specifier === "next/link") return { url: `${pathToFileURL(file).href}?cjs`, format: "module", shortCircuit: true };
     if (existsSync(file)) return { url: pathToFileURL(file).href, shortCircuit: true };
   }
   return next(specifier, context);
 }
 
 export async function load(url, context, next) {
+  if (url.startsWith("file:") && url.endsWith(".js?cjs")) {
+    const file = fileURLToPath(url.slice(0, -"?cjs".length));
+    const source = [
+      `import { createRequire } from "node:module";`,
+      `export default createRequire(${JSON.stringify(file)})(${JSON.stringify(file)});`,
+    ].join("\n");
+    return { format: "module", source, shortCircuit: true };
+  }
   if (!/\.tsx?$/.test(url) || !url.startsWith("file:")) return next(url, context);
   const source = await readFile(fileURLToPath(url), "utf8");
   const { outputText } = ts.transpileModule(source, {
