@@ -48,7 +48,7 @@ export function ContactRowActions({
           <Icon name="wa" size={14} />
         </button>
       )}
-      {!phone && !email && <span style={{ color: "var(--faint)", fontSize: 12 }}>No contact details</span>}
+      {!phone && !email && <span style={{ color: "var(--faint-text)", fontSize: 12 }}>No contact details</span>}
     </div>
   );
 }

@@ -62,7 +62,7 @@ export default function TasksPage() {
           <h4>
             <Icon name={label === "Overdue" ? "alert" : "clock"} size={14} />
             {label}
-            <span style={{ color: "var(--faint)", fontWeight: 500 }}>({groups[label].length})</span>
+            <span style={{ color: "var(--faint-text)", fontWeight: 500 }}>({groups[label].length})</span>
           </h4>
           {groups[label].length === 0 && (
             <p style={{ color: "var(--muted)", fontSize: 12.5, padding: "4px 0 4px 2px" }}>Nothing here.</p>
@@ -96,7 +96,7 @@ export default function TasksPage() {
         <div className="task-group">
           <h4>
             <Icon name="check" size={14} /> Completed
-            <span style={{ color: "var(--faint)", fontWeight: 500 }}>({groups.Done.length})</span>
+            <span style={{ color: "var(--faint-text)", fontWeight: 500 }}>({groups.Done.length})</span>
           </h4>
           {groups.Done.map((t) => (
             <div className="task done" key={t.id}>

@@ -48,7 +48,7 @@ export function SalesOrderCancelledBanner({
           {reason}
         </p>
       )}
-      <p style={{ color: "var(--faint)", fontSize: 12, marginTop: 8 }}>
+      <p style={{ color: "var(--faint-text)", fontSize: 12, marginTop: 8 }}>
         Cancellation is final: this order can&apos;t be reopened or changed, and its history is kept. If it came from a
         Proforma Invoice, a new Sales Order can be created from that Proforma.
       </p>

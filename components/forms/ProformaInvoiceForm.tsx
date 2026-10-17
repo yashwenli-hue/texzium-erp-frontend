@@ -98,7 +98,7 @@ export function ProformaInvoiceForm({
         <TextField label="Issue date" required type="date" value={issueDate} onChange={(e) => setIssueDate(e.target.value)} error={errors.issueDate} />
         <TextField label="Valid until" type="date" value={validityDate} min={today} onChange={(e) => setValidityDate(e.target.value)} error={errors.validityDate} />
       </FieldRow>
-      <p style={{ fontSize: 11.5, color: "var(--faint)", marginTop: -8, marginBottom: 12 }}>
+      <p style={{ fontSize: 11.5, color: "var(--faint-text)", marginTop: -8, marginBottom: 12 }}>
         Valid until is optional. The Proforma stays valid through the end of that day (UTC); after it, it can&apos;t be approved or
         turned into a Sales Order. Leave it empty for no expiry.
       </p>

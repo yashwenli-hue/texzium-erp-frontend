@@ -66,7 +66,7 @@ export default function OpportunitiesPage() {
     {
       key: "product",
       header: "Product",
-      render: (o) => productByLeadId.get(o.leadId) ?? <span style={{ color: "var(--faint)" }}>—</span>,
+      render: (o) => productByLeadId.get(o.leadId) ?? <span style={{ color: "var(--faint-text)" }}>—</span>,
     },
     { key: "expectedValue", header: "Expected Value", sortable: true, render: (o) => formatInr(o.expectedValue) },
     {

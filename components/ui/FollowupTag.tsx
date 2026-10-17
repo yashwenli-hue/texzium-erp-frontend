@@ -6,14 +6,14 @@ const STYLE: Record<FollowupUrgency, { bg: string; fg: string }> = {
   "Due Today": { bg: "var(--warn-bg)", fg: "var(--warn)" },
   Tomorrow: { bg: "var(--info-bg)", fg: "var(--info)" },
   Scheduled: { bg: "var(--line-2)", fg: "var(--muted)" },
-  None: { bg: "transparent", fg: "var(--faint)" },
+  None: { bg: "transparent", fg: "var(--faint-text)" },
 };
 
 /** MOCK/UI-ONLY — derived from mock Task data, not a real backend Followup. See lib/followup.ts. */
 export function FollowupTag({ urgency, dueAt }: { urgency: FollowupUrgency; dueAt: string | null }) {
   const style = STYLE[urgency];
   if (urgency === "None") {
-    return <span style={{ fontSize: 12, color: "var(--faint)" }}>No follow-up</span>;
+    return <span style={{ fontSize: 12, color: "var(--faint-text)" }}>No follow-up</span>;
   }
   const label = urgency === "Scheduled" && dueAt ? formatDate(dueAt) : urgency;
   return (

@@ -109,7 +109,7 @@ export function DeactivateLeadDialog({
             onChange={(e) => setReason(e.target.value)}
             placeholder="For example: duplicate of the Sterling Pumps lead"
           />
-          <p style={{ color: "var(--faint)", fontSize: 11.5, marginTop: -4 }}>
+          <p style={{ color: "var(--faint-text)", fontSize: 11.5, marginTop: -4 }}>
             {reason.length}/{LEAD_DEACTIVATION_REASON_MAX_LENGTH}
           </p>
         </div>

@@ -78,7 +78,7 @@ export function Pagination({
         {pages[0] > 1 && (
           <>
             <button className="page-btn" onClick={() => onPageChange(1)}>1</button>
-            {pages[0] > 2 && <span style={{ color: "var(--faint)", fontSize: 12 }}>…</span>}
+            {pages[0] > 2 && <span style={{ color: "var(--faint-text)", fontSize: 12 }}>…</span>}
           </>
         )}
         {pages.map((p) => (
@@ -89,7 +89,7 @@ export function Pagination({
         {pages[pages.length - 1] < totalPages && (
           <>
             {pages[pages.length - 1] < totalPages - 1 && (
-              <span style={{ color: "var(--faint)", fontSize: 12 }}>…</span>
+              <span style={{ color: "var(--faint-text)", fontSize: 12 }}>…</span>
             )}
             <button className="page-btn" onClick={() => onPageChange(totalPages)}>{totalPages}</button>
           </>

@@ -74,10 +74,11 @@ export default function DashboardPage() {
   const { quotations } = useQuotations();
   const { customers } = useCustomers();
   const quoteToCash = useQuoteToCashSummary();
-  // Company-wide totals: revenue for revenue.view.all, collections for finance visibility
-  // (finance.view.all, or revenue.view.all which includes it).
-  const canRevenueTotals = hasPermission("revenue.view.all");
-  const canCollectionTotals = canRevenueTotals || hasPermission("finance.view.all");
+  // Company-wide money totals (revenue summary, collections) need finance visibility:
+  // finance.view.all, or revenue.view.all which includes it (backend sales-reports and
+  // collections-dashboard). Nobody else asks for them.
+  const canCollectionTotals = hasPermission("revenue.view.all") || hasPermission("finance.view.all");
+  const canRevenueTotals = canCollectionTotals;
   const { data: financials, loading: financialsLoading, error: financialsError, refetch: refetchFinancials } = useFinancialSummary({ revenue: canRevenueTotals, collections: canCollectionTotals });
   const fin = financials?.collections ?? null;
   const [showLeadForm, setShowLeadForm] = useState(false);
@@ -290,7 +291,7 @@ export default function DashboardPage() {
           <StatCard label="Sales Invoices" value={stageValue(quoteToCash.salesInvoices)} note={stageNote(quoteToCash.salesInvoices)} />
           <StatCard label="Customers" value={String(customers.length)} note="GET /customers" />
         </StatRow>
-        <p style={{ fontSize: 11.5, color: "var(--faint)", margin: "10px 19px 0" }}>
+        <p style={{ fontSize: 11.5, color: "var(--faint-text)", margin: "10px 19px 0" }}>
           Operational counts from each stage&apos;s own real list — not a conversion funnel. The backend
           does not track which quotation led to which sales order, so no stage-to-stage rate is implied.
         </p>
@@ -337,7 +338,7 @@ export default function DashboardPage() {
             )}
           </>
         )}
-        <p style={{ fontSize: 11.5, color: "var(--faint)", margin: "12px 19px 0" }}>
+        <p style={{ fontSize: 11.5, color: "var(--faint-text)", margin: "12px 19px 0" }}>
           AR status and balances come from the authoritative AccountsReceivable record, never the sales
           invoice&apos;s own payment status field (see Stage 2G). Figures are all-time totals — the backend
           has no date-range filtering on any of these endpoints.

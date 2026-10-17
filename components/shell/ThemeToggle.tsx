@@ -76,7 +76,7 @@ export function ThemeToggle() {
       </button>
       {open && pos && (
         <div className="user-menu" ref={menuRef} role="menu" style={{ right: pos.right, top: pos.top }}>
-          <div style={{ padding: "8px 14px 6px", fontSize: 11, fontWeight: 700, color: "var(--faint)", textTransform: "uppercase", letterSpacing: ".4px" }}>
+          <div style={{ padding: "8px 14px 6px", fontSize: 11, fontWeight: 700, color: "var(--faint-text)", textTransform: "uppercase", letterSpacing: ".4px" }}>
             Theme (experimental)
           </div>
           {OPTIONS.map((o) => (

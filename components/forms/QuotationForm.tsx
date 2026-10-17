@@ -252,17 +252,17 @@ export function QuotationForm({
             })) : [{ value: "", label: selectedOpportunity && !customerId ? "Link a customer first" : "—" }]}
           />
           {(sellerGstOptions.some((g) => !g.isActive) || buyerOptions.some((g) => !g.isActive)) && (
-            <p style={{ fontSize: 11.5, color: "var(--faint)" }}>
+            <p style={{ fontSize: 11.5, color: "var(--faint-text)" }}>
               Inactive GST registrations are shown greyed out and can&apos;t be newly selected.
             </p>
           )}
           {taxablePreview > 0 && (
-            <p style={{ fontSize: 11.5, color: "var(--faint)" }}>
+            <p style={{ fontSize: 11.5, color: "var(--faint-text)" }}>
               Taxable amount preview: <b>{formatInr(taxablePreview)}</b> (quantity × unit price). GST and
               the final total are calculated by the backend from the item&apos;s HSN rate once created.
             </p>
           )}
-          <p style={{ fontSize: 11.5, color: "var(--faint)" }}>
+          <p style={{ fontSize: 11.5, color: "var(--faint-text)" }}>
             Every new quotation starts as <b>Draft</b>.
           </p>
         </>

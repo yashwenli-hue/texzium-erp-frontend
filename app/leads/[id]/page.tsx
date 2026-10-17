@@ -469,7 +469,7 @@ export default function LeadDetailPage() {
                         </div>
                       )}
                       {f.status === "COMPLETED" && f.completedByName && (
-                        <p style={{ color: "var(--faint)", fontSize: 11.5 }}>Completed by {f.completedByName}</p>
+                        <p style={{ color: "var(--faint-text)", fontSize: 11.5 }}>Completed by {f.completedByName}</p>
                       )}
                     </div>
                   </div>
@@ -541,7 +541,7 @@ export default function LeadDetailPage() {
               )
             }
           >
-            <p style={{ color: "var(--faint)", fontSize: 11.5, marginBottom: 10 }}>
+            <p style={{ color: "var(--faint-text)", fontSize: 11.5, marginBottom: 10 }}>
               {isReal
                 ? "Text imported with this lead, for example the requirement from a connected lead source. Log your own calls, meetings and remarks under Activity & History."
                 : "General context that stays useful across every call and meeting — not a record of a specific interaction. Log what happened on a call or email above instead."}

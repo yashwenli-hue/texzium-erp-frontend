@@ -17,8 +17,8 @@ import { useAsyncList } from "./useAsyncList";
  */
 export function useFinancialSummary(access: { revenue: boolean; collections: boolean } = { revenue: true, collections: true }) {
   const repo = useRepository();
-  // Company-wide totals are only asked for by people who may see them (D3): revenue needs
-  // revenue.view.all, the collection totals finance visibility. Nothing is fetched otherwise.
+  // Company-wide totals are only asked for by people who may see them (D3): both need
+  // finance visibility (finance.view.all, or revenue.view.all). Nothing is fetched otherwise.
   const { revenue: canRevenue, collections: canCollections } = access;
   const { data, loading, error, refetch } = useAsyncList(
     () =>

@@ -49,7 +49,7 @@ export function LeadDeactivationBanner({
               {reason}
             </p>
           )}
-          <p style={{ color: "var(--faint)", fontSize: 12, marginTop: 8 }}>
+          <p style={{ color: "var(--faint-text)", fontSize: 12, marginTop: 8 }}>
             It&apos;s out of active sales and can&apos;t be changed, but its history is kept. Reactivate it to work on it again.
           </p>
         </div>

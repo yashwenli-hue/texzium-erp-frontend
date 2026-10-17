@@ -101,7 +101,7 @@ export default function ActivitiesPage() {
                       <b>{a.type} · {a.relatedName}</b>
                       <span className="when">{formatDateTime(a.occurredAt)}</span>
                     </div>
-                    <p>{a.note} — <span style={{ color: "var(--faint)" }}>{a.ownerName}</span></p>
+                    <p>{a.note} — <span style={{ color: "var(--faint-text)" }}>{a.ownerName}</span></p>
                   </div>
                 </div>
               ))}

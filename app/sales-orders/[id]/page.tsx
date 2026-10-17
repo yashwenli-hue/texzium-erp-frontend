@@ -328,7 +328,7 @@ export default function SalesOrderDetailPage() {
 
           {!hasGstDetails && (
             <div style={{ padding: "0 19px 19px" }}>
-              <p style={{ fontSize: 11.5, color: "var(--faint)" }}>
+              <p style={{ fontSize: 11.5, color: "var(--faint-text)" }}>
                 No seller/buyer GST or tax type on this order — it is a legacy order, created before the lifecycle by
                 converting a Quotation directly, which didn&apos;t collect that information.
               </p>
@@ -448,7 +448,7 @@ export default function SalesOrderDetailPage() {
                 {approvals.map((a) =>
                   a.status === "RETRACTED" ? (
                     // Kept for the record, but no longer in force.
-                    <p key={a.id} style={{ fontSize: 12.5, color: "var(--faint)" }}>
+                    <p key={a.id} style={{ fontSize: 12.5, color: "var(--faint-text)" }}>
                       Accounts approval by {a.approvedBy} on {formatDate(a.createdAt)} was retracted.
                     </p>
                   ) : (
@@ -473,7 +473,7 @@ export default function SalesOrderDetailPage() {
               </div>
             )}
             {!access.viewApprovals && (
-              <p style={{ fontSize: 12, color: "var(--faint)", marginTop: 10 }}>
+              <p style={{ fontSize: 12, color: "var(--faint-text)", marginTop: 10 }}>
                 You don&apos;t have permission to view accounts approvals.
               </p>
             )}
@@ -537,7 +537,7 @@ export default function SalesOrderDetailPage() {
               />
             )}
             {cancelled && advanceReceipts.length > 0 && (
-              <p style={{ fontSize: 12, color: "var(--faint)", padding: "10px 19px 14px" }}>
+              <p style={{ fontSize: 12, color: "var(--faint-text)", padding: "10px 19px 14px" }}>
                 This order is cancelled. Its receipts are left exactly as they were: a verified advance stays verified
                 (it is not refunded here) and a pending receipt stays pending.
               </p>
@@ -547,7 +547,7 @@ export default function SalesOrderDetailPage() {
 
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <Panel title="Lifecycle history">
-            <p style={{ fontSize: 12, color: "var(--faint)", marginBottom: 10 }}>
+            <p style={{ fontSize: 12, color: "var(--faint-text)", marginBottom: 10 }}>
               Audit trail of advance verifications, rejections, accounts approvals, their retractions and any
               cancellation for this order, with the reason for each retraction or cancellation. It is not a place for
               general notes.

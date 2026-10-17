@@ -165,7 +165,7 @@ export function SalesOrderForm({
         }))}
       />
       {(sellerGstOptions.some((g) => !g.isActive) || buyerGstOptions.some((g) => !g.isActive)) && (
-        <p style={{ fontSize: 11.5, color: "var(--faint)" }}>
+        <p style={{ fontSize: 11.5, color: "var(--faint-text)" }}>
           Inactive GST registrations are shown greyed out and can&apos;t be newly selected.
         </p>
       )}
@@ -176,10 +176,10 @@ export function SalesOrderForm({
         <span style={{ fontSize: 12.5, color: "var(--muted)" }}>Order total</span>
         <b style={{ fontSize: 15 }}>{formatInr(proformaTotalAmount)}</b>
       </div>
-      <p style={{ fontSize: 11.5, color: "var(--faint)", marginTop: 0 }}>
+      <p style={{ fontSize: 11.5, color: "var(--faint-text)", marginTop: 0 }}>
         The order total is the approved proforma invoice&apos;s total. It is set when the order is created and can&apos;t be changed here.
       </p>
-      <p style={{ fontSize: 11.5, color: "var(--faint)" }}>
+      <p style={{ fontSize: 11.5, color: "var(--faint-text)" }}>
         If the selected item&apos;s available stock is short of the order quantity, the backend
         automatically raises a Purchase Requisition for the shortfall — there is no separate action for that here.
       </p>

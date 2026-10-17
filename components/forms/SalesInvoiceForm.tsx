@@ -111,7 +111,7 @@ export function SalesInvoiceForm({
         Invoiced to <b>{defaultCustomerName}</b> — the order&apos;s customer, as recorded on the customer record.
       </p>
       <TextAreaField label="Remarks" rows={3} value={remarks} onChange={(e) => setRemarks(e.target.value)} placeholder="Optional" />
-      <p style={{ fontSize: 11.5, color: "var(--faint)" }}>
+      <p style={{ fontSize: 11.5, color: "var(--faint-text)" }}>
         The invoice number, taxable amount, GST and total come from the system: the amounts are the ones on this
         order&apos;s quotation (GST is never added again), and an order is invoiced once. An invoice can&apos;t be dated
         before the last invoice in its number series.
