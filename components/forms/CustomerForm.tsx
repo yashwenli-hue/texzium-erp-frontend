@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { namesOf, routingAdvice } from "../../lib/repository/shared/leadDuplicates";
+import { creatorLine, routingAdvice, salespersonLine } from "../../lib/repository/shared/leadDuplicates";
 import { Modal } from "../ui/Modal";
 import { TextField, FieldRow } from "../ui/FormField";
 import { Button } from "../ui/Button";
@@ -40,7 +40,13 @@ export function MatchList({ matches }: { matches: CustomerDuplicateMatch[] }) {
             </Link>
           )}
           {!m.hidden && !m.isActive && " · inactive"} — {m.reasons.map((r) => MATCH_REASON_LABEL[r]).join(", ")}
-          {m.hidden ? <span className="dup-route"> {routingAdvice(m.mappedTo ?? [])}</span> : m.mappedTo?.length ? ` · looked after by ${namesOf(m.mappedTo)}` : ""}
+          {m.hidden ? (
+            <span className="dup-route"> {routingAdvice(m.mappedTo ?? [])}</span>
+          ) : (
+            <span className="dup-route">
+              {salespersonLine(m.mappedTo)} · {creatorLine(m.createdBy)}
+            </span>
+          )}
         </li>
       ))}
     </ul>

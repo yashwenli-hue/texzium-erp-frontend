@@ -283,13 +283,16 @@ export class CustomerConflictError extends Error {
   existing?: { id: string; customerCode?: string; customerName?: string; gstin?: string; isActive?: boolean };
   /** The existing customer is one the person may not open: who looks after it (D3). */
   mappedTo?: { id: string; fullName: string | null }[];
+  /** Who created the existing customer, when recorded (only for one the person may see). */
+  createdBy?: { id: string; fullName: string | null } | null;
 
-  constructor(message: string, code?: string, existing?: CustomerConflictError["existing"], mappedTo?: CustomerConflictError["mappedTo"]) {
+  constructor(message: string, code?: string, existing?: CustomerConflictError["existing"], mappedTo?: CustomerConflictError["mappedTo"], createdBy?: CustomerConflictError["createdBy"]) {
     super(message);
     this.name = "CustomerConflictError";
     this.code = code;
     this.existing = existing;
     this.mappedTo = mappedTo;
+    this.createdBy = createdBy;
   }
 }
 

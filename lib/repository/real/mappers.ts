@@ -1251,6 +1251,7 @@ export interface BackendDuplicateMatch {
   hidden?: boolean;
   /** Who looks after it (D3): { id, fullName } of active salespeople, newest deal first. */
   mappedTo?: Array<{ id: string; fullName: string | null }>;
+  createdBy?: { id: string; fullName: string | null } | null;
 }
 
 export function mapDuplicateCheck(raw: { blocking: BackendDuplicateMatch[]; warnings: BackendDuplicateMatch[] }): CustomerDuplicateCheck {
@@ -1263,6 +1264,7 @@ export function mapDuplicateCheck(raw: { blocking: BackendDuplicateMatch[]; warn
     ...(m.strength === "EXACT" || m.strength === "STRONG" || m.strength === "POSSIBLE" ? { strength: m.strength as CustomerMatchStrength } : {}),
     ...(m.hidden ? { hidden: true } : {}),
     ...(Array.isArray(m.mappedTo) ? { mappedTo: m.mappedTo } : {}),
+    ...(m.createdBy !== undefined && !m.hidden ? { createdBy: m.createdBy } : {}),
   });
   return { blocking: raw.blocking.map(one), warnings: raw.warnings.map(one) };
 }

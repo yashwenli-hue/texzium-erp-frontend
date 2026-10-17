@@ -165,6 +165,19 @@ export function routingAdvice(mappedTo: readonly PersonRef[]): string {
     : "No salesperson is linked to it yet. Ask an administrator how to route the enquiry - do not create another customer.";
 }
 
+/** "Salesperson: Sam" / "No salesperson assigned" - who looks after a customer the person may see. */
+export function salespersonLine(mappedTo: readonly PersonRef[] | undefined): string {
+  return mappedTo?.length ? `Salesperson: ${namesOf(mappedTo)}` : "No salesperson assigned";
+}
+
+/** "Created by Asha" / "creator not recorded" - never the same as who looks after it. */
+export function creatorLine(createdBy: PersonRef | null | undefined): string {
+  return createdBy ? `Created by ${createdBy.fullName ?? "a former user"}` : "Creator not recorded";
+}
+
+/** What was (not) done when a duplicate stopped the save. */
+export const NOTHING_SAVED = "Nothing was saved: the GST registration was not added, and no customer was created, merged or changed.";
+
 /** The headline of the returning-enquiry check, most important first. */
 export function returningHeadline(r: LeadDuplicateResult): string | null {
   if (r.summary.potentialDuplicates > 0) return "This may be an enquiry that is already in RevenueOS.";

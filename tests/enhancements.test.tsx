@@ -20,7 +20,7 @@ const {
 const { createCustomerThenRegistration } = await import("../lib/repository/shared/customerCreate");
 const { contentCategories, filterContent } = await import("../lib/content/shareSelection");
 const { LeadDuplicatesPanel } = await import("../components/ui/LeadDuplicatesPanel");
-const { NO_DUPLICATES, namesOf, probeIsWorthChecking, routingAdvice } = await import("../lib/repository/shared/leadDuplicates");
+const { NOTHING_SAVED, NO_DUPLICATES, namesOf, probeIsWorthChecking, routingAdvice } = await import("../lib/repository/shared/leadDuplicates");
 const { MatchList } = await import("../components/forms/CustomerForm");
 
 const html = (el: JSX.Element) => renderToStaticMarkup(el);
@@ -117,6 +117,23 @@ test("a duplicate the person may not open is named only as such", () => {
 });
 
 // ---------------------------------------------------------------- duplicate leads
+
+test("a duplicate customer names its salesperson and creator separately, and nothing unknown is guessed", () => {
+  const out = html(
+    <MatchList
+      matches={[
+        { id: "c1", customerCode: "CUST-1", customerName: "Orbit Fabrics", isActive: true, reasons: ["GSTIN"], strength: "EXACT", mappedTo: [{ id: "t", fullName: "Tara S" }], createdBy: { id: "a", fullName: "Admin A" } },
+        { id: "c2", customerCode: "CUST-2", customerName: "Legacy Traders", isActive: true, reasons: ["GSTIN"], strength: "EXACT", mappedTo: [], createdBy: null },
+        { id: "", customerCode: "", customerName: "", isActive: true, reasons: ["GSTIN"], strength: "EXACT", hidden: true, mappedTo: [{ id: "s", fullName: "Sam S" }] },
+      ]}
+    />,
+  );
+  assert.match(out, /Orbit Fabrics \(CUST-1\).*Salesperson: Tara S · Created by Admin A/);
+  assert.match(out, /Legacy Traders \(CUST-2\).*No salesperson assigned · Creator not recorded/);
+  assert.match(out, /A customer you do not have access to<\/span>.*It is looked after by Sam S\. Pass the enquiry to them/);
+  assert.doesNotMatch(out.split("A customer you do not have access to")[1], /Created by/, "no creator for a hidden match");
+  assert.match(NOTHING_SAVED, /GST registration was not added, and no customer was created, merged or changed/);
+});
 
 test("returning enquiries: kinds kept apart, provenance for visible ones, routing for hidden customers", () => {
   const out = html(

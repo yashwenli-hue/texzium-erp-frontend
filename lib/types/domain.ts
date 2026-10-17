@@ -517,6 +517,11 @@ export interface CustomerDuplicateMatch {
    * Knowing who looks after a customer never gives access to it.
    */
   mappedTo?: { id: ID; fullName: string | null }[];
+  /**
+   * VERIFIED (CUSTOMER_CREATED event actor): who created it - only for a match the person may
+   * see; null when no creator was recorded. A different fact from who looks after it.
+   */
+  createdBy?: { id: ID; fullName: string | null } | null;
 }
 
 /** What GET /customers/duplicate-check found: PAN and name matches are refused by the backend, phone and email only warn. */

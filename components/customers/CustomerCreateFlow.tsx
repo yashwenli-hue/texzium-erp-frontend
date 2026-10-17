@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { routingAdvice } from "../../lib/repository/shared/leadDuplicates";
+import { NOTHING_SAVED, creatorLine, routingAdvice, salespersonLine } from "../../lib/repository/shared/leadDuplicates";
 import { Modal } from "../ui/Modal";
 import { Button } from "../ui/Button";
 import { useToast } from "../ui/Toast";
@@ -269,7 +269,12 @@ export function CustomerCreateFlow({
                     <Link href={`/customers/${conflict.existing.id}`}>Open it</Link>
                   </>
                 )}
-                {conflict?.mappedTo && <> {routingAdvice(conflict.mappedTo)}</>}
+                {conflict?.code?.startsWith("DUPLICATE") && (
+                  <>
+                    {" "}
+                    {conflict.existing?.id ? `${salespersonLine(conflict.mappedTo)} · ${creatorLine(conflict.createdBy)}. Contact them or an administrator before creating another customer record.` : routingAdvice(conflict.mappedTo ?? [])} {NOTHING_SAVED}
+                  </>
+                )}
               </p>
             )}
           </>
@@ -282,8 +287,9 @@ export function CustomerCreateFlow({
             </p>
             {gstBlocked && (
               <div className="dup block" role="alert" data-testid="gst-dup-block">
-                <b>This GSTIN or its PAN is already registered.</b> A business has one customer; another site is a GST registration of that customer. Use the existing customer.
+                <b>This GSTIN or its PAN is already registered.</b> A business has one customer; another site is a GST registration of that customer. Contact the salesperson named below, or an administrator, before creating another customer record.
                 <MatchList matches={gstDup.blocking} />
+                <p className="dup-route">{NOTHING_SAVED}</p>
               </div>
             )}
             <GstFields values={gst} onChange={(f, v) => {
