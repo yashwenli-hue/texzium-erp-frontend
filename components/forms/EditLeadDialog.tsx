@@ -9,6 +9,7 @@ import { UpdateLeadInput } from "../../lib/repository/interfaces";
 import { useLeadSources } from "../../lib/hooks/useLeads";
 import { useRepository } from "../../lib/repository/RepositoryProvider";
 import { Lead } from "../../lib/types/domain";
+import { LeadProductField } from "./LeadProductField";
 import { LeadLocationFields } from "./LeadLocationFields";
 import { DraftErrors, draftFromLead, planLocationEdit, sameDraft } from "../../lib/geo/leadLocation";
 
@@ -43,7 +44,7 @@ export function EditLeadDialog({
   const [phone, setPhone] = useState(lead.phone);
   const [alternatePhone, setAlternatePhone] = useState(lead.alternatePhone ?? "");
   const [email, setEmail] = useState(lead.email ?? "");
-  const [productInterest, setProductInterest] = useState(lead.uiContext?.productInterest ?? "");
+  const [inventoryItemId, setInventoryItemId] = useState(lead.product?.id ?? "");
   const initialLocation = useMemo(() => draftFromLead(lead), [lead]);
   const [location, setLocation] = useState(initialLocation);
   const [locationErrors, setLocationErrors] = useState<DraftErrors>({});
@@ -77,8 +78,9 @@ export function EditLeadDialog({
         alternatePhone: alternatePhone.trim() || undefined,
         sourceId,
         ...(edit.kind === "change" ? edit.fields : {}),
+        // Sent only when changed: "" clears it (null), another item replaces it.
+        ...(inventoryItemId !== (lead.product?.id ?? "") ? { inventoryItemId: inventoryItemId || null } : {}),
         uiContext: {
-          productInterest: productInterest.trim() || undefined,
           remarks: showRemarks ? remarks.trim() || undefined : undefined,
         },
       });
@@ -127,13 +129,16 @@ export function EditLeadDialog({
         note={hasStoredLocation ? undefined : "No location is recorded for this lead. Leave this as it is to keep it that way, or choose one to record it."}
       />
 
-      <div className="field-divider">
-        <span>Additional context</span>
-        <small>Stored locally for this demo — not yet part of the connected backend</small>
-      </div>
-      <TextField label="Product / Interest" value={productInterest} onChange={(e) => setProductInterest(e.target.value)} placeholder="e.g. Hydraulic Pump Systems" />
+      <LeadProductField value={inventoryItemId} onChange={setInventoryItemId} />
+
       {showRemarks && (
-        <TextAreaField label="Remarks" rows={3} value={remarks} onChange={(e) => setRemarks(e.target.value)} placeholder="Context for the next person who talks to this account…" />
+        <>
+          <div className="field-divider">
+            <span>Additional context</span>
+            <small>Stored locally for this demo — not yet part of the connected backend</small>
+          </div>
+          <TextAreaField label="Remarks" rows={3} value={remarks} onChange={(e) => setRemarks(e.target.value)} placeholder="Context for the next person who talks to this account…" />
+        </>
       )}
 
       {errors.form && <p style={{ color: "var(--bad)", fontSize: 12.5 }}>{errors.form}</p>}

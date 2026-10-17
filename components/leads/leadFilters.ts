@@ -2,6 +2,7 @@ import type { FilterGroupConfig } from "../ui/FilterButton";
 import type { LeadSearchFacets, FacetCount } from "../../lib/repository/shared/leadSearch";
 import { countsOf } from "../../lib/repository/shared/leadSearch";
 import { FilterMap } from "../../lib/types/common";
+import { LEAD_STAGE_KEYS } from "../../lib/types/domain";
 import {
   FOLLOWUP_OPTIONS,
   LEAD_STATUS_ORDER,
@@ -10,6 +11,7 @@ import {
 } from "../../lib/repository/shared/leadList";
 
 const TITLE: Record<LeadFilterKey, string> = {
+  stage: "Stage",
   status: "Status",
   assignment: "Assignment",
   presales: "Pre-sales by",
@@ -17,6 +19,7 @@ const TITLE: Record<LeadFilterKey, string> = {
   followup: "Follow-up",
   lastCall: "Last call",
   source: "Source",
+  product: "Product",
   country: "Country",
   state: "State",
   city: "City",
@@ -29,8 +32,9 @@ const TITLE: Record<LeadFilterKey, string> = {
  */
 export function leadFilterGroups(facets: LeadSearchFacets, filters: FilterMap, keys: readonly LeadFilterKey[]): FilterGroupConfig[] {
   const names: Record<string, string> = {};
-  for (const p of [...facets.presales, ...facets.sales]) names[p.value] = p.name;
+  for (const p of [...facets.presales, ...facets.sales, ...facets.product]) names[p.value] = p.name;
   const facetOf: Record<LeadFilterKey, FacetCount[]> = {
+    stage: facets.stage,
     status: facets.status,
     assignment: facets.assignment,
     presales: facets.presales,
@@ -38,6 +42,7 @@ export function leadFilterGroups(facets: LeadSearchFacets, filters: FilterMap, k
     followup: facets.followup,
     lastCall: facets.lastCall,
     source: facets.source,
+    product: facets.product,
     country: facets.country,
     state: facets.state,
     city: facets.city,
@@ -48,6 +53,7 @@ export function leadFilterGroups(facets: LeadSearchFacets, filters: FilterMap, k
       const chosen = ([] as string[]).concat(filters[key] ?? []);
       let options = [...new Set([...facet.map((f) => f.value), ...chosen])];
       if (key === "status") options.sort((a, b) => LEAD_STATUS_ORDER.indexOf(a as never) - LEAD_STATUS_ORDER.indexOf(b as never));
+      else if (key === "stage") options = LEAD_STAGE_KEYS.filter((o) => options.includes(o));
       else if (key === "followup") options = FOLLOWUP_OPTIONS.filter((o) => options.includes(o));
       else if (key === "assignment") options = ["assigned", "unassigned"].filter((o) => options.includes(o));
       else if (key === "lastCall") options = ["CNC", "CONNECTED", "NONE"].filter((o) => options.includes(o));

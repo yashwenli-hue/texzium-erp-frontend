@@ -1,4 +1,4 @@
-import type { CallOutcome, Lead, LeadStatus } from "../../types/domain";
+import type { CallOutcome, Lead, LeadStage, LeadStatus } from "../../types/domain";
 import type { FollowupUrgency } from "../../followup";
 
 /**
@@ -18,11 +18,14 @@ export const LEAD_SEARCH_MAX_PAGE_SIZE = 100;
 export interface LeadSearchQuery {
   q?: string;
   status?: LeadStatus[];
+  stage?: LeadStage[];
   assignment?: "assigned" | "unassigned";
   assignedToId?: string;
   presalesUserId?: string[];
   salesUserId?: string[];
   source?: string[];
+  /** Inventory item ids of the enquiry's product, or NOT_SET for none recorded. */
+  product?: string[];
   /** ISO codes, or NOT_SET. */
   country?: string[];
   state?: string[];
@@ -50,10 +53,13 @@ export interface PersonFacetCount extends FacetCount {
 
 export interface LeadSearchFacets {
   status: FacetCount[];
+  stage: FacetCount[];
   assignment: FacetCount[];
   presales: PersonFacetCount[];
   sales: PersonFacetCount[];
   source: FacetCount[];
+  /** value: an inventory item id (name: the product), or NOT_SET. */
+  product: PersonFacetCount[];
   country: FacetCount[];
   state: FacetCount[];
   city: FacetCount[];
@@ -70,7 +76,7 @@ export interface LeadSearchResult {
 }
 
 export const EMPTY_FACETS: LeadSearchFacets = {
-  status: [], assignment: [], presales: [], sales: [], source: [], country: [], state: [], city: [], followup: [], lastCall: [],
+  status: [], stage: [], assignment: [], presales: [], sales: [], source: [], product: [], country: [], state: [], city: [], followup: [], lastCall: [],
 };
 
 /** The query string GET /leads/search takes (lists comma-separated, empty values left out). */
@@ -85,11 +91,13 @@ export function leadSearchParams(query: LeadSearchQuery): string {
   };
   put("q", query.q?.trim() || undefined);
   list("status", query.status);
+  list("stage", query.stage);
   put("assignment", query.assignment);
   put("assignedToId", query.assignedToId);
   list("presalesUserId", query.presalesUserId);
   list("salesUserId", query.salesUserId);
   list("source", query.source);
+  list("product", query.product);
   list("country", query.country);
   list("state", query.state);
   list("city", query.city);

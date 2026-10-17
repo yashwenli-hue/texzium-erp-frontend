@@ -18,7 +18,7 @@ import { FilterMap } from "../../lib/types/common";
 import { DEFAULT_LEAD_LIST_VIEW, LeadFilterKey, PRESALES_VIEW_KEY, leadRowLabel } from "../../lib/repository/shared/leadList";
 
 const PAGE_SIZE = 20;
-const FILTERS: readonly LeadFilterKey[] = ["presales", "assignment", "status", "sales", "lastCall", "followup", "source"];
+const FILTERS: readonly LeadFilterKey[] = ["presales", "assignment", "stage", "status", "sales", "lastCall", "followup", "source", "product"];
 
 /** Who holds the lead now, and in what capacity. */
 function ownerOf(l: Lead): { label: string; name: string } | null {

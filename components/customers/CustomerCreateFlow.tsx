@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { routingAdvice } from "../../lib/repository/shared/leadDuplicates";
 import { Modal } from "../ui/Modal";
 import { Button } from "../ui/Button";
 import { useToast } from "../ui/Toast";
@@ -120,6 +121,12 @@ export function CustomerCreateFlow({
   const gstDup = useCustomerDuplicateCheck({ gstin: gst.gstin }, step === "registration");
   const gstBlocked = gstDup.blocking.length > 0;
   const blocked = dup.blocking.length > 0;
+  // A phone or email match is weak (numbers and mailboxes are shared): creating anyway
+  // needs an explicit "this is a different business", asked again when the matches change.
+  const [warningsConfirmed, setWarningsConfirmed] = useState(false);
+  const warningKey = dup.warnings.map((w) => w.id || w.reasons.join("+")).join(",");
+  useEffect(() => setWarningsConfirmed(false), [warningKey]);
+  const unconfirmed = !blocked && dup.warnings.length > 0 && !warningsConfirmed;
   const pan = normalizePan(details.panNumber);
   const gstCustomer = { panNumber: created?.panNumber ?? (pan || undefined), gstRegistrations: [] as CustomerGstRegistration[] };
 
@@ -139,6 +146,7 @@ export function CustomerCreateFlow({
   function toRegistrationStep() {
     setConflict(null);
     const e = validateCustomerFields(details);
+    if (unconfirmed) e.form = "Confirm that this is a different business from the customers it shares a phone number or email with.";
     setErrors(e);
     if (Object.keys(e).length > 0 || blocked) return;
     if (!gst.legalName) setGst((g) => ({ ...g, legalName: details.customerName.trim() }));
@@ -148,6 +156,7 @@ export function CustomerCreateFlow({
   async function save(withRegistration: boolean) {
     setConflict(null);
     const de = validateCustomerFields(details);
+    if (unconfirmed) de.form = "Confirm that this is a different business from the customers it shares a phone number or email with.";
     if (Object.keys(de).length > 0 || blocked) {
       setErrors(de);
       setStep("details");
@@ -249,6 +258,7 @@ export function CustomerCreateFlow({
               }}
               errors={errors}
               dup={dup}
+              confirmWarnings={{ checked: warningsConfirmed, onChange: setWarningsConfirmed }}
             />
             {errors.form && (
               <p style={{ color: "var(--bad)", fontSize: 12.5 }} role="alert">
@@ -259,6 +269,7 @@ export function CustomerCreateFlow({
                     <Link href={`/customers/${conflict.existing.id}`}>Open it</Link>
                   </>
                 )}
+                {conflict?.mappedTo && <> {routingAdvice(conflict.mappedTo)}</>}
               </p>
             )}
           </>

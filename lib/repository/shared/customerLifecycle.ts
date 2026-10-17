@@ -281,12 +281,15 @@ export type CustomerConflictCode =
 export class CustomerConflictError extends Error {
   code?: string;
   existing?: { id: string; customerCode?: string; customerName?: string; gstin?: string; isActive?: boolean };
+  /** The existing customer is one the person may not open: who looks after it (D3). */
+  mappedTo?: { id: string; fullName: string | null }[];
 
-  constructor(message: string, code?: string, existing?: CustomerConflictError["existing"]) {
+  constructor(message: string, code?: string, existing?: CustomerConflictError["existing"], mappedTo?: CustomerConflictError["mappedTo"]) {
     super(message);
     this.name = "CustomerConflictError";
     this.code = code;
     this.existing = existing;
+    this.mappedTo = mappedTo;
   }
 }
 

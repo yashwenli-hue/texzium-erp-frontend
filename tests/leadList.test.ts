@@ -2,7 +2,10 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { Lead } from "../lib/types/domain";
 import {
+  LEAD_STAGES,
+  LEAD_STAGE_KEYS,
   LEAD_STATUSES,
+  leadStageOf,
   canMoveLeadStatus,
   canQualifyLeadFrom,
   canReopenLeadFrom,
@@ -68,12 +71,14 @@ test("a view becomes the server query: values not labels, both assignment choice
   assert.deepEqual(q, {
     q: "98765 43210",
     status: ["NEW"],
+    stage: undefined,
     assignment: undefined,
     presalesUserId: ["u1"],
     salesUserId: undefined,
     followup: undefined,
     lastCall: ["CNC"],
     source: undefined,
+    product: undefined,
     country: ["NOT_SET", "IN"],
     state: undefined,
     city: undefined,
@@ -154,6 +159,29 @@ test("the local search filters by pre-sales people and counts each facet without
   // other facets apply it: only B's status is counted
   assert.deepEqual(r.facets.status, [{ value: "PRE_SALES_ASSIGNED", count: 1 }]);
   assert.deepEqual(r.facets.assignment, [{ value: "assigned", count: 1 }]);
+});
+
+test("stages group the canonical statuses; the local search filters and counts them, and products", () => {
+  assert.equal(leadStageOf("UNDERQUALIFIED"), "PRE_QUALIFICATION");
+  assert.equal(leadStageOf("SALES_ASSIGNED"), "QUALIFIED");
+  assert.equal(leadStageOf("NEGOTIATION"), "IN_PROGRESS");
+  assert.equal(leadStageOf("REJECTED"), "REJECTED");
+  // every status is in exactly one stage
+  for (const st of LEAD_STATUSES) assert.equal(LEAD_STAGE_KEYS.filter((k) => (LEAD_STAGES[k] as readonly string[]).includes(st)).length, 1, st);
+  const leads = [
+    lead("a", { status: "PROPOSAL_SENT", product: { id: "INV1", name: "Pump" } }),
+    lead("b", { status: "NEGOTIATION" }),
+    lead("c", { status: "WON", product: { id: "INV1", name: "Pump" } }),
+  ];
+  assert.deepEqual(ids(searchLeadsLocally(leads, { stage: ["IN_PROGRESS"] })), ["a", "b"]);
+  assert.deepEqual(ids(searchLeadsLocally(leads, { stage: ["IN_PROGRESS"], product: ["INV1"] })), ["a"]);
+  assert.deepEqual(ids(searchLeadsLocally(leads, { product: ["NOT_SET"] })), ["b"]);
+  const r = searchLeadsLocally(leads, { stage: ["IN_PROGRESS"] });
+  assert.deepEqual(r.facets.stage.map((f) => [f.value, f.count]), [["IN_PROGRESS", 2], ["WON", 1]]);
+  assert.deepEqual(r.facets.product.map((f) => [f.value, f.name, f.count]), [["INV1", "Pump", 1], ["NOT_SET", "Not recorded", 1]]);
+  assert.equal(filterValueLabel("stage", "REJECTED"), "Rejected / disqualified");
+  assert.equal(filterValueLabel("product", "NOT_SET"), "Not recorded");
+  assert.equal(toSearchQuery(view({ filters: { stage: ["WON", "BOGUS"], product: ["INV1"] } }), "", 20).stage?.join(), "WON");
 });
 
 test("a call can be logged with only its outcome; other entries need a remark", () => {

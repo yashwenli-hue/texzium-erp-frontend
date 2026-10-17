@@ -35,7 +35,15 @@ import { MOCK_ASSIGNABLE_USERS } from "./mockUserRepository";
 import { OPPORTUNITY_STAGE_REMARK_MAX_LENGTH as LEAD_REJECT_REASON_MAX_LENGTH } from "../shared/opportunityStage";
 import { LeadSearchQuery, LeadSearchResult, phoneMatches } from "../shared/leadSearch";
 import { searchLeadsLocally } from "../shared/leadSearchLocal";
-import { LeadDuplicate, LeadDuplicateProbe, LeadDuplicateResult } from "../shared/leadDuplicates";
+import { DuplicateStrength, EnquiryKind, LeadDuplicate, LeadDuplicateProbe, LeadDuplicateResult } from "../shared/leadDuplicates";
+import { MOCK_INVENTORY_ITEMS } from "./mockInventoryItemRepository";
+
+// Like the backend: a product must be an existing inventory item.
+function mockProduct(id: ID): { id: ID; name: string } {
+  const item = MOCK_INVENTORY_ITEMS.find((i) => i.id === id);
+  if (!item) throw new Error("Product not found.");
+  return { id: item.id, name: item.name };
+}
 
 // Like the backend: only an existing, active user can take a lead.
 function activeAssignee(userId: ID) {
@@ -89,6 +97,7 @@ export class MockLeadRepository implements ILeadRepository {
       createdAt: now,
       updatedAt: now,
       lastActivityAt: now,
+      ...(input.inventoryItemId ? { product: mockProduct(input.inventoryItemId) } : {}),
       uiContext: input.uiContext,
     };
     db.leads.add(lead);
@@ -125,6 +134,7 @@ export class MockLeadRepository implements ILeadRepository {
       ...(input.alternatePhone !== undefined ? { alternatePhone: input.alternatePhone } : {}),
       ...(input.sourceId !== undefined ? { sourceId: input.sourceId, sourceName: source?.name ?? existing.sourceName } : {}),
       ...(touchesLocation ? { country: location.country ?? undefined, state: location.state ?? undefined, city: location.city ?? undefined } : {}),
+      ...(input.inventoryItemId !== undefined ? { product: input.inventoryItemId ? mockProduct(input.inventoryItemId) : undefined } : {}),
       ...(input.uiContext !== undefined ? { uiContext: { ...existing.uiContext, ...input.uiContext } } : {}),
       updatedAt: now,
       lastActivityAt: now,
@@ -217,7 +227,7 @@ export class MockLeadRepository implements ILeadRepository {
   async duplicatesOf(id: ID): Promise<LeadDuplicateResult> {
     const lead = db.leads.getById(id);
     if (!lead) throw new Error("Lead not found.");
-    return delay(mockDuplicates(db.leads.getAll(), lead, lead));
+    return delay(mockDuplicates(db.leads.getAll(), { ...lead, inventoryItemId: lead.product?.id }, lead));
   }
 
   // Same rules and sentence as the backend (lead-transitions.ts there).
@@ -437,18 +447,28 @@ export class MockLeadRepository implements ILeadRepository {
   }
 }
 
-// Same matching as the backend's lead-duplicates.ts (every mock lead is visible).
+// The backend's rules (lead-duplicates.ts there) over the mock leads. Mock mode has one
+// person who sees everything and no customer data to match, so nothing is hidden and
+// no customer is listed.
 function mockDuplicates(all: readonly Lead[], probe: LeadDuplicateProbe, self: Lead | null): LeadDuplicateResult {
   const norm = (v?: string | null) => (v ?? "").trim().replace(/\s+/g, " ").toLowerCase();
   const phones = [probe.phone, probe.alternatePhone].map((p) => (p ?? "").replace(/\D+/g, "")).filter((d) => d.length >= 10);
+  const probeItem = probe.inventoryItemId ?? null;
   const leads: LeadDuplicate[] = [];
   for (const l of all) {
     if (self && l.id === self.id) continue;
     const phone = phones.some((d) => phoneMatches(l.phone, d) || phoneMatches(l.alternatePhone, d));
     const email = !!norm(probe.email) && norm(l.email) === norm(probe.email);
-    const name = !!norm(probe.customerName) && !!norm(probe.companyName) && norm(l.customerName) === norm(probe.customerName) && norm(l.companyName) === norm(probe.companyName);
-    const place = !!norm(probe.companyName) && !!norm(probe.city) && norm(l.companyName) === norm(probe.companyName) && norm(l.city) === norm(probe.city);
+    const sameName = !!norm(probe.customerName) && norm(l.customerName) === norm(probe.customerName);
+    const sameCompany = !!norm(probe.companyName) && norm(l.companyName) === norm(probe.companyName);
+    const name = sameName && sameCompany;
+    const place = sameCompany && !!norm(probe.city) && norm(l.city) === norm(probe.city);
     if (!phone && !email && !name && !place) continue;
+    const strength: DuplicateStrength = ((phone || email) && sameName) || (phone && email) ? "EXACT" : email || (phone && sameCompany) ? "STRONG" : "POSSIBLE";
+    const otherItem = l.product?.id ?? null;
+    const sameProduct = probeItem && otherItem ? probeItem === otherItem : null;
+    const open = l.isActive && !["WON", "LOST", "REJECTED"].includes(l.status);
+    const kind: EnquiryKind = strength === "POSSIBLE" ? "POSSIBLE_MATCH" : open && sameProduct !== false ? "POTENTIAL_DUPLICATE" : "REPEAT_ENQUIRY";
     leads.push({
       id: l.id,
       customerName: l.customerName,
@@ -457,16 +477,29 @@ function mockDuplicates(all: readonly Lead[], probe: LeadDuplicateProbe, self: L
       isActive: l.isActive,
       createdAt: l.createdAt,
       sourceName: l.sourceName,
+      inventoryItem: l.product ? { id: l.product.id, productName: l.product.name, sku: null } : null,
+      assignedTo: l.assignedToId ? { id: l.assignedToId, fullName: l.assignedToName ?? null } : null,
+      customer: null,
       relation: self ? (l.createdAt < self.createdAt ? "EARLIER" : "LATER") : null,
-      strength: phone || email ? "EXACT" : "POSSIBLE",
-      reasons: [...(phone ? ["PHONE" as const] : []), ...(email ? ["EMAIL" as const] : []), ...(name ? ["NAME_AND_COMPANY" as const] : []), ...(place ? ["COMPANY_AND_CITY" as const] : [])],
+      strength,
+      reasons: [...(phone ? ["PHONE" as const] : []), ...(email ? ["EMAIL" as const] : []), ...((phone || email) && sameName ? ["NAME" as const] : []), ...(name ? ["NAME_AND_COMPANY" as const] : []), ...(place ? ["COMPANY_AND_CITY" as const] : [])],
+      differentName: !!norm(probe.customerName) && (phone || email) && !sameName,
+      kind,
+      sameProduct,
     });
   }
+  const sure = leads.filter((l) => l.strength !== "POSSIBLE");
   return {
+    person: { returning: sure.length > 0, previousEnquiries: sure.filter((l) => l.relation !== "LATER").length },
     leads,
     customers: [],
-    exact: leads.filter((l) => l.strength === "EXACT").length,
-    possible: leads.filter((l) => l.strength === "POSSIBLE").length,
-    productComparison: "unavailable",
+    summary: {
+      potentialDuplicates: leads.filter((l) => l.kind === "POTENTIAL_DUPLICATE").length,
+      repeatEnquiries: leads.filter((l) => l.kind === "REPEAT_ENQUIRY").length,
+      possibleMatches: leads.filter((l) => l.kind === "POSSIBLE_MATCH").length,
+      linkedCustomers: 0,
+      matchingCustomers: 0,
+    },
+    productComparison: probeItem ? "available" : "unavailable",
   };
 }

@@ -1,5 +1,5 @@
-import type { Lead, LeadStatus } from "../../types/domain";
-import { LEAD_STATUSES, formatLeadStatus } from "../../types/domain";
+import type { Lead, LeadStage, LeadStatus } from "../../types/domain";
+import { LEAD_STAGE_KEYS, LEAD_STAGE_LABEL, LEAD_STATUSES, formatLeadStatus } from "../../types/domain";
 import type { FilterMap, SortState } from "../../types/common";
 import type { FollowupUrgency } from "../../followup";
 import { countryName } from "../../geo/countries";
@@ -30,7 +30,7 @@ export const LEAD_STATUS_ORDER: readonly LeadStatus[] = [
 export type LeadSortField = LeadSearchSort;
 
 /** The filter keys a list keeps, each a list of values sent to the server. */
-export const LEAD_FILTER_KEYS = ["status", "assignment", "presales", "sales", "followup", "lastCall", "source", "country", "state", "city"] as const;
+export const LEAD_FILTER_KEYS = ["stage", "status", "assignment", "presales", "sales", "followup", "lastCall", "source", "product", "country", "state", "city"] as const;
 export type LeadFilterKey = (typeof LEAD_FILTER_KEYS)[number];
 
 export const ASSIGNMENT_LABEL: Record<"assigned" | "unassigned", string> = { assigned: "Assigned", unassigned: "Unassigned" };
@@ -108,10 +108,12 @@ export function toSearchQuery(view: LeadListView, search: string, pageSize: numb
   const f = view.filters;
   const list = (key: LeadFilterKey) => (valuesOf(f, key).length ? valuesOf(f, key) : undefined);
   const status = valuesOf(f, "status").filter((s): s is LeadStatus => (LEAD_STATUSES as string[]).includes(s));
+  const stage = valuesOf(f, "stage").filter((s): s is LeadStage => (LEAD_STAGE_KEYS as string[]).includes(s));
   const assignment = valuesOf(f, "assignment");
   return {
     q: search.trim() || undefined,
     status: status.length ? status : undefined,
+    stage: stage.length ? stage : undefined,
     // Both choices together are the same as neither.
     assignment: assignment.length === 1 && (assignment[0] === "assigned" || assignment[0] === "unassigned") ? assignment[0] : undefined,
     presalesUserId: list("presales"),
@@ -119,6 +121,7 @@ export function toSearchQuery(view: LeadListView, search: string, pageSize: numb
     followup: list("followup") as FollowupUrgency[] | undefined,
     lastCall: list("lastCall") as LastCallFilter[] | undefined,
     source: list("source"),
+    product: list("product"),
     country: list("country"),
     state: list("state"),
     city: list("city"),
@@ -137,6 +140,10 @@ export function filterValueLabel(key: LeadFilterKey, value: string, names: Recor
   switch (key) {
     case "status":
       return formatLeadStatus(value);
+    case "stage":
+      return LEAD_STAGE_LABEL[value as LeadStage] ?? value;
+    case "product":
+      return value === NOT_SET_COUNTRY ? "Not recorded" : names[value] || "Removed product";
     case "assignment":
       return ASSIGNMENT_LABEL[value as "assigned"] ?? value;
     case "lastCall":

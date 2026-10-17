@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { namesOf, routingAdvice } from "../../lib/repository/shared/leadDuplicates";
 import { Modal } from "../ui/Modal";
 import { TextField, FieldRow } from "../ui/FormField";
 import { Button } from "../ui/Button";
@@ -32,13 +33,14 @@ export function MatchList({ matches }: { matches: CustomerDuplicateMatch[] }) {
         <li key={m.id || `hidden-${i}`}>
           {m.strength && <span className={`dup-strength ${m.strength === "EXACT" ? "exact" : ""}`}>{STRENGTH_LABEL[m.strength]}</span>}{" "}
           {m.hidden ? (
-            <span>A customer you do not have access to. Ask an administrator for access instead of creating another.</span>
+            <span>A customer you do not have access to</span>
           ) : (
             <Link href={`/customers/${m.id}`}>
               {m.customerName} ({m.customerCode})
             </Link>
           )}
           {!m.hidden && !m.isActive && " · inactive"} — {m.reasons.map((r) => MATCH_REASON_LABEL[r]).join(", ")}
+          {m.hidden ? <span className="dup-route"> {routingAdvice(m.mappedTo ?? [])}</span> : m.mappedTo?.length ? ` · looked after by ${namesOf(m.mappedTo)}` : ""}
         </li>
       ))}
     </ul>
@@ -66,6 +68,7 @@ export function CustomerFields({
   errors,
   dup,
   customer,
+  confirmWarnings,
 }: {
   values: CustomerFieldValues;
   onChange: (field: keyof CustomerFieldValues, value: string) => void;
@@ -73,6 +76,8 @@ export function CustomerFields({
   dup: { blocking: CustomerDuplicateMatch[]; warnings: CustomerDuplicateMatch[] };
   /** Present when editing: the code is shown as assigned and fixed. */
   customer?: Customer;
+  /** When creating: a weak match (phone or email) must be confirmed as another business. */
+  confirmWarnings?: { checked: boolean; onChange: (checked: boolean) => void };
 }) {
   const editing = !!customer;
   const blocked = dup.blocking.length > 0;
@@ -97,8 +102,14 @@ export function CustomerFields({
       )}
       {!blocked && dup.warnings.length > 0 && (
         <div className="dup warn" role="status" data-testid="dup-warn">
-          <b>Check this isn&apos;t the same business.</b> It shares a phone number or email with:
+          <b>Check this isn&apos;t the same business.</b> It shares a phone number or email with the customers below. A phone number or email can be shared, so this alone does not mean it is the same business.
           <MatchList matches={dup.warnings} />
+          {confirmWarnings && (
+            <label className="choice-row dup-confirm">
+              <input type="checkbox" checked={confirmWarnings.checked} onChange={(e) => confirmWarnings.onChange(e.target.checked)} />
+              <span>I checked: this is a different business.</span>
+            </label>
+          )}
         </div>
       )}
 

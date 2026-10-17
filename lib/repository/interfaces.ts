@@ -57,6 +57,8 @@ export interface CreateLeadInput {
   country?: string;
   state?: string;
   city?: string;
+  /** VERIFIED: the product or machine the enquiry is about (an existing inventory item id). */
+  inventoryItemId?: ID;
   /** MOCK/UI-ONLY extras — kept structurally separate from the DTO fields above. See LeadUIContext. */
   uiContext?: LeadUIContext;
 }
@@ -78,6 +80,8 @@ export interface UpdateLeadInput {
   country?: string | null;
   state?: string | null;
   city?: string | null;
+  /** The product or machine the enquiry is about; null clears it, absent keeps it. */
+  inventoryItemId?: ID | null;
   uiContext?: LeadUIContext;
 }
 

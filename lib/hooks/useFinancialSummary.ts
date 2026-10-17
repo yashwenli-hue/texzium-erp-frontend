@@ -15,24 +15,23 @@ import { useAsyncList } from "./useAsyncList";
  * Deliberately excludes collections-dashboard/customer-ranking and
  * /high-risk — see ICollectionsDashboardRepository.
  */
-export function useFinancialSummary() {
+export function useFinancialSummary(access: { revenue: boolean; collections: boolean } = { revenue: true, collections: true }) {
   const repo = useRepository();
+  // Company-wide totals are only asked for by people who may see them (D3): revenue needs
+  // revenue.view.all, the collection totals finance visibility. Nothing is fetched otherwise.
+  const { revenue: canRevenue, collections: canCollections } = access;
   const { data, loading, error, refetch } = useAsyncList(
     () =>
       Promise.all([
-        repo.salesReports.revenueSummary(),
-        repo.collectionsDashboard.summary(),
-        repo.collectionsDashboard.aging(),
-        repo.collectionsDashboard.efficiency(),
-        repo.collectionsDashboard.recoveryRate(),
-      ]).then(([revenue, collections, aging, efficiency, recoveryRate]) => ({
+        canRevenue ? repo.salesReports.revenueSummary() : Promise.resolve(null),
+        canCollections
+          ? Promise.all([repo.collectionsDashboard.summary(), repo.collectionsDashboard.aging(), repo.collectionsDashboard.efficiency(), repo.collectionsDashboard.recoveryRate()])
+          : Promise.resolve(null),
+      ]).then(([revenue, c]) => ({
         revenue,
-        collections,
-        aging,
-        efficiency,
-        recoveryRate,
+        collections: c ? { collections: c[0], aging: c[1], efficiency: c[2], recoveryRate: c[3] } : null,
       })),
-    [repo]
+    [repo, canRevenue, canCollections]
   );
   return { data, loading, error, refetch };
 }

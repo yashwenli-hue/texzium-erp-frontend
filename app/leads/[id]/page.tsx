@@ -351,7 +351,10 @@ export default function LeadDetailPage() {
                 <div>{formatLeadLocation(lead) || <span style={{ color: "var(--text-2)" }}>Not set</span>}</div>
               </div>
               <div className="f"><label>Email</label><div style={{ wordBreak: "break-all" }}>{lead.email ?? "—"}</div></div>
-              <div className="f"><label>Product / Interest</label><div>{lead.uiContext?.productInterest ?? "—"}</div></div>
+              <div className="f" data-testid="lead-product">
+                <label>Product / machine</label>
+                <div>{lead.product?.name ?? lead.uiContext?.productInterest ?? <span style={{ color: "var(--text-2)" }}>Not recorded</span>}</div>
+              </div>
               <div className="f">
                 <label>Next Follow-up</label>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>

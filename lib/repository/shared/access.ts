@@ -50,6 +50,8 @@ export interface RolePermissionChange {
 /** Mirrors SENSITIVE_PERMISSIONS in the backend (identity-admin.ts). Granting one needs an explicit confirmation. */
 export const SENSITIVE_PERMISSIONS: readonly string[] = [
   "revenue.view.all",
+  "finance.view.all",
+  "payments.gateway.manage",
   "invoices.create",
   "invoices.document.view",
   "collections.record",
@@ -71,6 +73,17 @@ export const SENSITIVE_PERMISSIONS: readonly string[] = [
   "documents.profile.manage",
 ];
 
+/**
+ * A wider code that includes a narrower one (mirrors INCLUDED_BY in the backend): someone
+ * holding revenue.view.all may grant finance.view.all without holding it themselves.
+ */
+export const INCLUDED_BY: Readonly<Record<string, readonly string[]>> = { "finance.view.all": ["revenue.view.all"] };
+
+/** Holds the code itself, or a wider one that includes it. */
+export function holds(held: ReadonlySet<string>, code: string): boolean {
+  return held.has(code) || (INCLUDED_BY[code] ?? []).some((w) => held.has(w));
+}
+
 /** Codes held back by an earlier business decision: never part of a preset. */
 export const GATED_PERMISSIONS: readonly string[] = ["invoices.create", "invoices.document.view"];
 
@@ -79,6 +92,7 @@ export const isSensitive = (code: string) => SENSITIVE_PERMISSIONS.includes(code
 /** What a code lets someone do, from its last part: view, create, edit, assign, delete, export, ... */
 export function permissionKind(code: string): string {
   const last = code.split(".").pop() ?? "";
+  if (code === "finance.view.all") return "See every financial record";
   if (["view", "all"].includes(last)) return code.endsWith("view.all") ? "See every record" : "View";
   if (["create", "record"].includes(last)) return "Create";
   if (["edit", "update", "manage"].includes(last)) return "Edit";
@@ -102,6 +116,8 @@ export function permissionArea(code: string): string {
     collections: "Collections",
     content: "Content Library",
     revenue: "Record visibility",
+    finance: "Record visibility",
+    payments: "Payment gateway",
     governance: "Recycle Bin",
     documents: "Documents",
     roles: "Access administration",

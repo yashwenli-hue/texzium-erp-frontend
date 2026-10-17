@@ -74,7 +74,12 @@ export default function DashboardPage() {
   const { quotations } = useQuotations();
   const { customers } = useCustomers();
   const quoteToCash = useQuoteToCashSummary();
-  const { data: financials, loading: financialsLoading, error: financialsError, refetch: refetchFinancials } = useFinancialSummary();
+  // Company-wide totals: revenue for revenue.view.all, collections for finance visibility
+  // (finance.view.all, or revenue.view.all which includes it).
+  const canRevenueTotals = hasPermission("revenue.view.all");
+  const canCollectionTotals = canRevenueTotals || hasPermission("finance.view.all");
+  const { data: financials, loading: financialsLoading, error: financialsError, refetch: refetchFinancials } = useFinancialSummary({ revenue: canRevenueTotals, collections: canCollectionTotals });
+  const fin = financials?.collections ?? null;
   const [showLeadForm, setShowLeadForm] = useState(false);
   const [focusExpanded, setFocusExpanded] = useState(false);
 
@@ -292,7 +297,12 @@ export default function DashboardPage() {
       </Panel>
 
       <Panel title="Revenue & Collections" more={{ label: "Open Collections", onClick: () => router.push("/payments") }}>
-        {financialsLoading && !financials && <div className="skeleton" style={{ height: 120 }} />}
+        {!canRevenueTotals && !canCollectionTotals && (
+          <p style={{ fontSize: 12.5, color: "var(--text-2)", margin: "4px 19px 0" }} data-testid="totals-restricted">
+            Company-wide revenue and collection totals are shown to people with finance visibility.
+          </p>
+        )}
+        {(canRevenueTotals || canCollectionTotals) && financialsLoading && !financials && <div className="skeleton" style={{ height: 120 }} />}
         {financialsError && (
           <div style={{ padding: "4px 19px 12px" }}>
             <p style={{ color: "var(--bad)", fontSize: 12.5 }}>
@@ -301,28 +311,30 @@ export default function DashboardPage() {
             <Button variant="ghost" onClick={refetchFinancials}>Retry</Button>
           </div>
         )}
-        {financials && (
+        {financials && (financials.revenue || fin) && (
           <>
             <StatRow>
-              <StatCard label="Total Revenue" value={formatInr(financials.revenue.totalRevenue)} note={`tax ${formatInr(financials.revenue.totalTax)}`} />
-              <StatCard label="Outstanding AR" value={formatInr(financials.collections.totalOutstanding)} note={`${financials.collections.totalInvoices} receivables`} />
-              <StatCard label="Collected" value={formatInr(financials.collections.totalCollected)} note="all-time" />
-              <StatCard label="Recovery Rate" value={financials.recoveryRate.recoveryRate} note="collected vs invoiced" />
+              {financials.revenue && <StatCard label="Total Revenue" value={formatInr(financials.revenue.totalRevenue)} note={`tax ${formatInr(financials.revenue.totalTax)}`} />}
+              {fin && <StatCard label="Outstanding AR" value={formatInr(fin.collections.totalOutstanding)} note={`${fin.collections.totalInvoices} receivables`} />}
+              {fin && <StatCard label="Collected" value={formatInr(fin.collections.totalCollected)} note="all-time" />}
+              {fin && <StatCard label="Recovery Rate" value={fin.recoveryRate.recoveryRate} note="collected vs invoiced" />}
             </StatRow>
+            {fin && (
             <div style={{ display: "flex", flexWrap: "wrap", gap: 20, padding: "12px 19px 0", fontSize: 12.5 }}>
               <div>
                 <b style={{ color: "var(--text)" }}>AR status</b>{" "}
                 <span style={{ color: "var(--muted)" }}>
-                  Paid {financials.efficiency.paid} · Partial {financials.efficiency.partial} · Pending {financials.efficiency.pending} · Written off {financials.efficiency.writtenOff}
+                  Paid {fin.efficiency.paid} · Partial {fin.efficiency.partial} · Pending {fin.efficiency.pending} · Written off {fin.efficiency.writtenOff}
                 </span>
               </div>
               <div>
                 <b style={{ color: "var(--text)" }}>Aging</b>{" "}
                 <span style={{ color: "var(--muted)" }}>
-                  0-30d {formatInr(financials.aging.days0to30)} · 31-60d {formatInr(financials.aging.days31to60)} · 61-90d {formatInr(financials.aging.days61to90)} · 90d+ {formatInr(financials.aging.above90)}
+                  0-30d {formatInr(fin.aging.days0to30)} · 31-60d {formatInr(fin.aging.days31to60)} · 61-90d {formatInr(fin.aging.days61to90)} · 90d+ {formatInr(fin.aging.above90)}
                 </span>
               </div>
             </div>
+            )}
           </>
         )}
         <p style={{ fontSize: 11.5, color: "var(--faint)", margin: "12px 19px 0" }}>

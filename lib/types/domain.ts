@@ -82,6 +82,32 @@ export function isQualifiedLeadStatus(status: LeadStatus): boolean {
 // sales); Reopen takes a REJECTED lead back to Contacted; the status moves are New,
 // Contacted and Underqualified, from before qualification.
 export const LEAD_BEFORE_QUALIFICATION_STATUSES: LeadStatus[] = ["NEW", "ASSIGNED", "CONTACTED", "PRE_SALES_ASSIGNED", "UNDERQUALIFIED"];
+
+/**
+ * VERIFIED (backend lead-transitions.ts LEAD_STAGES): the lifecycle stages a list can be
+ * filtered by, each a group of the canonical statuses (no status is added or renamed).
+ */
+export const LEAD_STAGES = {
+  PRE_QUALIFICATION: LEAD_BEFORE_QUALIFICATION_STATUSES,
+  QUALIFIED: ["QUALIFIED", "SALES_ASSIGNED"],
+  IN_PROGRESS: ["PROPOSAL_SENT", "NEGOTIATION"],
+  WON: ["WON"],
+  LOST: ["LOST"],
+  REJECTED: ["REJECTED"],
+} as const satisfies Record<string, readonly LeadStatus[]>;
+export type LeadStage = keyof typeof LEAD_STAGES;
+export const LEAD_STAGE_KEYS = Object.keys(LEAD_STAGES) as LeadStage[];
+export const LEAD_STAGE_LABEL: Record<LeadStage, string> = {
+  PRE_QUALIFICATION: "New / contacted (pre-sales)",
+  QUALIFIED: "Qualified",
+  IN_PROGRESS: "In progress (proposal, negotiation)",
+  WON: "Won",
+  LOST: "Lost",
+  REJECTED: "Rejected / disqualified",
+};
+export function leadStageOf(status: LeadStatus): LeadStage | null {
+  return LEAD_STAGE_KEYS.find((k) => (LEAD_STAGES[k] as readonly LeadStatus[]).includes(status)) ?? null;
+}
 export const LEAD_CLOSED_STATUSES: LeadStatus[] = ["WON", "LOST", "REJECTED"];
 export const LEAD_STATUS_MOVE_TARGETS: LeadStatus[] = ["NEW", "CONTACTED", "UNDERQUALIFIED"];
 
@@ -258,6 +284,11 @@ export interface Lead {
   salesOwnerName?: string;
   /** VERIFIED (GET /leads/search rows only): the outcome of the latest call that has one. */
   lastCallOutcome?: CallOutcome | null;
+  /**
+   * VERIFIED (Lead.inventoryItemId, 2026-10-17): the product or machine the enquiry is about,
+   * an existing inventory item; absent when none is recorded (every earlier lead).
+   */
+  product?: { id: ID; name: string; category?: string | null };
   /**
    * VERIFIED (backend CP1): where the lead is. All three are absent for a lead recorded
    * without a location (every lead that existed before, and those the WhatsApp bot or a
@@ -480,6 +511,12 @@ export interface CustomerDuplicateMatch {
   strength?: CustomerMatchStrength;
   /** VERIFIED (record scope): a customer the person may not open — no id, code or name is given. */
   hidden?: boolean;
+  /**
+   * VERIFIED (D3, 2026-10-17): the salesperson(s) who look after it, derived from its
+   * opportunities' leads — given also for a hidden match, so the enquiry can be routed.
+   * Knowing who looks after a customer never gives access to it.
+   */
+  mappedTo?: { id: ID; fullName: string | null }[];
 }
 
 /** What GET /customers/duplicate-check found: PAN and name matches are refused by the backend, phone and email only warn. */

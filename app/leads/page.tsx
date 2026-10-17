@@ -27,7 +27,7 @@ import { FilterMap } from "../../lib/types/common";
 import { LEAD_LIST_VIEW_KEY, LeadFilterKey, leadRowLabel } from "../../lib/repository/shared/leadList";
 
 const PAGE_SIZE = 20;
-const FILTERS: readonly LeadFilterKey[] = ["status", "assignment", "followup", "lastCall", "presales", "sales", "source", "country", "state", "city"];
+const FILTERS: readonly LeadFilterKey[] = ["stage", "status", "assignment", "followup", "lastCall", "presales", "sales", "source", "product", "country", "state", "city"];
 
 const none = (text = "—") => <span className="cell-none">{text}</span>;
 
@@ -76,6 +76,7 @@ export default function LeadsPage() {
     { key: "followup", header: "Follow-up", render: (l) => <FollowupTag urgency={followupOf(l).urgency} dueAt={followupOf(l).dueAt} /> },
     { key: "lastCall", header: "Last call", render: (l) => <LastCallTag lead={l} /> },
     { key: "sourceName", header: "Source", render: (l) => <SourceTag source={l.sourceName} /> },
+    { key: "product", header: "Product", render: (l) => (l.product ? <span className="cell-clip" title={l.product.name}>{l.product.name}</span> : none("Not recorded")) },
     { key: "createdAt", header: "Received", sortKey: "createdAt", render: (l) => <span className="cell-nowrap">{formatDate(l.createdAt)}</span> },
     { key: "lastActivityAt", header: "Last Activity", sortKey: "lastActivityAt", render: (l) => <span className="cell-nowrap">{formatRelative(l.lastActivityAt)}</span> },
   ];
@@ -92,6 +93,7 @@ export default function LeadsPage() {
       <div className="rl-meta">
         <span>{l.assignedToName ?? "Unassigned"}</span>
         <span>{l.sourceName}</span>
+        {l.product && <span>{l.product.name}</span>}
         <span>Received {formatDate(l.createdAt)}</span>
         <span>Active {formatRelative(l.lastActivityAt)}</span>
         {l.lastCallOutcome === "NOT_CONNECTED" && <span>Last call: CNC</span>}

@@ -16,7 +16,11 @@ type BackendLeadSearch = {
   total: number;
   page: number;
   pageSize: number;
-  facets: Record<"status" | "assignment" | "presales" | "sales" | "source" | "country" | "state" | "city" | "followup" | "lastCall", BackendFacet[]>;
+  facets: Record<"status" | "assignment" | "presales" | "sales" | "source" | "country" | "state" | "city" | "followup" | "lastCall", BackendFacet[]> & {
+    /** Absent on a backend before 2026-10-17. */
+    stage?: BackendFacet[];
+    product?: Array<BackendFacet & { item?: { productName: string; sku?: string | null } | null }>;
+  };
 };
 const hasValue = <T extends { value: string | null }>(f: T): f is T & { value: string } => typeof f.value === "string" && f.value !== "";
 
@@ -79,6 +83,7 @@ export class RealLeadRepository implements ILeadRepository {
         phone: input.phone,
         alternatePhone: input.alternatePhone,
         sourceId: input.sourceId,
+        ...(input.inventoryItemId ? { inventoryItemId: input.inventoryItemId } : {}),
         ...withoutNulls(location),
       },
     });
@@ -99,6 +104,7 @@ export class RealLeadRepository implements ILeadRepository {
         phone: input.phone,
         alternatePhone: input.alternatePhone,
         sourceId: input.sourceId,
+        ...(input.inventoryItemId !== undefined ? { inventoryItemId: input.inventoryItemId } : {}),
         ...definedLocation(location),
       },
     });
@@ -143,10 +149,16 @@ export class RealLeadRepository implements ILeadRepository {
       pageSize: res.pageSize,
       facets: {
         status: res.facets.status.filter(hasValue),
+        stage: (res.facets.stage ?? []).filter(hasValue),
         assignment: res.facets.assignment.filter(hasValue),
         presales: res.facets.presales.filter(hasValue).map(person),
         sales: res.facets.sales.filter(hasValue).map(person),
         source: res.facets.source.filter(hasValue),
+        product: (res.facets.product ?? []).filter(hasValue).map((f) => ({
+          value: f.value,
+          count: f.count,
+          name: f.item ? (f.item.sku ? `${f.item.productName} (${f.item.sku})` : f.item.productName) : f.value === "NOT_SET" ? "Not recorded" : "Removed product",
+        })),
         country: res.facets.country.filter(hasValue),
         state: res.facets.state.filter(hasValue),
         city: res.facets.city.filter(hasValue),

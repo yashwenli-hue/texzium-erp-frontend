@@ -8,6 +8,7 @@ import { useToast } from "../ui/Toast";
 import { CreateLeadInput } from "../../lib/repository/interfaces";
 import { useLeadSources } from "../../lib/hooks/useLeads";
 import { LeadLocationFields } from "./LeadLocationFields";
+import { LeadProductField } from "./LeadProductField";
 import { LeadDuplicatesPanel } from "../ui/LeadDuplicatesPanel";
 import { useRepository } from "../../lib/repository/RepositoryProvider";
 import { LeadDuplicateResult, NO_DUPLICATES, probeIsWorthChecking } from "../../lib/repository/shared/leadDuplicates";
@@ -36,7 +37,9 @@ export function LeadForm({
   const [phone, setPhone] = useState("");
   const [alternatePhone, setAlternatePhone] = useState("");
   const [email, setEmail] = useState("");
-  const [productInterest, setProductInterest] = useState("");
+  const [inventoryItemId, setInventoryItemId] = useState("");
+  // Only for the check for an existing customer: a lead has no GSTIN of its own.
+  const [gstin, setGstin] = useState("");
   const [remarks, setRemarks] = useState("");
   const [location, setLocation] = useState<LocationDraft>(EMPTY_LOCATION_DRAFT);
   const [locationErrors, setLocationErrors] = useState<DraftErrors>({});
@@ -45,14 +48,14 @@ export function LeadForm({
 
   const effectiveSourceId = sourceId || sources[0]?.id || "";
 
-  // Likely duplicates, asked once typing pauses: the same number or email (possibly from
-  // another source), or the same name and company. A warning only: nothing is blocked
-  // or merged, and a lookup that fails just shows nothing.
+  // Returning enquiries, asked once typing pauses: the same person (number, email, name),
+  // an existing customer (also by GSTIN), compared by product. Context only: nothing is
+  // blocked or merged, and a lookup that fails just shows nothing.
   const repo = useRepository();
   const [duplicates, setDuplicates] = useState<LeadDuplicateResult>(NO_DUPLICATES);
   const city = location.city;
   useEffect(() => {
-    const probe = { phone, alternatePhone, email, customerName, companyName, city };
+    const probe = { phone, alternatePhone, email, customerName, companyName, city, gstin, inventoryItemId: inventoryItemId || undefined };
     if (!probeIsWorthChecking(probe)) {
       setDuplicates(NO_DUPLICATES);
       return;
@@ -68,7 +71,7 @@ export function LeadForm({
       cancelled = true;
       clearTimeout(t);
     };
-  }, [repo, phone, alternatePhone, email, customerName, companyName, city]);
+  }, [repo, phone, alternatePhone, email, customerName, companyName, city, gstin, inventoryItemId]);
 
   function validate(): boolean {
     const e: Record<string, string> = {};
@@ -93,9 +96,9 @@ export function LeadForm({
         phone: phone.trim(),
         alternatePhone: alternatePhone.trim() || undefined,
         sourceId: effectiveSourceId,
+        ...(inventoryItemId ? { inventoryItemId } : {}),
         ...createFieldsFromDraft(location),
         uiContext: {
-          productInterest: productInterest.trim() || undefined,
           remarks: remarks.trim() || undefined,
         },
       });
@@ -153,6 +156,16 @@ export function LeadForm({
         <TextField label="Phone" required value={phone} onChange={(e) => setPhone(e.target.value)} error={errors.phone} placeholder="+91 …" />
         <TextField label="Email" value={email} onChange={(e) => setEmail(e.target.value)} error={errors.email} placeholder="name@company.com (optional)" />
       </FieldRow>
+      <FieldRow>
+        <LeadProductField value={inventoryItemId} onChange={setInventoryItemId} />
+        <TextField
+          label="Customer GSTIN"
+          value={gstin}
+          onChange={(e) => setGstin(e.target.value)}
+          placeholder="If the enquiry gave one (optional)"
+          hint="Only used to find an existing customer; it is not saved on the lead."
+        />
+      </FieldRow>
       <LeadDuplicatesPanel result={duplicates} compact />
 
       <LeadLocationFields
@@ -168,7 +181,6 @@ export function LeadForm({
         <span>Additional context</span>
         <small>Stored locally for this demo — not yet part of the connected backend</small>
       </div>
-      <TextField label="Product / Interest" value={productInterest} onChange={(e) => setProductInterest(e.target.value)} placeholder="e.g. Hydraulic Pump Systems (optional)" />
       <TextAreaField label="Remarks" rows={3} value={remarks} onChange={(e) => setRemarks(e.target.value)} placeholder="Any context worth capturing now (optional)" />
 
       {errors.form && <p style={{ color: "var(--bad)", fontSize: 12.5 }}>{errors.form}</p>}

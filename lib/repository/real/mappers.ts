@@ -146,6 +146,8 @@ export interface BackendLead {
   notes?: BackendLeadNote[];
   timelines?: BackendLeadTimeline[];
   followups?: BackendLeadFollowup[];
+  /** Lead.inventoryItemId's item, selected as { id, sku, productName, category }; absent on older backends. */
+  inventoryItem?: { id: string; sku?: string | null; productName: string; category?: string | null } | null;
   /** GET /leads/search rows only. */
   presales?: Array<{ id: string; fullName: string | null }>;
   salesOwner?: { id: string; fullName: string | null } | null;
@@ -309,6 +311,7 @@ export function mapLead(raw: BackendLead): Lead {
     ...(raw.presales ? { presales: raw.presales.map((p) => ({ id: p.id, name: p.fullName ?? "Former user" })) } : {}),
     ...(raw.salesOwner ? { salesOwnerId: raw.salesOwner.id, salesOwnerName: raw.salesOwner.fullName ?? "Former user" } : {}),
     ...(raw.lastCallOutcome !== undefined ? { lastCallOutcome: outcomeOfLastCall(raw.lastCallOutcome) } : {}),
+    ...(raw.inventoryItem ? { product: mapLeadProduct(raw.inventoryItem) } : {}),
     followups: raw.followups?.map(mapLeadFollowup),
     notes: raw.notes?.map(mapLeadNote),
     timelines: raw.timelines?.map(mapLeadTimeline),
@@ -321,6 +324,11 @@ export interface BackendInventoryItem {
   sku?: string;
   stockQty?: number;
   availableQty?: number;
+}
+
+/** An enquiry's product, named like the product pickers ("Needle Loom 100 (NL-100)"). */
+export function mapLeadProduct(raw: NonNullable<BackendLead["inventoryItem"]>): { id: string; name: string; category: string | null } {
+  return { id: raw.id, name: raw.sku ? `${raw.productName} (${raw.sku})` : raw.productName, category: raw.category ?? null };
 }
 
 export function mapInventoryItem(raw: BackendInventoryItem): InventoryItemOption {
@@ -1241,6 +1249,8 @@ export interface BackendDuplicateMatch {
   reasons: string[];
   strength?: string;
   hidden?: boolean;
+  /** Who looks after it (D3): { id, fullName } of active salespeople, newest deal first. */
+  mappedTo?: Array<{ id: string; fullName: string | null }>;
 }
 
 export function mapDuplicateCheck(raw: { blocking: BackendDuplicateMatch[]; warnings: BackendDuplicateMatch[] }): CustomerDuplicateCheck {
@@ -1252,6 +1262,7 @@ export function mapDuplicateCheck(raw: { blocking: BackendDuplicateMatch[]; warn
     reasons: m.reasons.filter((r): r is CustomerMatchReason => ["GSTIN", "PAN", "NAME", "PHONE", "EMAIL"].includes(r)),
     ...(m.strength === "EXACT" || m.strength === "STRONG" || m.strength === "POSSIBLE" ? { strength: m.strength as CustomerMatchStrength } : {}),
     ...(m.hidden ? { hidden: true } : {}),
+    ...(Array.isArray(m.mappedTo) ? { mappedTo: m.mappedTo } : {}),
   });
   return { blocking: raw.blocking.map(one), warnings: raw.warnings.map(one) };
 }

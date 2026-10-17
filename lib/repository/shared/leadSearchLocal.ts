@@ -1,5 +1,5 @@
-import type { Lead, LeadStatus } from "../../types/domain";
-import { LEAD_BEFORE_QUALIFICATION_STATUSES } from "../../types/domain";
+import type { Lead, LeadStage, LeadStatus } from "../../types/domain";
+import { LEAD_BEFORE_QUALIFICATION_STATUSES, leadStageOf } from "../../types/domain";
 import { nextPendingFollowup } from "../../followup";
 import {
   FacetCount,
@@ -18,7 +18,7 @@ import {
  * qualification), and facets counted with every other filter applied.
  */
 
-type Dim = "status" | "assignment" | "presales" | "sales" | "source" | "country" | "state" | "city" | "followup" | "lastCall";
+type Dim = "status" | "stage" | "product" | "assignment" | "presales" | "sales" | "source" | "country" | "state" | "city" | "followup" | "lastCall";
 
 const PRE_QUAL: readonly LeadStatus[] = LEAD_BEFORE_QUALIFICATION_STATUSES;
 const salesOwnerOf = (l: Lead) => (!PRE_QUAL.includes(l.status) && l.salesOwnerId ? l.salesOwnerId : null);
@@ -43,6 +43,8 @@ function keep(l: Lead, q: LeadSearchQuery, except?: Dim): boolean {
   if (q.createdFrom && istDay(l.createdAt) < q.createdFrom) return false;
   if (q.createdTo && istDay(l.createdAt) > q.createdTo) return false;
   if (except !== "status" && q.status?.length && !q.status.includes(l.status)) return false;
+  if (except !== "stage" && q.stage?.length && !q.stage.includes(leadStageOf(l.status) as LeadStage)) return false;
+  if (except !== "product" && q.product?.length && !q.product.includes(l.product?.id ?? NOT_SET_COUNTRY)) return false;
   if (except !== "assignment" && q.assignment && (q.assignment === "assigned") !== !!l.assignedToId) return false;
   if (except !== "presales" && q.presalesUserId?.length && !(l.presales ?? []).some((p) => q.presalesUserId!.includes(p.id))) return false;
   if (except !== "sales" && q.salesUserId?.length && !q.salesUserId.includes(salesOwnerOf(l) ?? "")) return false;
@@ -79,6 +81,15 @@ export function searchLeadsLocally(all: readonly Lead[], q: LeadSearchQuery): Le
   };
   const facets: LeadSearchFacets = {
     status: count(without("status").map((l) => l.status)),
+    stage: count(without("stage").map((l) => leadStageOf(l.status))),
+    product: (() => {
+      const names = new Map<string, string>();
+      const values = without("product").map((l) => {
+        if (l.product) names.set(l.product.id, l.product.name);
+        return l.product?.id ?? NOT_SET_COUNTRY;
+      });
+      return count(values).map((f) => ({ ...f, name: names.get(f.value) ?? "Not recorded" }));
+    })(),
     assignment: count(without("assignment").map((l) => (l.assignedToId ? "assigned" : "unassigned"))),
     presales: people("presales"),
     sales: people("sales"),

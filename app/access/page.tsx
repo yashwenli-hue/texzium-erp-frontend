@@ -22,6 +22,7 @@ import {
   describeAuditEntry,
   diffCodes,
   groupPermissions,
+  holds,
   isSensitive,
   permissionKind,
 } from "../../lib/repository/shared/access";
@@ -133,7 +134,7 @@ function RolesTab() {
   const why = (code: string): string | undefined => {
     const on = desired.has(code);
     const stored = role.permissionCodes.includes(code);
-    if (!held.has(code)) return "You don't hold this permission, so you can't grant or remove it.";
+    if (!holds(held, code)) return "You don't hold this permission, so you can't grant or remove it.";
     if (!stored && !on && !canGrant) return "Granting needs roles.permissions.assign.";
     if (stored && on && !canRevoke) return "Removing needs roles.permissions.revoke.";
     return undefined;
@@ -185,7 +186,7 @@ function RolesTab() {
                   type="button"
                   className="chip"
                   title={`${p.description} Fills in the boxes only; nothing is saved until you review it.`}
-                  onClick={() => setDesired(new Set(p.codes.filter((c) => held.has(c) && !GATED_PERMISSIONS.includes(c))))}
+                  onClick={() => setDesired(new Set(p.codes.filter((c) => holds(held, c) && !GATED_PERMISSIONS.includes(c))))}
                 >
                   {p.label}
                 </button>
