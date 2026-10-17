@@ -1,3 +1,5 @@
+import type { SalespersonResolution } from "../../types/domain";
+
 /**
  * VERIFIED (backend, returning enquiries 2026-10-17): GET /leads/duplicate-check and
  * GET /leads/:id/duplicates. Nothing is blocked or merged: the result is context for a
@@ -33,10 +35,12 @@ export interface VisibleCustomerRef {
   customerName: string;
   isActive: boolean;
   mappedTo: PersonRef[];
+  salesperson?: SalespersonResolution;
 }
 export interface HiddenCustomerRef {
   hidden: true;
   mappedTo: PersonRef[];
+  salesperson?: SalespersonResolution;
 }
 export type CustomerRef = VisibleCustomerRef | HiddenCustomerRef;
 
@@ -156,18 +160,30 @@ export function namesOf(people: readonly PersonRef[]): string {
   return names.length <= 1 ? (names[0] ?? "") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
 }
 
-/** What to do about a customer the person may not open: route it, never create another. */
-export function routingAdvice(mappedTo: readonly PersonRef[]): string {
-  const who = namesOf(mappedTo);
-  // (a name may end with a full stop, as in "Tara S.")
-  return who
-    ? `It is looked after by ${who}${who.endsWith(".") ? "" : "."} Pass the enquiry to them, or ask an administrator to assign it - do not create another customer.`
-    : "No salesperson is linked to it yet. Ask an administrator how to route the enquiry - do not create another customer.";
+type SalespersonSource = { salesperson?: SalespersonResolution; mappedTo?: readonly PersonRef[] };
+
+/** The backend's resolution; from an older backend (the list only), one person is the salesperson and more is not clear. */
+export function resolveSalesperson(x: SalespersonSource): SalespersonResolution {
+  if (x.salesperson) return x.salesperson;
+  const m = x.mappedTo ?? [];
+  if (m.length === 1) return { status: "ASSIGNED", id: m[0].id, fullName: m[0].fullName ?? "a former user" };
+  return { status: "NOT_CLEAR", reason: m.length > 1 ? "MULTIPLE" : "NONE" };
 }
 
-/** "Salesperson: Sam" / "No salesperson assigned" - who looks after a customer the person may see. */
-export function salespersonLine(mappedTo: readonly PersonRef[] | undefined): string {
-  return mappedTo?.length ? `Salesperson: ${namesOf(mappedTo)}` : "No salesperson assigned";
+export const SALESPERSON_NOT_CLEAR = "Salesperson not clearly assigned—contact an authorized administrator.";
+
+/** "Mapped salesperson: Sam" - or, missing / inactive / several, the not-clear message. Never a guess. */
+export function salespersonLine(x: SalespersonSource): string {
+  const sp = resolveSalesperson(x);
+  return sp.status === "ASSIGNED" ? `Mapped salesperson: ${sp.fullName}` : SALESPERSON_NOT_CLEAR;
+}
+
+/** What to do about an existing customer: route to its salesperson, never create another. */
+export function routingAdvice(x: SalespersonSource): string {
+  const sp = resolveSalesperson(x);
+  return sp.status === "ASSIGNED"
+    ? `Mapped salesperson: ${sp.fullName}${sp.fullName.endsWith(".") ? "" : "."} Contact them, or an authorized administrator, before creating another customer record.`
+    : `${SALESPERSON_NOT_CLEAR} Do not create another customer record.`;
 }
 
 /** "Created by Asha" / "creator not recorded" - never the same as who looks after it. */

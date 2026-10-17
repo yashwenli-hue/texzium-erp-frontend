@@ -1,5 +1,5 @@
 import type { ActionState } from "./quotationLifecycle";
-import type { Customer, CustomerGstRegistration, CustomerMatchReason, QuotingBlocker } from "../../types/domain";
+import type { SalespersonResolution, Customer, CustomerGstRegistration, CustomerMatchReason, QuotingBlocker } from "../../types/domain";
 
 /**
  * Customer Management rules, mirroring the backend (commits bb9f81f customer
@@ -285,6 +285,8 @@ export class CustomerConflictError extends Error {
   mappedTo?: { id: string; fullName: string | null }[];
   /** Who created the existing customer, when recorded (only for one the person may see). */
   createdBy?: { id: string; fullName: string | null } | null;
+  /** Who the existing customer can be routed to, or why nobody (backend resolution). */
+  salesperson?: SalespersonResolution;
 
   constructor(message: string, code?: string, existing?: CustomerConflictError["existing"], mappedTo?: CustomerConflictError["mappedTo"], createdBy?: CustomerConflictError["createdBy"]) {
     super(message);
@@ -293,6 +295,11 @@ export class CustomerConflictError extends Error {
     this.existing = existing;
     this.mappedTo = mappedTo;
     this.createdBy = createdBy;
+  }
+
+  withSalesperson(sp: SalespersonResolution | undefined): this {
+    this.salesperson = sp;
+    return this;
   }
 }
 

@@ -522,7 +522,19 @@ export interface CustomerDuplicateMatch {
    * see; null when no creator was recorded. A different fact from who looks after it.
    */
   createdBy?: { id: ID; fullName: string | null } | null;
+  /** VERIFIED (backend customerSalesperson): the one salesperson to route to, or why there is none. */
+  salesperson?: SalespersonResolution;
 }
+
+/**
+ * VERIFIED (backend customer-relationship.ts): reliable only when every assigned lead behind
+ * the customer's opportunities has the same, active assignee. Otherwise NOT_CLEAR - nobody is
+ * guessed: NONE (no assigned deal), INACTIVE (that person is no longer active), MULTIPLE
+ * (different people across its deals).
+ */
+export type SalespersonResolution =
+  | { status: "ASSIGNED"; id: ID; fullName: string }
+  | { status: "NOT_CLEAR"; reason: "NONE" | "INACTIVE" | "MULTIPLE" };
 
 /** What GET /customers/duplicate-check found: PAN and name matches are refused by the backend, phone and email only warn. */
 export interface CustomerDuplicateCheck {

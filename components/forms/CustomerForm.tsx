@@ -41,10 +41,10 @@ export function MatchList({ matches }: { matches: CustomerDuplicateMatch[] }) {
           )}
           {!m.hidden && !m.isActive && " · inactive"} — {m.reasons.map((r) => MATCH_REASON_LABEL[r]).join(", ")}
           {m.hidden ? (
-            <span className="dup-route"> {routingAdvice(m.mappedTo ?? [])}</span>
+            <span className="dup-route"> {routingAdvice(m)}</span>
           ) : (
             <span className="dup-route">
-              {salespersonLine(m.mappedTo)} · {creatorLine(m.createdBy)}
+              {salespersonLine(m)} · {creatorLine(m.createdBy)}
             </span>
           )}
         </li>

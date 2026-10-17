@@ -478,7 +478,19 @@ export default function LeadDetailPage() {
             )}
           </Panel>
 
-          <LeadDuplicatesPanel result={duplicates} canResolve={hasPermission("leads.deactivate") || hasPermission("leads.delete")} />
+          <LeadDuplicatesPanel
+            result={duplicates}
+            canResolve={hasPermission("leads.deactivate") || hasPermission("leads.delete")}
+            routing={{
+              leadStatus: lead.status,
+              assignedToId: lead.assignedToId,
+              canAssign: hasPermission("leads.assign") && !inactive,
+              onAssign: async (personId, name) => {
+                await assignLead(personId, name);
+                toast.success(`Lead assigned to ${name}`);
+              },
+            }}
+          />
 
           <Panel
             title="Activity & History"

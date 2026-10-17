@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { NOTHING_SAVED, creatorLine, routingAdvice, salespersonLine } from "../../lib/repository/shared/leadDuplicates";
+import { NOTHING_SAVED, creatorLine, routingAdvice } from "../../lib/repository/shared/leadDuplicates";
 import { Modal } from "../ui/Modal";
 import { Button } from "../ui/Button";
 import { useToast } from "../ui/Toast";
@@ -272,7 +272,7 @@ export function CustomerCreateFlow({
                 {conflict?.code?.startsWith("DUPLICATE") && (
                   <>
                     {" "}
-                    {conflict.existing?.id ? `${salespersonLine(conflict.mappedTo)} · ${creatorLine(conflict.createdBy)}. Contact them or an administrator before creating another customer record.` : routingAdvice(conflict.mappedTo ?? [])} {NOTHING_SAVED}
+                    {conflict.existing?.id ? `${routingAdvice(conflict)} ${creatorLine(conflict.createdBy)}.` : routingAdvice(conflict)} {NOTHING_SAVED}
                   </>
                 )}
               </p>

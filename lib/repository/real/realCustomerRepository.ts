@@ -37,8 +37,8 @@ const SEARCHABLE: (keyof Customer)[] = ["customerName", "customerCode", "email",
 export function toCustomerError(err: unknown, forbidden: string): unknown {
   if (err instanceof ApiError) {
     if (err.status === 409) {
-      const d = (err.details ?? {}) as { code?: string; existing?: CustomerConflictError["existing"]; mappedTo?: CustomerConflictError["mappedTo"]; createdBy?: CustomerConflictError["createdBy"]; existingHidden?: boolean };
-      return new CustomerConflictError(err.message, d.code, d.existing, Array.isArray(d.mappedTo) ? d.mappedTo : undefined, d.existingHidden ? undefined : d.createdBy);
+      const d = (err.details ?? {}) as { code?: string; existing?: CustomerConflictError["existing"]; mappedTo?: CustomerConflictError["mappedTo"]; createdBy?: CustomerConflictError["createdBy"]; salesperson?: CustomerConflictError["salesperson"]; existingHidden?: boolean };
+      return new CustomerConflictError(err.message, d.code, d.existing, Array.isArray(d.mappedTo) ? d.mappedTo : undefined, d.existingHidden ? undefined : d.createdBy).withSalesperson(d.salesperson);
     }
     if (err.status === 403) return new ApiError(forbidden, 403, err.details);
   }

@@ -20,7 +20,7 @@ const {
 const { createCustomerThenRegistration } = await import("../lib/repository/shared/customerCreate");
 const { contentCategories, filterContent } = await import("../lib/content/shareSelection");
 const { LeadDuplicatesPanel } = await import("../components/ui/LeadDuplicatesPanel");
-const { NOTHING_SAVED, NO_DUPLICATES, namesOf, probeIsWorthChecking, routingAdvice } = await import("../lib/repository/shared/leadDuplicates");
+const { NOTHING_SAVED, NO_DUPLICATES, namesOf, probeIsWorthChecking, resolveSalesperson, routingAdvice, salespersonLine } = await import("../lib/repository/shared/leadDuplicates");
 const { MatchList } = await import("../components/forms/CustomerForm");
 
 const html = (el: JSX.Element) => renderToStaticMarkup(el);
@@ -111,7 +111,7 @@ test("a duplicate the person may not open is named only as such", () => {
     />,
   );
   assert.match(out, /Same GSTIN<\/span> <span>A customer you do not have access to<\/span>/);
-  assert.match(out, /No salesperson is linked to it yet/);
+  assert.match(out, /Salesperson not clearly assigned—contact an authorized administrator\. Do not create another customer record\./);
   assert.doesNotMatch(out, /href="\/customers\/"/);
   assert.match(out, /href="\/customers\/c9">Raj Traders \(CUST-9\)<\/a> · inactive — same name/);
 });
@@ -128,11 +128,34 @@ test("a duplicate customer names its salesperson and creator separately, and not
       ]}
     />,
   );
-  assert.match(out, /Orbit Fabrics \(CUST-1\).*Salesperson: Tara S · Created by Admin A/);
-  assert.match(out, /Legacy Traders \(CUST-2\).*No salesperson assigned · Creator not recorded/);
-  assert.match(out, /A customer you do not have access to<\/span>.*It is looked after by Sam S\. Pass the enquiry to them/);
+  assert.match(out, /Orbit Fabrics \(CUST-1\).*Mapped salesperson: Tara S · Created by Admin A/);
+  assert.match(out, /Legacy Traders \(CUST-2\).*Salesperson not clearly assigned—contact an authorized administrator\. · Creator not recorded/);
+  assert.match(out, /A customer you do not have access to<\/span>.*Mapped salesperson: Sam S\. Contact them, or an authorized administrator, before creating another customer record\./);
   assert.doesNotMatch(out.split("A customer you do not have access to")[1], /Created by/, "no creator for a hidden match");
   assert.match(NOTHING_SAVED, /GST registration was not added, and no customer was created, merged or changed/);
+});
+
+test("one reliable salesperson is named; none, inactive or several are never guessed", () => {
+  const one = { status: "ASSIGNED" as const, id: "b", fullName: "Employee B" };
+  assert.equal(salespersonLine({ salesperson: one }), "Mapped salesperson: Employee B");
+  for (const reason of ["NONE", "INACTIVE", "MULTIPLE"] as const)
+    assert.equal(salespersonLine({ salesperson: { status: "NOT_CLEAR", reason }, mappedTo: [{ id: "x", fullName: "X" }] }), "Salesperson not clearly assigned—contact an authorized administrator.", reason);
+  // an older backend sends only the list: one person is the salesperson, several are not clear
+  assert.deepEqual(resolveSalesperson({ mappedTo: [{ id: "b", fullName: "Employee B" }] }), one);
+  assert.deepEqual(resolveSalesperson({ mappedTo: [{ id: "b", fullName: "B" }, { id: "c", fullName: "C" }] }), { status: "NOT_CLEAR", reason: "MULTIPLE" });
+});
+
+test("routing the lead to a matching customer's salesperson: offered only when the existing assignment allows it", () => {
+  const cust = (salesperson: unknown) => ({ ...NO_DUPLICATES, customers: [{ hidden: true, mappedTo: [], salesperson, link: "MATCH", strength: "EXACT", reasons: ["GSTIN"] }], summary: { ...NO_DUPLICATES.summary, matchingCustomers: 1 } }) as never;
+  const B = { status: "ASSIGNED", id: "b", fullName: "Employee B" };
+  const r = (over: object) => ({ leadStatus: "CONTACTED" as const, assignedToId: "a", canAssign: true, onAssign: async () => undefined, ...over });
+  const panel = (sp: unknown, over: object = {}) => html(<LeadDuplicatesPanel result={cust(sp)} routing={r(over)} />);
+  assert.match(panel(B), />.*Assign lead to Employee B<\/button>/);
+  assert.match(panel(B, { canAssign: false }), /To route this lead to Employee B, ask an authorized administrator/);
+  assert.match(panel(B, { leadStatus: "SALES_ASSIGNED" }), /past qualification and cannot be reassigned here: ask an authorized administrator to route it to Employee B/);
+  assert.match(panel(B, { assignedToId: "b" }), /This lead is already assigned to Employee B\./);
+  assert.doesNotMatch(panel({ status: "NOT_CLEAR", reason: "MULTIPLE" }), /Assign lead to/);
+  assert.doesNotMatch(html(<LeadDuplicatesPanel result={cust(B)} />), /Assign lead to/, "no routing outside the lead page");
 });
 
 test("returning enquiries: kinds kept apart, provenance for visible ones, routing for hidden customers", () => {
@@ -154,9 +177,9 @@ test("returning enquiries: kinds kept apart, provenance for visible ones, routin
   assert.match(out, /This may be an enquiry that is already in RevenueOS/);
   assert.match(out, /Possible duplicate<\/span>.*href="\/leads\/l1">Asha Rao · Sterling<\/a>/);
   assert.match(out, /IndiaMART · received .* \(earlier\) · Needle Loom 100 \(same product\) · same phone number, same name · handled by Priya N\./);
-  assert.match(out, /Earlier enquiry<\/span>.*Braider 16 \(another product\).*linked to a customer looked after by Tara S\./);
+  assert.match(out, /Earlier enquiry<\/span>.*Braider 16 \(another product\).*linked to a customer \(Mapped salesperson: Tara S\.\)/);
   assert.match(out, /An enquiry you do not have access to \(later\)\..*same phone number - but another name: it may be a different person · handled by Sam S\./);
-  assert.match(out, /An existing customer you do not have access to \(same GSTIN\)\..*It is looked after by Tara S\. Pass the enquiry to them/);
+  assert.match(out, /An existing customer you do not have access to \(same GSTIN\)\..*Mapped salesperson: Tara S\. Contact them/);
   assert.doesNotMatch(out, /href="\/customers\//);
   assert.doesNotMatch(out, /S\.\./, "no doubled full stop after a name");
   assert.match(out, /aria-label="Earlier enquiries from this person"/);
@@ -181,8 +204,8 @@ test("a weak phone match alone is shown as something to check, not as the same p
 
 test("routing advice names who looks after a customer, or says to ask an administrator", () => {
   assert.equal(namesOf([{ id: "a", fullName: "Sam" }, { id: "b", fullName: "Tara" }, { id: "c", fullName: null }]), "Sam, Tara and a former user");
-  assert.match(routingAdvice([{ id: "a", fullName: "Sam" }]), /^It is looked after by Sam\. Pass the enquiry to them, or ask an administrator .* do not create another customer\.$/);
-  assert.match(routingAdvice([]), /^No salesperson is linked to it yet\. Ask an administrator/);
+  assert.equal(routingAdvice({ mappedTo: [{ id: "a", fullName: "Sam" }] }), "Mapped salesperson: Sam. Contact them, or an authorized administrator, before creating another customer record.");
+  assert.equal(routingAdvice({ mappedTo: [] }), "Salesperson not clearly assigned—contact an authorized administrator. Do not create another customer record.");
   assert.equal(probeIsWorthChecking({ gstin: "27 abcde 1234 f1z5" }), true);
   assert.equal(probeIsWorthChecking({ gstin: "27ABCDE" }), false);
 });
