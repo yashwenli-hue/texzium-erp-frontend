@@ -7,6 +7,7 @@ import { Icon } from "../../../components/ui/Icon";
 import { Panel } from "../../../components/ui/Card";
 import { DocumentCustomer } from "../../../components/ui/DocumentCustomer";
 import { ProformaInvoiceStatusTag, QuotationStatusTag, SalesOrderStatusTag, Tag } from "../../../components/ui/Tag";
+import { BackLink } from "../../../components/ui/BackLink";
 import { Button, EmptyState } from "../../../components/ui/Button";
 import { DataTable, Column } from "../../../components/ui/DataTable";
 import { ConfirmDialog } from "../../../components/ui/ConfirmDialog";
@@ -29,13 +30,6 @@ import { QUOTATION_PERMISSIONS, isLegacyTaxBreakdown, quotationActions, quotatio
 import { PROFORMA_PERMISSIONS, validityLabel } from "../../../lib/repository/shared/proformaLifecycle";
 import { formatDate, formatInrExact } from "../../../lib/format";
 
-function goBackOrTo(router: ReturnType<typeof useRouter>, fallback: string) {
-  if (typeof window !== "undefined" && window.history.length > 1) {
-    router.back();
-  } else {
-    router.push(fallback);
-  }
-}
 
 export default function QuotationDetailPage() {
   const params = useParams<{ id: string }>();
@@ -82,9 +76,7 @@ export default function QuotationDetailPage() {
     const forbidden = (error as { status?: number }).status === 403;
     return (
       <div className="page">
-        <a className="back-link" onClick={() => goBackOrTo(router, "/quotations")}>
-          <Icon name="back" size={14} /> Back to Quotations
-        </a>
+        <BackLink fallback="/quotations">Back to Quotations</BackLink>
         <Panel title="Couldn't load this quotation">
           <EmptyState
             icon="alert"
@@ -104,9 +96,7 @@ export default function QuotationDetailPage() {
   if (!quotation) {
     return (
       <div className="page">
-        <a className="back-link" onClick={() => goBackOrTo(router, "/quotations")}>
-          <Icon name="back" size={14} /> Back to Quotations
-        </a>
+        <BackLink fallback="/quotations">Back to Quotations</BackLink>
         <Panel title="Quotation not found">
           <p style={{ color: "var(--muted)", fontSize: 13.5 }}>
             This quotation may have been removed, or the link is out of date.
@@ -198,9 +188,7 @@ export default function QuotationDetailPage() {
 
   return (
     <div className="page">
-      <a className="back-link" onClick={() => goBackOrTo(router, "/quotations")}>
-        <Icon name="back" size={14} /> Back to Quotations
-      </a>
+      <BackLink fallback="/quotations">Back to Quotations</BackLink>
 
       <div className="card panel" style={{ marginBottom: 16 }}>
         <div className="doc-head" style={{ borderBottom: 0, paddingBottom: 10 }}>

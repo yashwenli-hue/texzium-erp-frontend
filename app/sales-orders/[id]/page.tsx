@@ -6,6 +6,7 @@ import { Icon } from "../../../components/ui/Icon";
 import { Panel } from "../../../components/ui/Card";
 import { DocumentCustomer } from "../../../components/ui/DocumentCustomer";
 import { SalesOrderStatusTag, SalesInvoiceStatusTag, DispatchOrderStatusTag, AdvanceReceiptStatusTag, Tag } from "../../../components/ui/Tag";
+import { BackLink } from "../../../components/ui/BackLink";
 import { Button, EmptyState } from "../../../components/ui/Button";
 import { DataTable, Column } from "../../../components/ui/DataTable";
 import { DesignNote } from "../../../components/ui/PageHeader";
@@ -46,13 +47,6 @@ import {
   isSalesOrderCancelled,
 } from "../../../lib/repository/shared/salesOrderLifecycle";
 
-function goBackOrTo(router: ReturnType<typeof useRouter>, fallback: string) {
-  if (typeof window !== "undefined" && window.history.length > 1) {
-    router.back();
-  } else {
-    router.push(fallback);
-  }
-}
 
 export default function SalesOrderDetailPage() {
   const params = useParams<{ id: string }>();
@@ -113,9 +107,7 @@ export default function SalesOrderDetailPage() {
   if (error) {
     return (
       <div className="page">
-        <a className="back-link" onClick={() => goBackOrTo(router, "/sales-orders")}>
-          <Icon name="back" size={14} /> Back to Sales Orders
-        </a>
+        <BackLink fallback="/sales-orders">Back to Sales Orders</BackLink>
         <Panel title="Couldn't load this sales order">
           <EmptyState
             icon="alert"
@@ -135,9 +127,7 @@ export default function SalesOrderDetailPage() {
   if (!salesOrder) {
     return (
       <div className="page">
-        <a className="back-link" onClick={() => goBackOrTo(router, "/sales-orders")}>
-          <Icon name="back" size={14} /> Back to Sales Orders
-        </a>
+        <BackLink fallback="/sales-orders">Back to Sales Orders</BackLink>
         <Panel title="Sales order not found">
           <p style={{ color: "var(--muted)", fontSize: 13.5 }}>
             This sales order may have been removed, or the link is out of date.
@@ -278,9 +268,7 @@ export default function SalesOrderDetailPage() {
 
   return (
     <div className="page">
-      <a className="back-link" onClick={() => goBackOrTo(router, "/sales-orders")}>
-        <Icon name="back" size={14} /> Back to Sales Orders
-      </a>
+      <BackLink fallback="/sales-orders">Back to Sales Orders</BackLink>
       {cancelled && (
         <SalesOrderCancelledBanner
           salesOrderCode={salesOrder.salesOrderCode}

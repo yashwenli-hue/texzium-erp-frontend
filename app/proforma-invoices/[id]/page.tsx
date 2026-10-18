@@ -7,6 +7,7 @@ import { Icon } from "../../../components/ui/Icon";
 import { Panel } from "../../../components/ui/Card";
 import { DocumentCustomer } from "../../../components/ui/DocumentCustomer";
 import { ProformaInvoiceStatusTag, QuotationStatusTag, SalesOrderStatusTag } from "../../../components/ui/Tag";
+import { BackLink } from "../../../components/ui/BackLink";
 import { Button, EmptyState } from "../../../components/ui/Button";
 import { DataTable, Column } from "../../../components/ui/DataTable";
 import { ConfirmDialog } from "../../../components/ui/ConfirmDialog";
@@ -28,13 +29,6 @@ import { isLegacyTaxBreakdown, quotationAmounts } from "../../../lib/repository/
 import { formatDate, formatInrExact } from "../../../lib/format";
 import { SalesOrder } from "../../../lib/types/domain";
 
-function goBackOrTo(router: ReturnType<typeof useRouter>, fallback: string) {
-  if (typeof window !== "undefined" && window.history.length > 1) {
-    router.back();
-  } else {
-    router.push(fallback);
-  }
-}
 
 export default function ProformaInvoiceDetailPage() {
   const params = useParams<{ id: string }>();
@@ -80,9 +74,7 @@ export default function ProformaInvoiceDetailPage() {
     const forbidden = (error as { status?: number }).status === 403;
     return (
       <div className="page">
-        <a className="back-link" onClick={() => goBackOrTo(router, "/proforma-invoices")}>
-          <Icon name="back" size={14} /> Back to Proforma Invoices
-        </a>
+        <BackLink fallback="/proforma-invoices">Back to Proforma Invoices</BackLink>
         <Panel title="Couldn't load this proforma invoice">
           <EmptyState
             icon="alert"
@@ -102,9 +94,7 @@ export default function ProformaInvoiceDetailPage() {
   if (!proforma) {
     return (
       <div className="page">
-        <a className="back-link" onClick={() => goBackOrTo(router, "/proforma-invoices")}>
-          <Icon name="back" size={14} /> Back to Proforma Invoices
-        </a>
+        <BackLink fallback="/proforma-invoices">Back to Proforma Invoices</BackLink>
         <Panel title="Proforma invoice not found">
           <p style={{ color: "var(--muted)", fontSize: 13.5 }}>
             This proforma invoice may have been removed, or the link is out of date.
@@ -179,9 +169,7 @@ export default function ProformaInvoiceDetailPage() {
 
   return (
     <div className="page">
-      <a className="back-link" onClick={() => goBackOrTo(router, "/proforma-invoices")}>
-        <Icon name="back" size={14} /> Back to Proforma Invoices
-      </a>
+      <BackLink fallback="/proforma-invoices">Back to Proforma Invoices</BackLink>
 
       <div className="card panel" style={{ marginBottom: 16 }}>
         <div className="doc-head" style={{ borderBottom: 0, paddingBottom: 10 }}>

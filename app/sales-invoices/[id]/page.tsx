@@ -1,10 +1,10 @@
 "use client";
 
-import { useParams, useRouter } from "next/navigation";
-import { Icon } from "../../../components/ui/Icon";
+import { useParams } from "next/navigation";
 import { Panel } from "../../../components/ui/Card";
 import { DocumentCustomer } from "../../../components/ui/DocumentCustomer";
 import { SalesInvoiceStatusTag, AccountsReceivableStatusTag, DispatchOrderStatusTag, Tag } from "../../../components/ui/Tag";
+import { BackLink } from "../../../components/ui/BackLink";
 import { Button, EmptyState } from "../../../components/ui/Button";
 import { DocumentTrail } from "../../../components/ui/DocumentTrail";
 import { ReceivableCollectionsPanel } from "../../../components/collections/ReceivableCollectionsPanel";
@@ -19,17 +19,9 @@ import { DocumentLinesPanel } from "../../../components/ui/DocumentLinesPanel";
 import { useDocumentDownload } from "../../../lib/hooks/useDocumentDownload";
 import { useRepository } from "../../../lib/repository/RepositoryProvider";
 
-function goBackOrTo(router: ReturnType<typeof useRouter>, fallback: string) {
-  if (typeof window !== "undefined" && window.history.length > 1) {
-    router.back();
-  } else {
-    router.push(fallback);
-  }
-}
 
 export default function SalesInvoiceDetailPage() {
   const params = useParams<{ id: string }>();
-  const router = useRouter();
   const id = params?.id;
   const { invoice, salesOrder, proforma, quotation, opportunity, opportunityStatus, loading, error, refetch } = useSalesInvoiceDetail(id);
   const { hasPermission } = useAuth();
@@ -49,9 +41,7 @@ export default function SalesInvoiceDetailPage() {
   if (!canViewInvoices) {
     return (
       <div className="page">
-        <a className="back-link" onClick={() => goBackOrTo(router, "/sales-invoices")}>
-          <Icon name="back" size={14} /> Back to Sales Invoices
-        </a>
+        <BackLink fallback="/sales-invoices">Back to Sales Invoices</BackLink>
         <Panel title="Sales invoice">
           <EmptyState icon="lock" title="No access" body="You don't have permission to view invoices." />
         </Panel>
@@ -74,9 +64,7 @@ export default function SalesInvoiceDetailPage() {
   if (error) {
     return (
       <div className="page">
-        <a className="back-link" onClick={() => goBackOrTo(router, "/sales-invoices")}>
-          <Icon name="back" size={14} /> Back to Sales Invoices
-        </a>
+        <BackLink fallback="/sales-invoices">Back to Sales Invoices</BackLink>
         <Panel title="Couldn't load this sales invoice">
           <EmptyState
             icon="alert"
@@ -96,9 +84,7 @@ export default function SalesInvoiceDetailPage() {
   if (!invoice) {
     return (
       <div className="page">
-        <a className="back-link" onClick={() => goBackOrTo(router, "/sales-invoices")}>
-          <Icon name="back" size={14} /> Back to Sales Invoices
-        </a>
+        <BackLink fallback="/sales-invoices">Back to Sales Invoices</BackLink>
         <Panel title="Sales invoice not found">
           <p style={{ color: "var(--muted)", fontSize: 13.5 }}>
             This sales invoice may have been removed, or the link is out of date.
@@ -111,9 +97,7 @@ export default function SalesInvoiceDetailPage() {
   const hasGstSplit = (invoice.cgstAmount ?? 0) > 0 || (invoice.sgstAmount ?? 0) > 0 || (invoice.igstAmount ?? 0) > 0;
   return (
     <div className="page">
-      <a className="back-link" onClick={() => goBackOrTo(router, "/sales-invoices")}>
-        <Icon name="back" size={14} /> Back to Sales Invoices
-      </a>
+      <BackLink fallback="/sales-invoices">Back to Sales Invoices</BackLink>
       <div className="crm-grid">
         <div className="card panel">
           <div className="profile-head">
