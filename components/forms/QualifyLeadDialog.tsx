@@ -5,7 +5,7 @@ import { Modal } from "../ui/Modal";
 import { SelectField } from "../ui/FormField";
 import { Button } from "../ui/Button";
 import { useToast } from "../ui/Toast";
-import { useAssignableUsers } from "../../lib/hooks/useAssignableUsers";
+import { peopleListProblem, useAssignableUsers } from "../../lib/hooks/useAssignableUsers";
 
 /**
  * VERIFIED: PATCH /lead-assignments/:id/qualify requires a salesUserId body
@@ -22,7 +22,8 @@ export function QualifyLeadDialog({
   onSubmit: (salesUserId: string) => Promise<unknown>;
 }) {
   const toast = useToast();
-  const { users, loading: usersLoading } = useAssignableUsers();
+  const { users, loading: usersLoading, error: usersError } = useAssignableUsers();
+  const listProblem = peopleListProblem(usersError);
   const [salesUserId, setSalesUserId] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -31,6 +32,7 @@ export function QualifyLeadDialog({
   const offered = users.filter((u) => u.active);
   const effectiveUserId = offered.some((u) => u.id === salesUserId) ? salesUserId : offered[0]?.id || "";
   const noneOffered = !usersLoading && offered.length === 0;
+  // A list that could not be read is not an empty one: say which it is.
 
   async function handleSubmit() {
     if (!effectiveUserId) {
@@ -76,7 +78,11 @@ export function QualifyLeadDialog({
         disabled={usersLoading}
         options={offered.map((u) => ({ value: u.id, label: u.name }))}
       />
-      {noneOffered && <p style={{ color: "var(--muted)", fontSize: 12.5 }}>No active user is available to take this lead.</p>}
+      {listProblem ? (
+        <p role="alert" style={{ color: "var(--bad)", fontSize: 12.5 }}>{listProblem}</p>
+      ) : (
+        noneOffered && <p style={{ color: "var(--muted)", fontSize: 12.5 }}>No active user is available to take this lead.</p>
+      )}
       {error && <p style={{ color: "var(--bad)", fontSize: 12.5 }}>{error}</p>}
     </Modal>
   );

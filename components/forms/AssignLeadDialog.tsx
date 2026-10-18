@@ -5,7 +5,7 @@ import { Modal } from "../ui/Modal";
 import { SelectField } from "../ui/FormField";
 import { Button } from "../ui/Button";
 import { useToast } from "../ui/Toast";
-import { useAssignableUsers } from "../../lib/hooks/useAssignableUsers";
+import { peopleListProblem, useAssignableUsers } from "../../lib/hooks/useAssignableUsers";
 
 // Only active users are offered (the backend refuses inactive and suspended ones).
 // `excludeUserId` is the current pre-sales assignee: reassigning to them is refused.
@@ -21,7 +21,8 @@ export function AssignLeadDialog({
   onSubmit: (assignedToId: string, assignedToName: string) => Promise<unknown>;
 }) {
   const toast = useToast();
-  const { users, loading: usersLoading } = useAssignableUsers();
+  const { users, loading: usersLoading, error: usersError } = useAssignableUsers();
+  const listProblem = peopleListProblem(usersError);
   const [userId, setUserId] = useState(currentAssigneeId ?? "");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -29,6 +30,7 @@ export function AssignLeadDialog({
   const offered = users.filter((u) => u.active && u.id !== excludeUserId);
   const effectiveUserId = offered.some((u) => u.id === userId) ? userId : offered[0]?.id || "";
   const noneOffered = !usersLoading && offered.length === 0;
+  // A list that could not be read is not an empty one: say which it is.
 
   async function handleSubmit() {
     const user = offered.find((u) => u.id === effectiveUserId);
@@ -68,7 +70,11 @@ export function AssignLeadDialog({
         disabled={usersLoading}
         options={offered.map((u) => ({ value: u.id, label: u.name }))}
       />
-      {noneOffered && <p style={{ color: "var(--muted)", fontSize: 12.5 }}>No other active user is available to take this lead.</p>}
+      {listProblem ? (
+        <p role="alert" style={{ color: "var(--bad)", fontSize: 12.5 }}>{listProblem}</p>
+      ) : (
+        noneOffered && <p style={{ color: "var(--muted)", fontSize: 12.5 }}>No other active user is available to take this lead.</p>
+      )}
       {error && <p style={{ color: "var(--bad)", fontSize: 12.5 }}>{error}</p>}
     </Modal>
   );
