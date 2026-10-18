@@ -1,13 +1,15 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import { PageHeader, PageHelp } from "../../components/ui/PageHeader";
 import { StatCard, StatRow, Panel } from "../../components/ui/Card";
 import { Button, EmptyState } from "../../components/ui/Button";
 import { Pagination, paginate } from "../../components/ui/Button";
 import { SalesInvoiceStatusTag, ChipGroup, Chip } from "../../components/ui/Tag";
-import { DataTable, Column } from "../../components/ui/DataTable";
+import { ResponsiveList, ResponsiveColumn, ListCard } from "../../components/ui/ResponsiveList";
+import { ListSearch } from "../../components/ui/ListSearch";
+import { LoadingRegion } from "../../components/ui/LoadingRegion";
+import { matchesText } from "../../lib/ui/listSearch";
 import { useAuth } from "../../lib/auth/AuthContext";
 import { useSalesInvoices } from "../../lib/hooks/useSalesInvoices";
 import { SalesInvoice, formatSalesInvoiceStatus } from "../../lib/types/domain";
@@ -16,11 +18,11 @@ import { formatInr, formatDate } from "../../lib/format";
 const PAGE_SIZE = 8;
 
 export default function SalesInvoicesPage() {
-  const router = useRouter();
   const { salesInvoices, loading, error, refetch } = useSalesInvoices();
   const { hasPermission } = useAuth();
   const [statusChip, setStatusChip] = useState<string>("All");
   const [page, setPage] = useState(1);
+  const [search, setSearch] = useState("");
 
   const totalValue = salesInvoices.reduce((s, i) => s + i.totalAmount, 0);
   const postedCount = salesInvoices.filter((i) => i.status === "POSTED").length;
@@ -37,10 +39,11 @@ export default function SalesInvoicesPage() {
   }, [salesInvoices]);
   const statusOptions = useMemo(() => Object.keys(statusCounts).sort(), [statusCounts]);
 
-  const filtered = statusChip === "All" ? salesInvoices : salesInvoices.filter((i) => i.status === statusChip);
+  const byStatus = statusChip === "All" ? salesInvoices : salesInvoices.filter((i) => i.status === statusChip);
+  const filtered = search.trim() ? byStatus.filter((i) => matchesText([i.invoiceNumber, i.customerName, i.salesOrderCode, i.dispatchOrderNo], search)) : byStatus;
   const rows = paginate(filtered, page, PAGE_SIZE);
 
-  const columns: Column<SalesInvoice>[] = [
+  const columns: ResponsiveColumn<SalesInvoice>[] = [
     { key: "invoiceNumber", header: "Invoice No.", render: (i) => i.invoiceNumber },
     { key: "customerName", header: "Customer", render: (i) => i.customerName },
     { key: "source", header: "From", render: (i) => i.salesOrderCode ?? "—" },
@@ -65,8 +68,10 @@ export default function SalesInvoicesPage() {
   if (loading && salesInvoices.length === 0) {
     return (
       <div className="page">
-        <div className="skeleton" style={{ height: 220, marginBottom: 16 }} />
-        <div className="skeleton" style={{ height: 300 }} />
+        <LoadingRegion label="Loading sales invoices">
+          <div className="skeleton" style={{ height: 220, marginBottom: 16 }} />
+          <div className="skeleton" style={{ height: 300 }} />
+        </LoadingRegion>
       </div>
     );
   }
@@ -110,6 +115,10 @@ export default function SalesInvoicesPage() {
         <StatCard label="Posted" value={String(postedCount)} note="accounting effects applied by the backend" />
       </StatRow>
 
+      <div className="list-toolbar">
+        <ListSearch value={search} onChange={(t) => { setSearch(t); setPage(1); }} label="Search sales invoices" placeholder="Search invoice no., customer, order, dispatch…" />
+        <p className="list-status" role="status">{search.trim() ? `${filtered.length} of ${byStatus.length}` : ""}</p>
+      </div>
       <ChipGroup>
         <Chip label={`All ${salesInvoices.length}`} active={statusChip === "All"} onClick={() => { setStatusChip("All"); setPage(1); }} />
         {statusOptions.map((s) => (
@@ -119,12 +128,15 @@ export default function SalesInvoicesPage() {
 
       <div style={{ marginTop: 14 }}>
         <Panel title="All Sales Invoices" flush>
-          <DataTable
-            columns={columns}
+          <ResponsiveList
             rows={rows}
-            onRowClick={(i) => router.push(`/sales-invoices/${i.id}`)}
-            emptyTitle="No sales invoices match this filter"
-            emptyBody="Create one from a Sales Order that's ready to invoice, on its detail page."
+            columns={columns}
+            getHref={(i) => `/sales-invoices/${i.id}`}
+            getLabel={(i) => `Open sales invoice ${i.invoiceNumber}, ${i.customerName}`}
+            card={(i) => <ListCard title={i.invoiceNumber} sub={i.customerName} status={<SalesInvoiceStatusTag status={i.status} />} amount={formatInr(i.totalAmount)} meta={[`Order ${i.salesOrderCode ?? "—"}`, i.dispatchOrderNo ? `Dispatch ${i.dispatchOrderNo}` : null, formatDate(i.invoiceDate)]} />}
+            caption="Sales invoices"
+            emptyTitle={search.trim() ? "Nothing matches this search" : "No sales invoices match this filter"}
+            emptyBody={search.trim() ? "Try another name or number, or clear the search." : "Create one from a Sales Order that's ready to invoice, on its detail page."}
           />
           <Pagination page={page} pageSize={PAGE_SIZE} total={filtered.length} onPageChange={setPage} />
         </Panel>

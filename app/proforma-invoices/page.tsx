@@ -1,13 +1,15 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import { PageHeader } from "../../components/ui/PageHeader";
 import { StatCard, StatRow, Panel } from "../../components/ui/Card";
 import { Button, EmptyState } from "../../components/ui/Button";
 import { Pagination, paginate } from "../../components/ui/Button";
 import { ProformaInvoiceStatusTag, ChipGroup, Chip } from "../../components/ui/Tag";
-import { DataTable, Column } from "../../components/ui/DataTable";
+import { ResponsiveList, ResponsiveColumn, ListCard } from "../../components/ui/ResponsiveList";
+import { ListSearch } from "../../components/ui/ListSearch";
+import { LoadingRegion } from "../../components/ui/LoadingRegion";
+import { matchesText } from "../../lib/ui/listSearch";
 import { NextStepCell } from "../../components/ui/NextStepCell";
 import { useProformaPipeline } from "../../lib/hooks/useProformaInvoices";
 import { proformaNextStep } from "../../lib/repository/shared/commercialChain";
@@ -20,10 +22,10 @@ const PAGE_SIZE = 8;
 const EXPIRED_CHIP = "Expired";
 
 export default function ProformaInvoicesPage() {
-  const router = useRouter();
   const { proformaInvoices, orders, ordersKnown, loading, error, refetch } = useProformaPipeline();
   const [statusChip, setStatusChip] = useState<string>("All");
   const [page, setPage] = useState(1);
+  const [search, setSearch] = useState("");
 
   const liveOrdersOf = (p: ProformaInvoice) => orders.filter((o) => o.proformaInvoiceId === p.id && isLiveSalesOrder(o.status));
   const isExpiredNow = (p: ProformaInvoice) => p.status !== "CANCELLED" && p.isExpired;
@@ -39,11 +41,11 @@ export default function ProformaInvoicesPage() {
     return map;
   }, [proformaInvoices]);
 
-  const filtered =
-    statusChip === "All" ? proformaInvoices : statusChip === EXPIRED_CHIP ? proformaInvoices.filter(isExpiredNow) : proformaInvoices.filter((p) => p.status === statusChip);
+  const byStatus = statusChip === "All" ? proformaInvoices : statusChip === EXPIRED_CHIP ? proformaInvoices.filter(isExpiredNow) : proformaInvoices.filter((p) => p.status === statusChip);
+  const filtered = search.trim() ? byStatus.filter((p) => matchesText([p.proformaNumber, p.customerName, p.quoteNo], search)) : byStatus;
   const rows = paginate(filtered, page, PAGE_SIZE);
 
-  const columns: Column<ProformaInvoice>[] = [
+  const columns: ResponsiveColumn<ProformaInvoice>[] = [
     { key: "proformaNumber", header: "Proforma No.", render: (p) => p.proformaNumber },
     { key: "customerName", header: "Customer", render: (p) => p.customerName },
     { key: "quoteNo", header: "Quotation", render: (p) => p.quoteNo },
@@ -56,8 +58,10 @@ export default function ProformaInvoicesPage() {
   if (loading && proformaInvoices.length === 0) {
     return (
       <div className="page">
-        <div className="skeleton" style={{ height: 220, marginBottom: 16 }} />
-        <div className="skeleton" style={{ height: 300 }} />
+        <LoadingRegion label="Loading proforma invoices">
+          <div className="skeleton" style={{ height: 220, marginBottom: 16 }} />
+          <div className="skeleton" style={{ height: 300 }} />
+        </LoadingRegion>
       </div>
     );
   }
@@ -104,6 +108,10 @@ export default function ProformaInvoicesPage() {
         <StatCard label="Expired" value={String(expired)} note="can't be approved or ordered" />
       </StatRow>
 
+      <div className="list-toolbar">
+        <ListSearch value={search} onChange={(t) => { setSearch(t); setPage(1); }} label="Search proforma invoices" placeholder="Search proforma no., customer, quotation…" />
+        <p className="list-status" role="status">{search.trim() ? `${filtered.length} of ${byStatus.length}` : ""}</p>
+      </div>
       <ChipGroup>
         <Chip label={`All ${proformaInvoices.length}`} active={statusChip === "All"} onClick={() => { setStatusChip("All"); setPage(1); }} />
         {PROFORMA_INVOICE_STATUSES.filter((s) => statusCounts[s]).map((s) => (
@@ -114,12 +122,15 @@ export default function ProformaInvoicesPage() {
 
       <div style={{ marginTop: 14 }}>
         <Panel title="All Proforma Invoices" flush>
-          <DataTable
-            columns={columns}
+          <ResponsiveList
             rows={rows}
-            onRowClick={(p) => router.push(`/proforma-invoices/${p.id}`)}
-            emptyTitle={proformaInvoices.length === 0 ? "No proforma invoices yet" : "No proforma invoices match this filter"}
-            emptyBody="A Proforma Invoice is created from an approved quotation's detail page."
+            columns={columns}
+            getHref={(p) => `/proforma-invoices/${p.id}`}
+            getLabel={(p) => `Open proforma invoice ${p.proformaNumber}, ${p.customerName}`}
+            card={(p) => <ListCard title={p.proformaNumber} sub={`${p.customerName} · ${p.quoteNo}`} status={<ProformaInvoiceStatusTag status={p.status} expired={p.isExpired} />} amount={formatInrExact(p.totalAmount)} meta={[p.validityDate ? `Valid through ${formatDate(p.validityDate)}` : "No expiry", <NextStepCell key="n" step={proformaNextStep(p, liveOrdersOf(p))} />]} />}
+            caption="Proforma invoices"
+            emptyTitle={search.trim() ? "Nothing matches this search" : proformaInvoices.length === 0 ? "No proforma invoices yet" : "No proforma invoices match this filter"}
+            emptyBody={search.trim() ? "Try another name or number, or clear the search." : "A Proforma Invoice is created from an approved quotation's detail page."}
           />
           <Pagination page={page} pageSize={PAGE_SIZE} total={filtered.length} onPageChange={setPage} />
         </Panel>

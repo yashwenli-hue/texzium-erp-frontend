@@ -141,3 +141,27 @@ export function ResponsiveList<T extends { id: string }>({
     </div>
   );
 }
+
+/**
+ * The usual phone card for a document or deal: what it is, who it is for, its status, the amount,
+ * and a line of facts. Lists with richer cards (leads, customers) build their own.
+ */
+export function ListCard({ title, sub, status, amount, meta }: { title: ReactNode; sub?: ReactNode; status?: ReactNode; amount?: ReactNode; meta?: ReactNode[] }) {
+  return (
+    <>
+      <div className="rl-top">
+        <div style={{ minWidth: 0 }}>
+          <div className="rl-title">{title}</div>
+          {sub && <div className="rl-sub">{sub}</div>}
+        </div>
+        {status}
+      </div>
+      {(amount || (meta && meta.length > 0)) && (
+        <div className="rl-meta">
+          {amount && <b className="rl-amount">{amount}</b>}
+          {meta?.filter(Boolean).map((m, i) => <span key={i}>{m}</span>)}
+        </div>
+      )}
+    </>
+  );
+}

@@ -1050,6 +1050,7 @@ a.doc-trail-node:hover{border-color:var(--m);background:var(--m-soft)}
 .rl-card .rl-title{font-weight:700;color:var(--ink);overflow-wrap:anywhere}
 .rl-card .rl-sub{font-size:12px;color:var(--muted);overflow-wrap:anywhere}
 .rl-card .rl-meta{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--muted)}
+.rl-card .rl-amount{color:var(--ink);font-variant-numeric:tabular-nums}
 .rl-card .rl-hint{font-size:12px;color:var(--warn);font-weight:600}
 @media(max-width:720px){
   .rl-table{display:none}

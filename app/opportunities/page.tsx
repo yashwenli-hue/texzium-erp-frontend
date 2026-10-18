@@ -1,12 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import { PageHeader } from "../../components/ui/PageHeader";
 import { StatCard, StatRow, Panel } from "../../components/ui/Card";
 import { Button, EmptyState } from "../../components/ui/Button";
 import { OpportunityStageTag, ChipGroup, Chip } from "../../components/ui/Tag";
-import { DataTable, Column, toggleSortDirection } from "../../components/ui/DataTable";
+import { ResponsiveList, ResponsiveColumn, ListCard } from "../../components/ui/ResponsiveList";
+import { ListSearch } from "../../components/ui/ListSearch";
+import { LoadingRegion } from "../../components/ui/LoadingRegion";
+import { matchesText } from "../../lib/ui/listSearch";
 import { Pagination, paginate } from "../../components/ui/Button";
 import { OpportunityForm } from "../../components/forms/OpportunityForm";
 import { useOpportunities } from "../../lib/hooks/useOpportunities";
@@ -14,24 +16,38 @@ import { useLeads } from "../../lib/hooks/useLeads";
 import { useAuth } from "../../lib/auth/AuthContext";
 import { Opportunity, OPPORTUNITY_STAGES, formatOpportunityStage } from "../../lib/types/domain";
 import { formatInr, formatDate } from "../../lib/format";
-import { SortState } from "../../lib/types/common";
 import { OpportunitySortField } from "../../lib/repository/interfaces";
 
 const PAGE_SIZE = 8;
 
 export default function OpportunitiesPage() {
-  const router = useRouter();
   const { opportunities, loading, error, createOpportunity, refetch, sort, setSort } = useOpportunities();
   const { leads } = useLeads();
   const { hasPermission } = useAuth();
   const [showForm, setShowForm] = useState(false);
   const [stageChip, setStageChip] = useState<string>("All");
   const [page, setPage] = useState(1);
+  const [search, setSearch] = useState("");
 
-  // Product isn't an Opportunity field — it's surfaced from the linked
-  // Lead's existing uiContext.productInterest (mock/UI-only, see
-  // LeadUIContext in lib/types/domain.ts). No new relation invented.
-  const productByLeadId = useMemo(() => new Map(leads.map((l) => [l.id, l.uiContext?.productInterest])), [leads]);
+  // Product isn't an Opportunity field: it is the product recorded on the lead the deal came from
+  // (Lead.inventoryItem), or, for older leads, the free-text interest kept with the lead in this browser.
+  const productByLeadId = useMemo(() => new Map(leads.map((l) => [l.id, l.product?.name ?? l.uiContext?.productInterest])), [leads]);
+  const productOf = (o: Opportunity) => productByLeadId.get(o.leadId);
+  const opportunitySort = {
+    key: sort?.field ?? "default",
+    direction: sort?.direction ?? ("desc" as const),
+    options: [
+      { key: "default", label: "Default order" },
+      { key: "expectedValue", label: "Expected value" },
+      { key: "probability", label: "Probability" },
+      { key: "expectedCloseDate", label: "Expected close" },
+    ],
+    onChange: (key: string, direction?: "asc" | "desc") => {
+      setPage(1);
+      if (key === "default") return setSort(undefined);
+      setSort({ field: key as OpportunitySortField, direction: direction ?? (key === sort?.field ? (sort.direction === "asc" ? "desc" : "asc") : key === "expectedCloseDate" ? "asc" : "desc") });
+    },
+  };
 
   const open = opportunities.filter((o) => o.stage !== "WON" && o.stage !== "LOST");
   const weighted = open.reduce((s, o) => s + (o.expectedValue * o.probability) / 100, 0);
@@ -45,10 +61,11 @@ export default function OpportunitiesPage() {
     return map;
   }, [opportunities]);
 
-  const filtered = stageChip === "All" ? opportunities : opportunities.filter((o) => o.stage === stageChip);
+  const byStatus = stageChip === "All" ? opportunities : opportunities.filter((o) => o.stage === stageChip);
+  const filtered = search.trim() ? byStatus.filter((o) => matchesText([o.title, o.customer?.customerName ?? o.customerName, o.ownerName, productOf(o)], search)) : byStatus;
   const rows = paginate(filtered, page, PAGE_SIZE);
 
-  const columns: Column<Opportunity>[] = [
+  const columns: ResponsiveColumn<Opportunity>[] = [
     {
       key: "title",
       header: "Opportunity",
@@ -66,13 +83,13 @@ export default function OpportunitiesPage() {
     {
       key: "product",
       header: "Product",
-      render: (o) => productByLeadId.get(o.leadId) ?? <span style={{ color: "var(--faint-text)" }}>—</span>,
+      render: (o) => productOf(o) ?? <span className="cell-none">Not recorded</span>,
     },
-    { key: "expectedValue", header: "Expected Value", sortable: true, render: (o) => formatInr(o.expectedValue) },
+    { key: "expectedValue", header: "Expected Value", sortKey: "expectedValue", render: (o) => formatInr(o.expectedValue) },
     {
       key: "probability",
       header: "Probability",
-      sortable: true,
+      sortKey: "probability",
       render: (o) => (
         <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 90 }}>
           <div className="bar" style={{ flex: 1 }}>
@@ -82,15 +99,17 @@ export default function OpportunitiesPage() {
         </div>
       ),
     },
-    { key: "expectedCloseDate", header: "Expected Close", sortable: true, render: (o) => formatDate(o.expectedCloseDate) },
+    { key: "expectedCloseDate", header: "Expected Close", sortKey: "expectedCloseDate", render: (o) => formatDate(o.expectedCloseDate) },
     { key: "ownerName", header: "Owner", render: (o) => o.ownerName },
   ];
 
   if (loading && opportunities.length === 0) {
     return (
       <div className="page">
-        <div className="skeleton" style={{ height: 220, marginBottom: 16 }} />
-        <div className="skeleton" style={{ height: 300 }} />
+        <LoadingRegion label="Loading opportunities">
+          <div className="skeleton" style={{ height: 220, marginBottom: 16 }} />
+          <div className="skeleton" style={{ height: 300 }} />
+        </LoadingRegion>
       </div>
     );
   }
@@ -147,6 +166,10 @@ export default function OpportunitiesPage() {
         <StatCard label="Win Rate" value={`${winRate}%`} note="of all opportunities" />
       </StatRow>
 
+      <div className="list-toolbar">
+        <ListSearch value={search} onChange={(t) => { setSearch(t); setPage(1); }} label="Search opportunities" placeholder="Search opportunity, customer, product, owner…" />
+        <p className="list-status" role="status">{search.trim() ? `${filtered.length} of ${byStatus.length}` : ""}</p>
+      </div>
       <ChipGroup>
         <Chip label={`All ${opportunities.length}`} active={stageChip === "All"} onClick={() => { setStageChip("All"); setPage(1); }} />
         {OPPORTUNITY_STAGES.filter((s) => stageCounts[s]).map((s) => (
@@ -156,16 +179,16 @@ export default function OpportunitiesPage() {
 
       <div style={{ marginTop: 14 }}>
         <Panel title="Opportunities" flush>
-          <DataTable
-            columns={columns}
+          <ResponsiveList
             rows={rows}
-            sort={sort}
-            onSort={(field) =>
-              setSort((s) => toggleSortDirection(s, field) as SortState<OpportunitySortField>)
-            }
-            onRowClick={(o) => router.push(`/opportunities/${o.id}`)}
-            emptyTitle="No opportunities yet"
-            emptyBody="Opportunities appear here once a lead is qualified and converted."
+            columns={columns}
+            getHref={(o) => `/opportunities/${o.id}`}
+            getLabel={(o) => `Open opportunity ${o.title}, ${o.customer ? o.customer.customerName : o.customerName}`}
+            card={(o) => <ListCard title={o.title} sub={o.customer ? o.customer.customerName : `${o.customerName} · no customer yet`} status={<OpportunityStageTag stage={o.stage} />} amount={formatInr(o.expectedValue)} meta={[`${o.probability}% likely`, `Close ${formatDate(o.expectedCloseDate)}`, o.ownerName, productOf(o)]} />}
+            caption="Opportunities"
+            emptyTitle={search.trim() ? "Nothing matches this search" : "No opportunities yet"}
+            emptyBody={search.trim() ? "Try another name or number, or clear the search." : "Opportunities appear here once a lead is qualified and converted."}
+            sort={opportunitySort}
           />
           <Pagination page={page} pageSize={PAGE_SIZE} total={filtered.length} onPageChange={setPage} />
         </Panel>

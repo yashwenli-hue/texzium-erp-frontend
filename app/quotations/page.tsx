@@ -1,12 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import { PageHeader } from "../../components/ui/PageHeader";
 import { StatCard, StatRow, Panel } from "../../components/ui/Card";
 import { Button, EmptyState } from "../../components/ui/Button";
 import { QuotationStatusTag, ChipGroup, Chip, Tag } from "../../components/ui/Tag";
-import { DataTable, Column } from "../../components/ui/DataTable";
+import { ResponsiveList, ResponsiveColumn, ListCard } from "../../components/ui/ResponsiveList";
+import { ListSearch } from "../../components/ui/ListSearch";
+import { LoadingRegion } from "../../components/ui/LoadingRegion";
+import { matchesText } from "../../lib/ui/listSearch";
 import { Pagination, paginate } from "../../components/ui/Button";
 import { NextStepCell } from "../../components/ui/NextStepCell";
 import { QuotationForm } from "../../components/forms/QuotationForm";
@@ -20,12 +22,12 @@ import { formatInr, formatInrExact } from "../../lib/format";
 const PAGE_SIZE = 8;
 
 export default function QuotationsPage() {
-  const router = useRouter();
   const { hasPermission } = useAuth();
   const { quotations, proformas, orders, downstreamKnown, loading, error, createQuotation, refetch } = useQuotationPipeline();
   const [showForm, setShowForm] = useState(false);
   const [statusChip, setStatusChip] = useState<string>("All");
   const [page, setPage] = useState(1);
+  const [search, setSearch] = useState("");
   const mayCreate = hasPermission(QUOTATION_PERMISSIONS.create);
 
   const chains = useMemo(() => new Map(quotations.map((q) => [q.id, buildCommercialChain(q.id, proformas, orders)])), [quotations, proformas, orders]);
@@ -42,10 +44,11 @@ export default function QuotationsPage() {
     return map;
   }, [quotations]);
 
-  const filtered = statusChip === "All" ? quotations : quotations.filter((q) => q.status === statusChip);
+  const byStatus = statusChip === "All" ? quotations : quotations.filter((q) => q.status === statusChip);
+  const filtered = search.trim() ? byStatus.filter((q) => matchesText([q.quoteNo, q.customerName, q.opportunityName, q.ownerName], search)) : byStatus;
   const rows = paginate(filtered, page, PAGE_SIZE);
 
-  const columns: Column<Quotation>[] = [
+  const columns: ResponsiveColumn<Quotation>[] = [
     { key: "quoteNo", header: "Quote No.", render: (q) => (
       <span style={{ display: "inline-flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}>
         {q.quoteNo}
@@ -63,8 +66,10 @@ export default function QuotationsPage() {
   if (loading && quotations.length === 0) {
     return (
       <div className="page">
-        <div className="skeleton" style={{ height: 220, marginBottom: 16 }} />
-        <div className="skeleton" style={{ height: 300 }} />
+        <LoadingRegion label="Loading quotations">
+          <div className="skeleton" style={{ height: 220, marginBottom: 16 }} />
+          <div className="skeleton" style={{ height: 300 }} />
+        </LoadingRegion>
       </div>
     );
   }
@@ -122,6 +127,10 @@ export default function QuotationsPage() {
         <StatCard label="In progress" value={downstreamKnown ? String(inProgress) : "—"} note={downstreamKnown ? "Proforma or Sales Order under way" : "needs Proforma and Sales Order access"} />
       </StatRow>
 
+      <div className="list-toolbar">
+        <ListSearch value={search} onChange={(t) => { setSearch(t); setPage(1); }} label="Search quotations" placeholder="Search quote no., customer, opportunity, owner…" />
+        <p className="list-status" role="status">{search.trim() ? `${filtered.length} of ${byStatus.length}` : ""}</p>
+      </div>
       <ChipGroup>
         <Chip label={`All ${quotations.length}`} active={statusChip === "All"} onClick={() => { setStatusChip("All"); setPage(1); }} />
         {QUOTATION_STATUSES.filter((s) => statusCounts[s]).map((s) => (
@@ -131,12 +140,15 @@ export default function QuotationsPage() {
 
       <div style={{ marginTop: 14 }}>
         <Panel title="All Quotations" flush>
-          <DataTable
-            columns={columns}
+          <ResponsiveList
             rows={rows}
-            onRowClick={(q) => router.push(`/quotations/${q.id}`)}
-            emptyTitle={quotations.length === 0 ? "No quotations yet" : "No quotations match this filter"}
-            emptyBody={quotations.length === 0 ? (mayCreate ? "Create one from an opportunity to start the quote-to-cash flow." : undefined) : undefined}
+            columns={columns}
+            getHref={(q) => `/quotations/${q.id}`}
+            getLabel={(q) => `Open quotation ${q.quoteNo}, ${q.customerName}`}
+            card={(q) => <ListCard title={q.quoteNo} sub={`${q.customerName} · ${q.opportunityName}`} status={<QuotationStatusTag status={q.status} />} amount={formatInrExact(q.amount)} meta={[q.ownerName, <NextStepCell key="n" step={quotationNextStep(q, chains.get(q.id) ?? buildCommercialChain(q.id, [], []))} />]} />}
+            caption="Quotations"
+            emptyTitle={search.trim() ? "Nothing matches this search" : quotations.length === 0 ? "No quotations yet" : "No quotations match this filter"}
+            emptyBody={search.trim() ? "Try another name or number, or clear the search." : quotations.length === 0 ? (mayCreate ? "Create one from an opportunity to start the quote-to-cash flow." : undefined) : undefined}
           />
           <Pagination page={page} pageSize={PAGE_SIZE} total={filtered.length} onPageChange={setPage} />
         </Panel>

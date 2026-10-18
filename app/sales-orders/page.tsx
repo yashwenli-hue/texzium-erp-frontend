@@ -1,13 +1,15 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import { PageHeader, PageHelp } from "../../components/ui/PageHeader";
 import { StatCard, StatRow, Panel } from "../../components/ui/Card";
 import { Button, EmptyState } from "../../components/ui/Button";
 import { Pagination, paginate } from "../../components/ui/Button";
 import { SalesOrderStatusTag, ChipGroup, Chip } from "../../components/ui/Tag";
-import { DataTable, Column } from "../../components/ui/DataTable";
+import { ResponsiveList, ResponsiveColumn, ListCard } from "../../components/ui/ResponsiveList";
+import { ListSearch } from "../../components/ui/ListSearch";
+import { LoadingRegion } from "../../components/ui/LoadingRegion";
+import { matchesText } from "../../lib/ui/listSearch";
 import { useSalesOrders } from "../../lib/hooks/useSalesOrders";
 import { SalesOrder, formatSalesOrderStatus } from "../../lib/types/domain";
 import { formatInr, formatDate } from "../../lib/format";
@@ -16,10 +18,10 @@ import { isLiveSalesOrder } from "../../lib/repository/shared/salesOrderLifecycl
 const PAGE_SIZE = 8;
 
 export default function SalesOrdersPage() {
-  const router = useRouter();
   const { salesOrders, loading, error, refetch } = useSalesOrders();
   const [statusChip, setStatusChip] = useState<string>("All");
   const [page, setPage] = useState(1);
+  const [search, setSearch] = useState("");
 
   // A cancelled order is no longer part of the pipeline: it is left out of the count and the value, and
   // shown on its own (it still has its own chip and row below, with its history).
@@ -41,10 +43,11 @@ export default function SalesOrdersPage() {
   }, [salesOrders]);
   const statusOptions = useMemo(() => Object.keys(statusCounts).sort(), [statusCounts]);
 
-  const filtered = statusChip === "All" ? salesOrders : salesOrders.filter((o) => o.status === statusChip);
+  const byStatus = statusChip === "All" ? salesOrders : salesOrders.filter((o) => o.status === statusChip);
+  const filtered = search.trim() ? byStatus.filter((o) => matchesText([o.salesOrderCode, o.customerName, o.proformaNumber, o.quoteNo, o.ownerName], search)) : byStatus;
   const rows = paginate(filtered, page, PAGE_SIZE);
 
-  const columns: Column<SalesOrder>[] = [
+  const columns: ResponsiveColumn<SalesOrder>[] = [
     { key: "salesOrderCode", header: "Order No.", render: (o) => o.salesOrderCode },
     { key: "customerName", header: "Customer", render: (o) => o.customerName },
     { key: "source", header: "From", render: (o) => o.proformaNumber ?? o.quoteNo ?? "—" },
@@ -57,8 +60,10 @@ export default function SalesOrdersPage() {
   if (loading && salesOrders.length === 0) {
     return (
       <div className="page">
-        <div className="skeleton" style={{ height: 220, marginBottom: 16 }} />
-        <div className="skeleton" style={{ height: 300 }} />
+        <LoadingRegion label="Loading sales orders">
+          <div className="skeleton" style={{ height: 220, marginBottom: 16 }} />
+          <div className="skeleton" style={{ height: 300 }} />
+        </LoadingRegion>
       </div>
     );
   }
@@ -107,6 +112,10 @@ export default function SalesOrdersPage() {
         <StatCard label="Pending Store Approval" value={String(pendingStoreCount)} note="from a Proforma Invoice" />
       </StatRow>
 
+      <div className="list-toolbar">
+        <ListSearch value={search} onChange={(t) => { setSearch(t); setPage(1); }} label="Search sales orders" placeholder="Search order no., customer, proforma, owner…" />
+        <p className="list-status" role="status">{search.trim() ? `${filtered.length} of ${byStatus.length}` : ""}</p>
+      </div>
       <ChipGroup>
         <Chip label={`All ${salesOrders.length}`} active={statusChip === "All"} onClick={() => { setStatusChip("All"); setPage(1); }} />
         {statusOptions.map((s) => (
@@ -116,12 +125,15 @@ export default function SalesOrdersPage() {
 
       <div style={{ marginTop: 14 }}>
         <Panel title="All Sales Orders" flush>
-          <DataTable
-            columns={columns}
+          <ResponsiveList
             rows={rows}
-            onRowClick={(o) => router.push(`/sales-orders/${o.id}`)}
-            emptyTitle="No sales orders match this filter"
-            emptyBody="Create one from an approved Proforma Invoice."
+            columns={columns}
+            getHref={(o) => `/sales-orders/${o.id}`}
+            getLabel={(o) => `Open sales order ${o.salesOrderCode}, ${o.customerName}`}
+            card={(o) => <ListCard title={o.salesOrderCode} sub={o.customerName} status={<SalesOrderStatusTag status={o.status} />} amount={formatInr(o.totalAmount)} meta={[`From ${o.proformaNumber ?? o.quoteNo ?? "—"}`, formatDate(o.orderDate), o.ownerName]} />}
+            caption="Sales orders"
+            emptyTitle={search.trim() ? "Nothing matches this search" : "No sales orders match this filter"}
+            emptyBody={search.trim() ? "Try another name or number, or clear the search." : "Create one from an approved Proforma Invoice."}
           />
           <Pagination page={page} pageSize={PAGE_SIZE} total={filtered.length} onPageChange={setPage} />
         </Panel>
