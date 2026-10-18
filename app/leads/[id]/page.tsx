@@ -123,19 +123,23 @@ export default function LeadDetailPage() {
 
   // A fetch failure (403/network/5xx) is not the same as a genuine 404 — only
   // getById() resolving to null means the lead truly doesn't exist.
+  // A refusal (403) is not a failure to retry: say what access it needs.
+  const forbidden = (error as { status?: number } | null)?.status === 403;
   if (error) {
     return (
       <div className="page">
         <BackLink fallback="/leads">Back to Leads</BackLink>
-        <Panel title="Couldn't load this lead">
+        <Panel title={forbidden ? "No access" : "Couldn't load this lead"}>
           <EmptyState
-            icon="alert"
-            title="Something went wrong"
-            body={error.message || "Something went wrong reaching the RevenueOS backend. Please try again."}
+            icon={forbidden ? "lock" : "alert"}
+            title={forbidden ? "You don't have access to this lead" : "Something went wrong"}
+            body={forbidden ? "Viewing it needs the leads.view permission. Ask an administrator, then sign in again." : error.message || "Something went wrong reaching the RevenueOS backend. Please try again."}
             action={
-              <Button variant="ghost" onClick={refetch}>
-                Retry
-              </Button>
+              forbidden ? undefined : (
+                <Button variant="ghost" onClick={refetch}>
+                  Retry
+                </Button>
+              )
             }
           />
         </Panel>

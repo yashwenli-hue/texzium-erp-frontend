@@ -207,3 +207,12 @@ test("a people list the backend refused is reported as such, not as 'nobody avai
   assert.match(peopleListProblem(new Error("network")) ?? "", /Couldn't load/);
   for (const p of ["components/forms/AssignLeadDialog.tsx", "components/forms/QualifyLeadDialog.tsx"]) assert.match(src(p), /listProblem \? \(/, p);
 });
+
+test("a refused lead or opportunity page says which access it needs, without a pointless Retry", () => {
+  for (const [p, perm] of [["app/leads/[id]/page.tsx", "leads.view"], ["app/opportunities/[id]/page.tsx", "opportunities.view"]]) {
+    const s = src(p);
+    assert.match(s, /const forbidden = \(error as \{ status\?: number \} \| null\)\?\.status === 403;/, p);
+    assert.ok(s.includes(`needs the ${perm} permission`), p);
+    assert.match(s, /forbidden \? undefined : \(/, p);
+  }
+});

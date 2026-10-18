@@ -73,19 +73,23 @@ export default function OpportunityDetailPage() {
   // only getById() resolving to null (id absent from the real list, or a
   // real 404) means the opportunity truly doesn't exist. See the equivalent
   // Lead Detail handling for the same pattern.
+  // A refusal (403) is not a failure to retry: say what access it needs.
+  const forbidden = (error as { status?: number } | null)?.status === 403;
   if (error) {
     return (
       <div className="page">
         <BackLink fallback="/opportunities">Back to Opportunities</BackLink>
-        <Panel title="Couldn't load this opportunity">
+        <Panel title={forbidden ? "No access" : "Couldn't load this opportunity"}>
           <EmptyState
-            icon="alert"
-            title="Something went wrong"
-            body={error.message || "Something went wrong reaching the RevenueOS backend. Please try again."}
+            icon={forbidden ? "lock" : "alert"}
+            title={forbidden ? "You don't have access to this opportunity" : "Something went wrong"}
+            body={forbidden ? "Viewing it needs the opportunities.view permission. Ask an administrator, then sign in again." : error.message || "Something went wrong reaching the RevenueOS backend. Please try again."}
             action={
-              <Button variant="ghost" onClick={refetch}>
-                Retry
-              </Button>
+              forbidden ? undefined : (
+                <Button variant="ghost" onClick={refetch}>
+                  Retry
+                </Button>
+              )
             }
           />
         </Panel>
