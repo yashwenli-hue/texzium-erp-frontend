@@ -4,11 +4,17 @@ import Link from "next/link";
 import { Icon } from "./Icon";
 import { Button } from "./Button";
 import { Disclosure } from "./Disclosure";
-import type { AttentionAction, AttentionItem } from "../../lib/repository/shared/customerCockpit";
 
-const TONE_ICON: Record<AttentionItem["tone"], string> = { bad: "alert", warn: "alert", action: "arrow", info: "clock", good: "check" };
+import type { NextUpItem, OpenAction } from "../../lib/ui/attention";
+export type { NextUpItem, OpenAction };
 
-function Line({ item, onAction }: { item: AttentionItem; onAction: (a: AttentionAction) => void }) {
+const TONE_ICON: Record<NextUpItem["tone"], string> = { bad: "alert", warn: "alert", action: "arrow", info: "clock", good: "check" };
+
+function isOpen(a: { type: string }): a is OpenAction {
+  return a.type === "open";
+}
+
+function Line<A extends { type: string }>({ item, onAction }: { item: NextUpItem<A>; onAction: (a: A) => void }) {
   return (
     <li className={`nu-${item.tone}`}>
       <span className="nu-dot" aria-hidden="true" />
@@ -18,23 +24,25 @@ function Line({ item, onAction }: { item: AttentionItem; onAction: (a: Attention
   );
 }
 
-function Cta({ item, onAction, primary }: { item: AttentionItem; onAction: (a: AttentionAction) => void; primary?: boolean }) {
+function Cta<A extends { type: string }>({ item, onAction, primary }: { item: NextUpItem<A>; onAction: (a: A) => void; primary?: boolean }) {
   const cta = item.cta;
   if (!cta) return null;
   const reasonId = `nu-why-${item.key}`;
-  if (cta.action.type === "open") {
+  if (isOpen(cta.action)) {
+    const href = cta.action.href;
     return primary ? (
-      <Link href={cta.action.href} className="btn primary">
+      <Link href={href} className="btn primary">
         {cta.label}
         <Icon name="arrow" size={14} />
       </Link>
     ) : (
-      <Link href={cta.action.href} className="nu-link">
+      <Link href={href} className="nu-link">
         {cta.label}
       </Link>
     );
   }
-  const run = () => onAction(cta.action);
+  const action = cta.action as A;
+  const run = () => onAction(action);
   return primary ? (
     <>
       <Button variant="primary" onClick={run} disabled={!cta.enabled} aria-describedby={!cta.enabled && cta.reason ? reasonId : undefined}>
@@ -69,7 +77,7 @@ function Cta({ item, onAction, primary }: { item: AttentionItem; onAction: (a: A
  * two lines is one press away ("N more"). This only presents them and hands the chosen action back (`onAction`) to the page, which
  * owns the dialogs. A button that cannot be pressed says why in text, next to it.
  */
-export function NextUp({ items, onAction, maxMore = 2 }: { items: AttentionItem[]; onAction: (a: AttentionAction) => void; maxMore?: number }) {
+export function NextUp<A extends { type: string }>({ items, onAction, maxMore = 2, eyebrow = "Next up" }: { items: NextUpItem<A>[]; onAction: (a: A) => void; maxMore?: number; eyebrow?: string }) {
   const [head, ...rest] = items;
   if (!head) return null;
   const more = rest.slice(0, maxMore);
@@ -80,7 +88,7 @@ export function NextUp({ items, onAction, maxMore = 2 }: { items: AttentionItem[
         <Icon name={TONE_ICON[head.tone]} size={18} />
       </div>
       <div className="nu-main">
-        <p className="nu-eyebrow">Next up</p>
+        <p className="nu-eyebrow">{eyebrow}</p>
         <h2 id="next-up-title">{head.title}</h2>
         {head.detail && <p className="nu-detail">{head.detail}</p>}
         {head.cta && (
