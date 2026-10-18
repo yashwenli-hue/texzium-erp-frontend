@@ -8,7 +8,7 @@ import { Panel } from "../../../components/ui/Card";
 import { DocumentCustomer } from "../../../components/ui/DocumentCustomer";
 import { ProformaInvoiceStatusTag, QuotationStatusTag, SalesOrderStatusTag, Tag } from "../../../components/ui/Tag";
 import { BackLink } from "../../../components/ui/BackLink";
-import { Button, EmptyState } from "../../../components/ui/Button";
+import { LoadFailure } from "../../../components/ui/LoadFailure";
 import { DataTable, Column } from "../../../components/ui/DataTable";
 import { ConfirmDialog } from "../../../components/ui/ConfirmDialog";
 import { CommercialSummary } from "../../../components/ui/CommercialSummary";
@@ -73,22 +73,10 @@ export default function QuotationDetailPage() {
   // A fetch failure (network/5xx/403) is not the same as a genuine not-found —
   // only getById() resolving to null means the quotation truly doesn't exist.
   if (error) {
-    const forbidden = (error as { status?: number }).status === 403;
     return (
       <div className="page">
         <BackLink fallback="/quotations">Back to Quotations</BackLink>
-        <Panel title="Couldn't load this quotation">
-          <EmptyState
-            icon="alert"
-            title={forbidden ? "You don't have access to quotations" : "Something went wrong"}
-            body={forbidden ? "Viewing quotations needs the quotations.view permission. Ask an administrator to grant it, then sign in again." : error.message || "Something went wrong reaching the RevenueOS backend. Please try again."}
-            action={
-              <Button variant="ghost" onClick={refetch}>
-                Retry
-              </Button>
-            }
-          />
-        </Panel>
+        <LoadFailure error={error} noun="quotation" permission="quotations.view" onRetry={refetch} />
       </div>
     );
   }

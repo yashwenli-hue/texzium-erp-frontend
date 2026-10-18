@@ -7,7 +7,8 @@ import { Panel } from "../../../components/ui/Card";
 import { DocumentCustomer } from "../../../components/ui/DocumentCustomer";
 import { SalesOrderStatusTag, SalesInvoiceStatusTag, DispatchOrderStatusTag, AdvanceReceiptStatusTag, Tag } from "../../../components/ui/Tag";
 import { BackLink } from "../../../components/ui/BackLink";
-import { Button, EmptyState } from "../../../components/ui/Button";
+import { Button } from "../../../components/ui/Button";
+import { LoadFailure } from "../../../components/ui/LoadFailure";
 import { DataTable, Column } from "../../../components/ui/DataTable";
 import { PageHelp } from "../../../components/ui/PageHeader";
 import { DocumentTrail } from "../../../components/ui/DocumentTrail";
@@ -108,18 +109,7 @@ export default function SalesOrderDetailPage() {
     return (
       <div className="page">
         <BackLink fallback="/sales-orders">Back to Sales Orders</BackLink>
-        <Panel title="Couldn't load this sales order">
-          <EmptyState
-            icon="alert"
-            title="Something went wrong"
-            body={error.message || "Something went wrong reaching the RevenueOS backend. Please try again."}
-            action={
-              <Button variant="ghost" onClick={refetch}>
-                Retry
-              </Button>
-            }
-          />
-        </Panel>
+        <LoadFailure error={error} noun="sales order" permission="salesorders.view" onRetry={refetch} />
       </div>
     );
   }

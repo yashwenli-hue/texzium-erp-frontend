@@ -5,7 +5,8 @@ import { Panel } from "../../../components/ui/Card";
 import { DocumentCustomer } from "../../../components/ui/DocumentCustomer";
 import { SalesInvoiceStatusTag, AccountsReceivableStatusTag, DispatchOrderStatusTag, Tag } from "../../../components/ui/Tag";
 import { BackLink } from "../../../components/ui/BackLink";
-import { Button, EmptyState } from "../../../components/ui/Button";
+import { EmptyState } from "../../../components/ui/Button";
+import { LoadFailure } from "../../../components/ui/LoadFailure";
 import { DocumentTrail } from "../../../components/ui/DocumentTrail";
 import { ReceivableCollectionsPanel } from "../../../components/collections/ReceivableCollectionsPanel";
 import { useSalesInvoiceDetail } from "../../../lib/hooks/useSalesInvoices";
@@ -65,18 +66,7 @@ export default function SalesInvoiceDetailPage() {
     return (
       <div className="page">
         <BackLink fallback="/sales-invoices">Back to Sales Invoices</BackLink>
-        <Panel title="Couldn't load this sales invoice">
-          <EmptyState
-            icon="alert"
-            title="Something went wrong"
-            body={error.message || "Something went wrong reaching the RevenueOS backend. Please try again."}
-            action={
-              <Button variant="ghost" onClick={refetch}>
-                Retry
-              </Button>
-            }
-          />
-        </Panel>
+        <LoadFailure error={error} noun="sales invoice" permission="invoices.view" onRetry={refetch} />
       </div>
     );
   }
