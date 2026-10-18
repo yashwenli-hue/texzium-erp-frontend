@@ -2,34 +2,39 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { Icon } from "../../../components/ui/Icon";
 import { LeadHistoryTimeline } from "../../../components/ui/LeadHistoryTimeline";
 import { Panel } from "../../../components/ui/Card";
 import { DocumentCustomer } from "../../../components/ui/DocumentCustomer";
-import { CustomerStatusTag, OpportunityStageTag, QuotationStatusTag, Tag } from "../../../components/ui/Tag";
+import { CustomerStatusTag, OpportunityStageTag, QuotationStatusTag } from "../../../components/ui/Tag";
 import { DocumentActions, DocumentAction } from "../../../components/ui/DocumentActions";
 import { LinkCustomerDialog } from "../../../components/forms/LinkCustomerDialog";
 import { LoadingRegion } from "../../../components/ui/LoadingRegion";
 import { Button, EmptyState } from "../../../components/ui/Button";
-import { DocumentTrail } from "../../../components/ui/DocumentTrail";
 import { LifecycleStepper } from "../../../components/ui/LifecycleStepper";
 import { QuickActions } from "../../../components/ui/QuickActions";
 import { BackLink } from "../../../components/ui/BackLink";
-import { DataTable, Column } from "../../../components/ui/DataTable";
+import { NextUp } from "../../../components/ui/NextUp";
+import { NextStepCell } from "../../../components/ui/NextStepCell";
+import { RecordJourney } from "../../../components/ui/RecordJourney";
+import { RecordPager } from "../../../components/ui/RecordPager";
 import { ConfirmDialog } from "../../../components/ui/ConfirmDialog";
 import { OpportunityStageDialog } from "../../../components/opportunities/OpportunityStageDialog";
 import { QuotationForm } from "../../../components/forms/QuotationForm";
 import { LeadActivityForm } from "../../../components/forms/LeadActivityForm";
 import { useRepository } from "../../../lib/repository/RepositoryProvider";
 import { useOpportunityDetail } from "../../../lib/hooks/useOpportunities";
-import { useQuotations } from "../../../lib/hooks/useQuotations";
+import { useQuotationPipeline } from "../../../lib/hooks/useQuotations";
+import { buildCommercialChain, quotationNextStep } from "../../../lib/repository/shared/commercialChain";
+import { OpportunityAction, lastContactAt, opportunityAttention } from "../../../lib/repository/shared/opportunityWorkspace";
+import { leadJourney } from "../../../lib/repository/shared/leadWorkspace";
 import { useToast } from "../../../components/ui/Toast";
 import { useAuth } from "../../../lib/auth/AuthContext";
 import { ShareContentDialog } from "../../../components/content/ShareContentDialog";
 import { initials } from "../../../components/ui/Who";
-import { formatInr, formatDate } from "../../../lib/format";
-import { CallOutcome, OPPORTUNITY_STEPS, OpportunityStage, Quotation, formatOpportunityStage } from "../../../lib/types/domain";
+import { formatInr, formatDate, formatRelative } from "../../../lib/format";
+import { CallOutcome, OPPORTUNITY_STEPS, OpportunityStage, formatOpportunityStage } from "../../../lib/types/domain";
 import { canMoveOpportunityStage, isOpportunityStageFinal } from "../../../lib/repository/shared/opportunityStage";
 import { QUOTATION_PERMISSIONS } from "../../../lib/repository/shared/quotationLifecycle";
 import { OPPORTUNITY_EDIT_PERMISSION, opportunityCustomerActions } from "../../../lib/repository/shared/customerLifecycle";
@@ -39,13 +44,12 @@ type PendingMove = { from: OpportunityStage; to: OpportunityStage };
 
 export default function OpportunityDetailPage() {
   const params = useParams<{ id: string }>();
-  const router = useRouter();
   const toast = useToast();
   const { hasPermission } = useAuth();
   const canEditStage = hasPermission("opportunities.edit");
   const id = params?.id;
   const { opportunity, lead, timeline, loading, error, updateStage, linkCustomer, refetch } = useOpportunityDetail(id);
-  const { quotations, createQuotation, refetch: refetchQuotations } = useQuotations();
+  const { quotations, proformas, orders, createQuotation, refetch: refetchQuotations } = useQuotationPipeline();
   const [pendingMove, setPendingMove] = useState<PendingMove | null>(null);
   const [showQuotationForm, setShowQuotationForm] = useState(false);
   const [showShare, setShowShare] = useState(false);
@@ -135,166 +139,155 @@ export default function OpportunityDetailPage() {
     else toast.success(`Moved to ${formatOpportunityStage(to)}`);
   }
 
-  const quoteColumns: Column<Quotation>[] = [
-    { key: "quoteNo", header: "No.", render: (q) => q.quoteNo },
-    { key: "amount", header: "Amount", render: (q) => formatInr(q.amount) },
-    { key: "status", header: "Status", render: (q) => <QuotationStatusTag status={q.status} /> },
-  ];
+  const chains = new Map(relatedQuotes.map((q) => [q.id, buildCommercialChain(q.id, proformas, orders)]));
+  const quotesWithNext = relatedQuotes.map((q) => ({ ...q, next: quotationNextStep(q, chains.get(q.id)!) }));
+  const leadActive = lead ? lead.isActive : true;
+  const attention = opportunityAttention({
+    opportunity,
+    leadActive,
+    quotations: quotesWithNext,
+    timeline,
+    may: { editStage: canEditStage, editOpportunity: hasPermission(OPPORTUNITY_EDIT_PERMISSION), createQuotation: hasPermission(QUOTATION_PERMISSIONS.create), logActivity: hasPermission("leads.edit") },
+    linkState: customerActions.link,
+    now: new Date(),
+  });
+  const journey = lead ? leadJourney(lead, opportunity, relatedQuotes.length) : null;
+  const closePassed = !isTerminal && !!opportunity.expectedCloseDate && new Date(opportunity.expectedCloseDate).getTime() < new Date().setHours(0, 0, 0, 0);
+  const lastContact = lastContactAt(timeline);
+  const stageReason = !canEditStage ? noStagePermission : !leadActive ? "The lead is deactivated." : undefined;
+  const stageActions: DocumentAction[] = isTerminal
+    ? []
+    : [
+        ...(nextStep ? [{ key: "next", label: nextStep === "WON" ? "Mark Won" : `Move to ${formatOpportunityStage(nextStep)}`, icon: "arrow", variant: "primary" as const, state: { enabled: !stageReason, reason: stageReason }, onClick: () => setPendingMove({ from: opportunity.stage, to: nextStep }) }] : []),
+        ...(prevStep ? [{ key: "back", label: `Back to ${formatOpportunityStage(prevStep)}`, state: { enabled: !stageReason, reason: stageReason }, onClick: () => setPendingMove({ from: opportunity.stage, to: prevStep }) }] : []),
+        { key: "lost", label: "Mark Lost", icon: "close", className: "danger-ghost", state: { enabled: !stageReason, reason: stageReason }, onClick: () => setPendingMove({ from: opportunity.stage, to: "LOST" }) },
+      ];
+  const mayLog = !!lead && lead.isActive && hasPermission("leads.edit");
+  const mayQuote = hasPermission(QUOTATION_PERMISSIONS.create);
+
+  function onAttention(a: OpportunityAction) {
+    if (a.type === "link") setCustomerDialog("link");
+    else if (a.type === "quote") setShowQuotationForm(true);
+    else if (a.type === "logCall") setActivityOutcome("");
+    else if (a.type === "moveNext" && nextStep) setPendingMove({ from: opportunity!.stage, to: nextStep });
+    else if (a.type === "lost") setPendingMove({ from: opportunity!.stage, to: "LOST" });
+  }
 
   return (
-    <div className="page">
-      <BackLink fallback="/opportunities">Back to Opportunities</BackLink>
-      <div className="crm-grid">
-        <div className="card panel">
-          <div className="profile-head">
-            <div className="top">
-              <div className="av-lg">{initials(opportunity.customerName)}</div>
-              <div>
-                <h3>{opportunity.title}</h3>
-                <div className="co">{opportunity.customer?.customerName ?? opportunity.customerName} · Owner: {opportunity.ownerName}</div>
-              </div>
-            </div>
+    <div className="page opp-ws">
+      <div className="ws-top">
+        <BackLink fallback="/opportunities">Back to Opportunities</BackLink>
+        <RecordPager kind="opportunity" id={opportunity.id} hrefOf={(x) => `/opportunities/${x}`} />
+      </div>
+
+      <header className="card ws-head">
+        <div className="ws-id">
+          <div className="av-lg" aria-hidden="true">{initials(opportunity.customerName)}</div>
+          <div className="ws-title">
+            <p className="ws-kind">Opportunity</p>
+            <h1>{opportunity.title}</h1>
+            <p className="co">
+              {opportunity.customer ? <Link href={`/customers/${opportunity.customer.id}`}>{opportunity.customer.customerName}</Link> : <>{opportunity.customerName} · <span className="ws-warn">no customer linked</span></>}
+              {" · from lead "}
+              <Link href={`/leads/${opportunity.leadId}`}>{lead?.customerName ?? opportunity.customerName}</Link>
+            </p>
             <div className="tagrow">
               <OpportunityStageTag stage={opportunity.stage} />
-              <Tag color="n">{formatInr(opportunity.expectedValue)}</Tag>
-              <Tag color="n">{opportunity.probability}% probability</Tag>
-              {opportunity.customerId && opportunity.customer ? (
-                <DocumentCustomer opportunity={opportunity} status="ready" />
-              ) : (
-                <a href="#customer-panel" className="tag-link" aria-label="No customer linked. Go to the customer section">
-                  <Tag color="w">No customer linked</Tag>
-                </a>
-              )}
+              {opportunity.customerId && opportunity.customer && <DocumentCustomer opportunity={opportunity} status="ready" />}
             </div>
-            {lead && (
-              <QuickActions
-                phone={lead.phone}
-                email={lead.email}
-                contactName={opportunity.customerName}
-                country={lead.country ?? null}
-                share={
-                  hasPermission("content.view") && hasPermission("content.share")
-                    ? {
-                        onShare: () => setShowShare(true),
-                        unavailable: !lead.isActive
-                          ? "Reactivate the lead before sharing content for this opportunity."
-                          : opportunity.customer?.isActive === false
-                            ? "Reactivate the customer before sharing content for this opportunity."
-                            : undefined,
-                      }
-                    : undefined
-                }
-              />
-            )}
           </div>
-
-          <div style={{ padding: "16px 19px", borderBottom: "1px solid var(--line-2)" }}>
-            <DocumentTrail
-              nodes={[
-                { key: "lead", label: opportunity.customerName, sublabel: "Lead", href: `/leads/${opportunity.leadId}` },
-                { key: "opp", label: opportunity.title, sublabel: "Opportunity", current: true },
-              ]}
-            />
+        </div>
+        <dl className="ws-facts">
+          <div><dt>Expected value</dt><dd>{formatInr(opportunity.expectedValue)}</dd></div>
+          <div>
+            <dt>Probability</dt>
+            <dd className="ws-prob">
+              <span className="bar" aria-hidden="true"><i style={{ width: `${opportunity.probability}%` }} /></span>
+              {opportunity.probability}%
+            </dd>
           </div>
-
-          <div style={{ padding: "18px 19px" }}>
-            <LifecycleStepper
-              steps={OPPORTUNITY_STEPS.map((s) => ({ key: s, label: formatOpportunityStage(s) }))}
-              currentKey={opportunity.stage}
-              lostKey="LOST"
-              lostLabel="Lost"
-            />
-            {!isTerminal && (
-              <div style={{ display: "flex", gap: 9, marginTop: 16, flexWrap: "wrap" }}>
-                {nextStep && (
-                  <Button
-                    variant="primary"
-                    icon="arrow"
-                    disabled={!canEditStage}
-                    title={canEditStage ? undefined : noStagePermission}
-                    onClick={() => setPendingMove({ from: opportunity.stage, to: nextStep })}
-                  >
-                    {nextStep === "WON" ? "Mark Won" : `Move to ${formatOpportunityStage(nextStep)}`}
-                  </Button>
-                )}
-                {prevStep && (
-                  <Button
-                    variant="ghost"
-                    disabled={!canEditStage}
-                    title={canEditStage ? undefined : noStagePermission}
-                    onClick={() => setPendingMove({ from: opportunity.stage, to: prevStep })}
-                  >
-                    Move back to {formatOpportunityStage(prevStep)}
-                  </Button>
-                )}
-                <Button
-                  variant="ghost"
-                  className="danger-ghost"
-                  icon="close"
-                  disabled={!canEditStage}
-                  title={canEditStage ? undefined : noStagePermission}
-                  onClick={() => setPendingMove({ from: opportunity.stage, to: "LOST" })}
-                >
-                  Mark Lost
-                </Button>
-              </div>
-            )}
-            {isTerminal && (
-              <p style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 14 }}>
-                {stageLabel} is final — this opportunity can&apos;t be moved or reopened.
-              </p>
-            )}
+          <div><dt>Expected close</dt><dd className={closePassed ? "ws-warn" : undefined}>{formatDate(opportunity.expectedCloseDate)}{closePassed && <small> · passed</small>}</dd></div>
+          <div><dt>Owner</dt><dd>{opportunity.ownerName} <small>{lastContact ? `· last contact ${formatRelative(lastContact)}` : "· no contact logged"}</small></dd></div>
+        </dl>
+        {lead && (
+          <QuickActions
+            phone={lead.phone}
+            email={lead.email}
+            contactName={opportunity.customerName}
+            country={lead.country ?? null}
+            share={
+              hasPermission("content.view") && hasPermission("content.share")
+                ? {
+                    onShare: () => setShowShare(true),
+                    unavailable: !lead.isActive
+                      ? "Reactivate the lead before sharing content for this opportunity."
+                      : opportunity.customer?.isActive === false
+                        ? "Reactivate the customer before sharing content for this opportunity."
+                        : undefined,
+                  }
+                : undefined
+            }
+          />
+        )}
+        <div className="ws-stage">
+          <LifecycleStepper
+            steps={OPPORTUNITY_STEPS.map((s) => ({ key: s, label: formatOpportunityStage(s) }))}
+            currentKey={opportunity.stage}
+            lostKey="LOST"
+            lostLabel="Lost"
+          />
+          {stageActions.length > 0 ? (
+            <div className="ws-actions"><DocumentActions actions={stageActions} testId="opportunity-stage-actions" /></div>
+          ) : (
+            <p className="ws-sub">{stageLabel} is final — this opportunity can&apos;t be moved or reopened.</p>
+          )}
+        </div>
+        {journey && (
+          <div className="ws-journey">
+            <RecordJourney steps={journey} />
           </div>
+        )}
+      </header>
 
-          <div className="info-grid">
-            <div className="f"><label>Expected Close</label><div>{formatDate(opportunity.expectedCloseDate)}</div></div>
-            <div className="f"><label>Expected Value</label><div>{formatInr(opportunity.expectedValue)}</div></div>
-          </div>
+      <NextUp items={attention} onAction={onAttention} />
 
+      <div className="ws-grid">
+        <div className="ws-main">
           <Panel
-            title="Activity & History"
+            title="Calls, meetings & history"
             flush
             extraHead={
-              lead && lead.isActive && hasPermission("leads.edit") ? (
+              mayLog ? (
                 <span className="panel-acts">
                   <button type="button" className="more" onClick={() => setActivityOutcome("NOT_CONNECTED")}>
                     <Icon name="phone" size={14} /> Log CNC
                   </button>
                   <button type="button" className="more" onClick={() => setActivityOutcome("")}>
-                    <Icon name="plus" size={14} /> Log interaction
+                    <Icon name="plus" size={14} /> Log call or meeting
                   </button>
                 </span>
               ) : undefined
             }
           >
             {lead?.notes && lead.notes.length > 0 && (
-              <div style={{ padding: "14px 19px", borderBottom: "1px solid var(--line-2)" }}>
-                <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8 }}>
-                  Imported notes
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                  {lead.notes.map((note) => (
-                    <div key={note.id} style={{ fontSize: 13.5 }}>
-                      <div>{note.note}</div>
-                      <div style={{ color: "var(--muted)", fontSize: 11.5, marginTop: 3 }}>
-                        {formatDate(note.createdAt)}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+              <div className="ws-notes ws-notes-top">
+                <h4>Imported with the lead</h4>
+                {lead.notes.map((note) => (
+                  <div key={note.id} className="ws-note">
+                    <p>{note.note}</p>
+                    <small>{formatDate(note.createdAt)}</small>
+                  </div>
+                ))}
               </div>
             )}
-
-            <div style={{ padding: "6px 0" }}>
-              <LeadHistoryTimeline
-                entries={timeline}
-                emptyText={lead?.notes && lead.notes.length > 0 ? "No activity logged yet." : "No Pre-Sales history available."}
-              />
-            </div>
+            <LeadHistoryTimeline
+              entries={timeline}
+              emptyText={lead?.notes && lead.notes.length > 0 ? "No activity logged yet." : "No Pre-Sales history available."}
+            />
           </Panel>
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        <aside className="ws-side" aria-label="Customer and quotations">
           <div className="card panel" id="customer-panel" data-testid="customer-panel">
             <div className="panel-head">
               <h3>Customer</h3>
@@ -322,28 +315,43 @@ export default function OpportunityDetailPage() {
             </div>
             <DocumentActions actions={customerActionList} testId="customer-actions" />
           </div>
+
           <Panel
-            title="Related Quotations"
+            title={`Quotations${relatedQuotes.length ? ` · ${relatedQuotes.length}` : ""}`}
             flush
             extraHead={
-              hasPermission(QUOTATION_PERMISSIONS.create) ? (
-                <a className="more" href="#" onClick={(e) => { e.preventDefault(); setShowQuotationForm(true); }}>
-                  <Icon name="plus" size={14} /> Create Quotation
-                </a>
+              mayQuote ? (
+                <span className="panel-acts">
+                  <button type="button" className="more" onClick={() => setShowQuotationForm(true)}>
+                    <Icon name="plus" size={14} /> Create quotation
+                  </button>
+                </span>
               ) : undefined
             }
           >
-            <DataTable
-              columns={quoteColumns}
-              rows={relatedQuotes}
-              onRowClick={(q) => router.push(`/quotations/${q.id}`)}
-              emptyTitle="No quotations yet"
-              emptyBody="Create one to move this opportunity toward Quote-to-Cash."
-            />
+            {quotesWithNext.length === 0 ? (
+              <p className="ws-empty">
+                No quotations yet.{" "}
+                {!opportunity.customerId ? "Link a customer first." : mayQuote ? "Create one to start Quote-to-Cash." : "Someone with the quotations.create permission can create one."}
+              </p>
+            ) : (
+              <ul className="ws-links">
+                {quotesWithNext.map((q) => (
+                  <li key={q.id}>
+                    <Link href={`/quotations/${q.id}`} className="ws-link">
+                      <span className="wl-main">
+                        <b>{q.quoteNo}</b>
+                        <small>{formatInr(q.amount)} · <NextStepCell step={q.next} /></small>
+                      </span>
+                      <QuotationStatusTag status={q.status} />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
           </Panel>
-        </div>
+        </aside>
       </div>
-
       {pendingMove && (
         <OpportunityStageDialog
           opportunityTitle={opportunity.title}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { PageHeader } from "../../components/ui/PageHeader";
 import { StatCard, StatRow, Panel } from "../../components/ui/Card";
 import { Button, EmptyState } from "../../components/ui/Button";
@@ -9,6 +9,7 @@ import { ResponsiveList, ResponsiveColumn, ListCard } from "../../components/ui/
 import { ListSearch } from "../../components/ui/ListSearch";
 import { LoadingRegion } from "../../components/ui/LoadingRegion";
 import { matchesText } from "../../lib/ui/listSearch";
+import { rememberSequence } from "../../lib/ui/recordSequence";
 import { Pagination, paginate } from "../../components/ui/Button";
 import { OpportunityForm } from "../../components/forms/OpportunityForm";
 import { useOpportunities } from "../../lib/hooks/useOpportunities";
@@ -64,6 +65,11 @@ export default function OpportunitiesPage() {
   const byStatus = stageChip === "All" ? opportunities : opportunities.filter((o) => o.stage === stageChip);
   const filtered = search.trim() ? byStatus.filter((o) => matchesText([o.title, o.customer?.customerName ?? o.customerName, o.ownerName, productOf(o)], search)) : byStatus;
   const rows = paginate(filtered, page, PAGE_SIZE);
+  // Opening an opportunity lets its page step through this list as filtered and sorted.
+  const sequenceIds = filtered.map((o) => o.id).join(",");
+  useEffect(() => {
+    if (sequenceIds) rememberSequence("opportunity", { ids: sequenceIds.split(","), from: "/opportunities", label: stageChip === "All" ? "Opportunities" : `Opportunities · ${formatOpportunityStage(stageChip as never)}` });
+  }, [sequenceIds, stageChip]);
 
   const columns: ResponsiveColumn<Opportunity>[] = [
     {
