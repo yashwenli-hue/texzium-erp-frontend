@@ -36,6 +36,9 @@ function toOpportunity(raw: BackendOpportunity, ownerName: string | undefined, l
  * `stage` is the backend's Opportunity.status (QUALIFIED, PROPOSAL, NEGOTIATION,
  * WON or LOST). Nothing about the stage is kept in the browser.
  */
+/** Shown when a deal has an owner whose name the person can't look up. */
+export const OWNER_NAME_UNAVAILABLE = "Name not available";
+
 export class RealOpportunityRepository implements IOpportunityRepository {
   constructor(private users: IUserRepository) {}
 
@@ -52,7 +55,10 @@ export class RealOpportunityRepository implements IOpportunityRepository {
 
     return rows.map((raw) => {
       const assignedToId = raw.lead?.assignedToId ?? undefined;
-      return toOpportunity(raw, assignedToId ? ownerNameById.get(assignedToId) : undefined);
+      // The list carries the owner's id, not the name. When the people list can't be read
+      // (it needs users.view), the deal still has an owner: say the name isn't available,
+      // never "Unassigned".
+      return toOpportunity(raw, assignedToId ? ownerNameById.get(assignedToId) ?? OWNER_NAME_UNAVAILABLE : undefined);
     });
   }
 
