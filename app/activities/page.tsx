@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { PageHeader, DesignNote } from "../../components/ui/PageHeader";
+import { PageHeader } from "../../components/ui/PageHeader";
 import { Panel } from "../../components/ui/Card";
 import { Button } from "../../components/ui/Button";
 import { ChipGroup, Chip } from "../../components/ui/Tag";
@@ -110,11 +110,6 @@ export default function ActivitiesPage() {
         </div>
       ))}
 
-      <DesignNote>
-        <b>Design note.</b> Activities is the audit trail every manager checks before a 1:1 — one icon
-        vocabulary grouped by recency, computed from each activity&apos;s real timestamp rather than a
-        stored group label.
-      </DesignNote>
 
       {showForm && <ActivityForm onClose={() => setShowForm(false)} onSubmit={logActivity} />}
     </div>

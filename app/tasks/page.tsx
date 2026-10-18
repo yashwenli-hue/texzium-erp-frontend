@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { PageHeader, DesignNote } from "../../components/ui/PageHeader";
+import { PageHeader } from "../../components/ui/PageHeader";
 import { Button } from "../../components/ui/Button";
 import { StatusTag } from "../../components/ui/Tag";
 import { Icon } from "../../components/ui/Icon";
@@ -115,10 +115,6 @@ export default function TasksPage() {
         </div>
       )}
 
-      <DesignNote>
-        <b>Design note.</b> Overdue always sits at the top in red. Checking a task off immediately moves
-        it out of the active lists and updates the sidebar&apos;s open-task badge (currently {activeCount}).
-      </DesignNote>
 
       {showForm && <TaskForm onClose={() => setShowForm(false)} onSubmit={createTask} />}
     </div>

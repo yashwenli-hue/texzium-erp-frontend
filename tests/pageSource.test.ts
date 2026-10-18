@@ -30,3 +30,12 @@ test("search results open as links, so they can be reached and opened from the k
   assert.equal((search.text.match(/<Link className="result result-link"/g) ?? []).length, 7);
   assert.match(search.text, /role="status"/);
 });
+
+test("no developer notes on screen: no 'Design note' blocks, no endpoints or source files in page help", () => {
+  for (const { file, text } of SOURCES) {
+    assert.doesNotMatch(text, /DesignNote|Design note\./, file);
+    for (const help of text.matchAll(/<PageHelp[^>]*>([\s\S]*?)<\/PageHelp>/g)) {
+      assert.doesNotMatch(help[1], /<code>|\b(GET|POST|PATCH|DELETE) \/|\.service\.ts|\bmock\b|backend/i, `${file}: ${help[1].slice(0, 60)}`);
+    }
+  }
+});

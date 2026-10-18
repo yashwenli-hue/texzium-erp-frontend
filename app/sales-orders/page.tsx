@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { PageHeader, DesignNote } from "../../components/ui/PageHeader";
+import { PageHeader, PageHelp } from "../../components/ui/PageHeader";
 import { StatCard, StatRow, Panel } from "../../components/ui/Card";
 import { Button, EmptyState } from "../../components/ui/Button";
 import { Pagination, paginate } from "../../components/ui/Button";
@@ -127,16 +127,12 @@ export default function SalesOrdersPage() {
         </Panel>
       </div>
 
-      <DesignNote>
-        <b>Design note.</b> A Sales Order is created in exactly one way: from an approved, unexpired Proforma
-        Invoice (<code>POST /sales-orders</code>) whose quotation is still approved. Each one then enters the
-        commercial workflow on its detail page: verifying an advance receipt moves it to Pending Accounts
-        Approval, and Accounts approval makes it Ready For Dispatch Order, with who did each step recorded in the
-        order&apos;s lifecycle history. Orders with status Open are legacy orders created before this existed, by
-        converting a quotation directly; they do not enter that workflow and are left as they are. Order No. falls
-        back to a short reference when the backend hasn&apos;t assigned a real code (no verified code path in this
-        controller sets one).
-      </DesignNote>
+      <PageHelp title="How a sales order moves">
+        A sales order is made from an approved, unexpired Proforma Invoice. On its page: verify the advance
+        receipt, then Accounts approves it, and it becomes ready for dispatch. Every step and who took it is
+        kept in the order&apos;s history. Orders marked Open were made the older way, straight from a quotation,
+        and do not follow these steps.
+      </PageHelp>
     </div>
   );
 }

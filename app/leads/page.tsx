@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { PageHeader, DesignNote } from "../../components/ui/PageHeader";
+import { PageHeader } from "../../components/ui/PageHeader";
 import { Panel } from "../../components/ui/Card";
 import { Icon } from "../../components/ui/Icon";
 import { Button, EmptyState, Pagination } from "../../components/ui/Button";
@@ -204,11 +204,6 @@ export default function LeadsPage() {
         </Panel>
       </div>
 
-      <DesignNote>
-        <b>Design note.</b> Search, filters, sort and paging run on the server, inside what you may see. A phone
-        number matches however it is typed (spaces, dashes, +91 or 0 prefix). Filter counts show how many leads
-        each choice gives with the other filters applied. Your choices are remembered for this browser tab.
-      </DesignNote>
 
       {showForm && <LeadForm onClose={() => setShowForm(false)} onSubmit={createLead} />}
     </div>

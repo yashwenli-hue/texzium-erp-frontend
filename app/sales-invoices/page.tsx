@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { PageHeader, DesignNote } from "../../components/ui/PageHeader";
+import { PageHeader, PageHelp } from "../../components/ui/PageHeader";
 import { StatCard, StatRow, Panel } from "../../components/ui/Card";
 import { Button, EmptyState } from "../../components/ui/Button";
 import { Pagination, paginate } from "../../components/ui/Button";
@@ -130,16 +130,10 @@ export default function SalesInvoicesPage() {
         </Panel>
       </div>
 
-      <DesignNote>
-        <b>Design note.</b> A Sales Invoice can only be created once the sales order it belongs to has a
-        DISPATCHED Dispatch Order (<code>POST /sales-invoices</code>, verified server-side in
-        sales-invoices.service.ts) — Quotation/Proforma cannot invoice directly, and this app has no Dispatch
-        Order management screens, so the action lives on the Sales Order&apos;s own detail page once a
-        dispatched order exists for it. Taxable amount, GST and total are entirely backend-computed (a flat
-        18% assumption on the sales order&apos;s total). Invoice No. falls back to a short reference when the
-        backend hasn&apos;t assigned a real number (no verified code path in this controller sets one — a
-        separate, unrelated FinanceOS module that does isn&apos;t wired into the running backend).
-      </DesignNote>
+      <PageHelp title="Where invoices come from">
+        A sales invoice is raised from its sales order&apos;s page, once that order has been dispatched. Its
+        taxable amount, GST and total are worked out by the system, not entered here.
+      </PageHelp>
     </div>
   );
 }

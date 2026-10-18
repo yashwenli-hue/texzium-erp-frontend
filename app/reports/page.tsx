@@ -1,7 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { PageHeader, DesignNote } from "../../components/ui/PageHeader";
+import { useAuth } from "../../lib/auth/AuthContext";
+import { PageHeader } from "../../components/ui/PageHeader";
 import { Panel } from "../../components/ui/Card";
 import { Button, EmptyState } from "../../components/ui/Button";
 
@@ -17,6 +18,9 @@ import { Button, EmptyState } from "../../components/ui/Button";
  */
 export default function ReportsPage() {
   const router = useRouter();
+  const { hasPermission } = useAuth();
+  // The Dashboard's revenue totals are company-wide, so they need finance visibility.
+  const seesTotals = hasPermission("revenue.view.all") || hasPermission("finance.view.all");
 
   return (
     <div className="page">
@@ -29,32 +33,22 @@ export default function ReportsPage() {
       <Panel title="Reports">
         <EmptyState
           icon="barChart"
-          title="Revenue reporting already lives on the Dashboard"
-          body="The one report figure verified trustworthy — revenue-summary — is already shown on the Dashboard's Revenue & Collections panel, all-time and backend-sourced. The other 10 report endpoints this backend exposes were each investigated and found unsuitable to present as real analytics, so no screen has been built against them here."
+          title="Reports aren't available yet"
+          body={
+            seesTotals
+              ? "Company revenue and collection totals are on the Dashboard. Funnel, conversion and performance reports will be added once their figures can be trusted; RevenueOS does not show numbers it cannot stand behind."
+              : "Funnel, conversion and performance reports will be added once their figures can be trusted; RevenueOS does not show numbers it cannot stand behind. Company-wide totals need finance visibility; ask an administrator if you need them."
+          }
           action={
-            <Button variant="ghost" onClick={() => router.push("/dashboard")}>
-              Go to Dashboard
-            </Button>
+            seesTotals ? (
+              <Button variant="ghost" onClick={() => router.push("/dashboard")}>
+                Go to Dashboard
+              </Button>
+            ) : undefined
           }
         />
       </Panel>
 
-      <DesignNote>
-        <b>Design note.</b> <code>quotation-conversion</code>/<code>lead-conversion</code> and{" "}
-        <code>funnel</code> produce naive ratios with no cohort or time basis (one was observed
-        returning a 200% conversion rate); <code>customer-ranking</code> sums a running
-        CustomerLedger balance column into a mathematically inflated total;{" "}
-        <code>salesperson-performance</code> is byte-for-byte identical to{" "}
-        <code>customer-revenue</code> — it groups by customer name, not salesperson, despite the
-        name; <code>lost-opportunities</code> lists opportunities whose saved stage is Lost, so it only
-        reflects deals moved to Lost since opportunity stages became persistent (it was always empty
-        before that). The remaining endpoints (<code>top-products</code>,{" "}
-        <code>product-revenue</code>, <code>product-quantity</code>, <code>hsn-revenue</code>,{" "}
-        <code>category-revenue</code>) were each investigated and found to be a naive ratio, an
-        always-empty list, or a mislabeled/duplicate metric. This isn&apos;t a coverage gap waiting on
-        frontend work — it&apos;s a deliberate decision not to present misleading analytics as real
-        ones.
-      </DesignNote>
     </div>
   );
 }

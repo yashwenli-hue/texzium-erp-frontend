@@ -9,7 +9,7 @@ import { SalesOrderStatusTag, SalesInvoiceStatusTag, DispatchOrderStatusTag, Adv
 import { BackLink } from "../../../components/ui/BackLink";
 import { Button, EmptyState } from "../../../components/ui/Button";
 import { DataTable, Column } from "../../../components/ui/DataTable";
-import { DesignNote } from "../../../components/ui/PageHeader";
+import { PageHelp } from "../../../components/ui/PageHeader";
 import { DocumentTrail } from "../../../components/ui/DocumentTrail";
 import { SalesInvoiceForm } from "../../../components/forms/SalesInvoiceForm";
 import { SalesOrderPaymentTermForm } from "../../../components/forms/SalesOrderPaymentTermForm";
@@ -553,20 +553,13 @@ export default function SalesOrderDetailPage() {
         </div>
       </div>
 
-      <DesignNote>
-        <b>Design note.</b> A Sales Order is created from an approved, unexpired Proforma Invoice
-        (<code>POST /sales-orders</code>, linked by proformaInvoiceId, status <code>PENDING_STORE_APPROVAL</code>,
-        total taken from that Proforma). An order with status <code>OPEN</code> is a legacy order created before
-        that, straight from a quotation; it does not enter the commercial workflow. Verifying an advance receipt
-        moves an order to Pending Accounts Approval, and Accounts approval makes it Ready For Dispatch Order. The
-        backend decides who did what (the signed-in user) and keeps it in the lifecycle history; a rejected advance
-        leaves the status unchanged. &quot;Ready For Invoicing&quot; is written by the OperationsOS Dispatch Orders service
-        when a linked Dispatch Order is marked DISPATCHED, so Create Sales Invoice only appears once that real
-        status is reached and a matching dispatched order is found. Each step can be retracted (most recent
-        first) and an order can be cancelled, both with a mandatory reason that is kept in the history; once a
-        Dispatch Order or Sales Invoice exists the backend refuses both. Cancelled is final, and cancelling does not
-        refund an advance or change any downstream record.
-      </DesignNote>
+      <PageHelp title="How this order moves">
+        Verify the advance receipt, then Accounts approves the order and it becomes ready for dispatch. Once the
+        warehouse marks its dispatch order as dispatched, it is ready for invoicing and Create Sales Invoice
+        appears. The latest step can be retracted, and the order can be cancelled, each with a reason kept in the
+        history; neither is possible once a dispatch order or invoice exists. Cancelling is final and does not
+        refund an advance.
+      </PageHelp>
 
       {showTermForm && (
         <SalesOrderPaymentTermForm

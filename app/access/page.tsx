@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { PageHeader, DesignNote } from "../../components/ui/PageHeader";
+import { PageHeader, PageHelp } from "../../components/ui/PageHeader";
 import { Panel } from "../../components/ui/Card";
 import { Button, EmptyState } from "../../components/ui/Button";
 import { Modal } from "../../components/ui/Modal";
@@ -79,12 +79,12 @@ export default function AccessPage() {
         {tab === "users" && <UsersTab />}
         {tab === "history" && <HistoryTab />}
       </div>
-      <DesignNote>
-        <b>How access works.</b> A person can do exactly what their role allows; there are no per-person exceptions,
+      <PageHelp title="How access works">
+        A person can do exactly what their role allows; there are no per-person exceptions,
         so nothing can conflict. Changes apply when the person next signs in (a login lasts one day). You can only
         grant or remove permissions you hold yourself, and RevenueOS refuses any change that would leave nobody able
         to administer access.
-      </DesignNote>
+      </PageHelp>
     </div>
   );
 }

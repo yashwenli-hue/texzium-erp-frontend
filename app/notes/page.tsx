@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { PageHeader, DesignNote } from "../../components/ui/PageHeader";
+import { PageHeader } from "../../components/ui/PageHeader";
 import { Button } from "../../components/ui/Button";
 import { ChipGroup, Chip } from "../../components/ui/Tag";
 import { Icon } from "../../components/ui/Icon";
@@ -89,11 +89,6 @@ export default function NotesPage() {
         </div>
       )}
 
-      <DesignNote>
-        <b>Design note.</b> Notes are short and scannable by design — click any card to open its full
-        context, jump to the related record, or edit it. Pinned notes get a colored border so they
-        surface before routine notes.
-      </DesignNote>
 
       {showForm && <NoteForm onClose={() => setShowForm(false)} onSubmit={createNote} />}
       {activeNote && (

@@ -11,7 +11,7 @@ import { QuickActions } from "../../../components/ui/QuickActions";
 import { BackLink } from "../../../components/ui/BackLink";
 import { DataTable, Column } from "../../../components/ui/DataTable";
 import { Button } from "../../../components/ui/Button";
-import { DesignNote } from "../../../components/ui/PageHeader";
+
 import { DocumentTrail } from "../../../components/ui/DocumentTrail";
 import { NoteForm } from "../../../components/forms/NoteForm";
 import { NoteDetailModal } from "../../../components/forms/NoteDetailModal";
@@ -585,11 +585,6 @@ export default function LeadDetailPage() {
         </div>
       </div>
 
-      <DesignNote>
-        <b>Design note.</b> Assign, Qualify and Reject are explicit gated actions — each mirrors a
-        dedicated backend endpoint with its own permission. Follow-ups use the backend&apos;s own
-        PENDING/COMPLETED/CANCELLED lifecycle, not local task data.
-      </DesignNote>
 
       {showNoteForm && (
         <NoteForm

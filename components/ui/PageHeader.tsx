@@ -26,14 +26,20 @@ export function PageHeader({
   );
 }
 
-export function DesignNote({ children }: { children: ReactNode }) {
+/**
+ * Plain-language help about how a page works, for the people using it: how records get here,
+ * what a step needs. Never implementation detail (endpoints, files, data sources).
+ */
+export function PageHelp({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <div className="helper">
-      <svg className="i16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round">
-        <path d="M3 3v18h18" />
-        <path d="m19 9-5 5-4-4-4 4" />
+    <aside className="helper" aria-label={title}>
+      <svg className="i16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 11v5M12 8h.01" />
       </svg>
-      <div>{children}</div>
-    </div>
+      <div>
+        <b>{title}.</b> {children}
+      </div>
+    </aside>
   );
 }

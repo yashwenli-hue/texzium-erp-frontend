@@ -1,6 +1,6 @@
 "use client";
 
-import { PageHeader, DesignNote } from "../../components/ui/PageHeader";
+import { PageHeader, PageHelp } from "../../components/ui/PageHeader";
 import { Panel } from "../../components/ui/Card";
 import { Icon } from "../../components/ui/Icon";
 import { Button, EmptyState, Pagination } from "../../components/ui/Button";
@@ -177,12 +177,12 @@ export default function PresalesPage() {
         </Panel>
       </div>
 
-      <DesignNote>
-        <b>Who counts as pre-sales.</b> Anyone recorded as working the lead before it was qualified: the person it was
-        assigned to in pre-sales, whoever logged calls, meetings or status changes before qualification, and whoever
-        qualified it. Assignments recorded before this release name the person only in their text, which is not
-        turned back into a person, so older leads may show none. The sales owner is whoever holds it after qualification.
-      </DesignNote>
+      <PageHelp title="Who counts as pre-sales">
+        Anyone recorded as working the lead before it was qualified: the person it was assigned to in pre-sales,
+        whoever logged calls, meetings or status changes before qualification, and whoever qualified it. Older
+        leads may show nobody, because early assignments named the person only in text. The sales owner is
+        whoever holds the lead after qualification.
+      </PageHelp>
     </div>
   );
 }

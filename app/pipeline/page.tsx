@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { PageHeader, DesignNote } from "../../components/ui/PageHeader";
+import { PageHeader, PageHelp } from "../../components/ui/PageHeader";
 import { StatCard, StatRow, Panel } from "../../components/ui/Card";
 import { KanbanBoard, KanbanColumnConfig } from "../../components/kanban/KanbanBoard";
 import { Icon } from "../../components/ui/Icon";
@@ -95,12 +95,10 @@ export default function PipelinePage() {
         </Panel>
       </div>
 
-      <DesignNote>
-        <b>Design note.</b> Only New and Contacted are drag targets here — Qualify and Reject are
-        permission-gated backend actions, so they live as explicit confirmations on the lead&apos;s
-        detail page rather than a casual drag on this board. Qualified leads move straight to the
-        Opportunities pipeline.
-      </DesignNote>
+      <PageHelp title="Moving leads">
+        Drag a card between New and Contacted. Qualifying or rejecting a lead needs a decision and a reason, so
+        it is done on the lead&apos;s own page. A qualified lead continues as an opportunity.
+      </PageHelp>
     </div>
   );
 }

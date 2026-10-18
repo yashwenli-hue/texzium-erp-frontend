@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { PageHeader, DesignNote } from "../../components/ui/PageHeader";
+import { PageHeader } from "../../components/ui/PageHeader";
 import { StatCard, StatRow, Panel } from "../../components/ui/Card";
 import { Button, EmptyState } from "../../components/ui/Button";
 import { OpportunityStageTag, ChipGroup, Chip } from "../../components/ui/Tag";
@@ -171,11 +171,6 @@ export default function OpportunitiesPage() {
         </Panel>
       </div>
 
-      <DesignNote>
-        <b>Design note.</b> The probability bar lets a sales head scan likelihood without reading every
-        number. Weighted Forecast is a frontend estimate for presentation only — it is not authoritative
-        unless the backend supplies a real forecast figure.
-      </DesignNote>
 
       {showForm && <OpportunityForm onClose={() => setShowForm(false)} onSubmit={createOpportunity} />}
     </div>

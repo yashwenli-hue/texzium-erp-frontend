@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { PageHeader, DesignNote } from "../../components/ui/PageHeader";
+import { PageHeader } from "../../components/ui/PageHeader";
 import { StatCard, StatRow, Panel, Cols } from "../../components/ui/Card";
 import { Button } from "../../components/ui/Button";
 import { Icon } from "../../components/ui/Icon";
@@ -345,16 +345,6 @@ export default function DashboardPage() {
         </p>
       </Panel>
 
-      <DesignNote>
-        <b>Design note.</b> &quot;Today&apos;s Focus&quot; is a presentation-only prioritization built from
-        mock Task/Lead/Quotation data — follow-up urgency is not a real backend priority field yet (see
-        lib/followup.ts). Opportunity stage, and the Open Pipeline and Won Value figures derived from it, come
-        from the backend&apos;s saved stage; the figures themselves are summed in the browser. Quote-to-Cash
-        and Revenue &amp; Collections above are real, backend-sourced, all-time totals (no endpoint here
-        supports a date range) — intentionally excluded are quotation/lead &quot;conversion rate&quot;,
-        salesperson performance and customer ranking endpoints, each found during investigation to produce
-        naive or misleading numbers rather than true analytics.
-      </DesignNote>
 
       {pendingMove && (
         <OpportunityStageDialog

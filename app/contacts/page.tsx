@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { PageHeader, DesignNote } from "../../components/ui/PageHeader";
+import { PageHeader } from "../../components/ui/PageHeader";
 import { Panel } from "../../components/ui/Card";
 import { Button } from "../../components/ui/Button";
 import { Who } from "../../components/ui/Who";
@@ -112,13 +112,6 @@ export default function ContactsPage() {
         </Panel>
       </div>
 
-      <DesignNote>
-        <b>Design note.</b> Contacts is the people-first view — the same humans who show up inside
-        Leads and Customers, listed once so reps don&apos;t have to remember which account a person
-        belongs to. A company name links through to its Customer account only once that company has
-        actually converted — contacts still tied to an open Lead show as plain text rather than a
-        link to a page that doesn&apos;t exist yet.
-      </DesignNote>
 
       {showForm && <ContactForm onClose={() => setShowForm(false)} onSubmit={createContact} />}
     </div>
