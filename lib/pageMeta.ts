@@ -31,6 +31,8 @@ export interface NavSection {
  * Sales Orders, Sales Invoices, Payments). Nothing here is a route that
  * doesn't already exist; this is a labeling/grouping change only.
  */
+// Each item that has a backend view permission names it, so nobody is shown a page that can only
+// refuse them. This is presentation only: the backend checks every request.
 export const NAV_SECTIONS: NavSection[] = [
   {
     label: "Overview",
@@ -39,26 +41,26 @@ export const NAV_SECTIONS: NavSection[] = [
   {
     label: "Pipeline",
     items: [
-      { href: "/leads", label: "Leads", icon: "funnel", countKey: "leadsCount" },
+      { href: "/leads", label: "Leads", icon: "funnel", countKey: "leadsCount", permission: "leads.view" },
       { href: "/presales", label: "Pre-Sales", icon: "users", permission: "leads.view" },
-      { href: "/pipeline", label: "Lead Pipeline", icon: "target" },
-      { href: "/opportunities", label: "Opportunities", icon: "brief", countKey: "opportunitiesCount" },
+      { href: "/pipeline", label: "Lead Pipeline", icon: "target", permission: "leads.view" },
+      { href: "/opportunities", label: "Opportunities", icon: "brief", countKey: "opportunitiesCount", permission: "opportunities.view" },
     ],
   },
   {
     label: "Quote to Cash",
     items: [
-      { href: "/quotations", label: "Quotations", icon: "file", countKey: "quotationsCount" },
-      { href: "/proforma-invoices", label: "Proforma Invoices", icon: "receipt", countKey: "proformaInvoicesCount" },
-      { href: "/sales-orders", label: "Sales Orders", icon: "cart", countKey: "salesOrdersCount" },
+      { href: "/quotations", label: "Quotations", icon: "file", countKey: "quotationsCount", permission: "quotations.view" },
+      { href: "/proforma-invoices", label: "Proforma Invoices", icon: "receipt", countKey: "proformaInvoicesCount", permission: "proformas.view" },
+      { href: "/sales-orders", label: "Sales Orders", icon: "cart", countKey: "salesOrdersCount", permission: "salesorders.view" },
       { href: "/sales-invoices", label: "Sales Invoices", icon: "file", countKey: "salesInvoicesCount", permission: "invoices.view" },
-      { href: "/payments", label: "Collections", icon: "cash" },
+      { href: "/payments", label: "Collections", icon: "cash", permission: "collections.view" },
     ],
   },
   {
     label: "Accounts",
     items: [
-      { href: "/customers", label: "Customers", icon: "building", countKey: "customersCount" },
+      { href: "/customers", label: "Customers", icon: "building", countKey: "customersCount", permission: "customers.view" },
     ],
   },
   {

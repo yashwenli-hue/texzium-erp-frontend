@@ -71,6 +71,7 @@ export default function SalesOrdersPage() {
   // A failed fetch must not read as "zero sales orders" — that's the
   // DataTable's own empty state below, reserved for a genuine zero-result response.
   if (error && salesOrders.length === 0) {
+    const forbidden = (error as { status?: number }).status === 403;
     return (
       <div className="page">
         <PageHeader
@@ -81,12 +82,14 @@ export default function SalesOrdersPage() {
         <Panel title="Sales Orders">
           <EmptyState
             icon="alert"
-            title="Couldn't load sales orders"
-            body={error.message || "Something went wrong reaching the RevenueOS backend. Please try again."}
+            title={forbidden ? "You don't have access to sales orders" : "Couldn't load sales orders"}
+            body={forbidden ? "Viewing sales orders needs the salesorders.view permission. Ask an administrator to grant it, then sign in again." : error.message || "Something went wrong reaching the RevenueOS backend. Please try again."}
             action={
-              <Button variant="ghost" onClick={refetch}>
-                Retry
-              </Button>
+              forbidden ? undefined : (
+                <Button variant="ghost" onClick={refetch}>
+                  Retry
+                </Button>
+              )
             }
           />
         </Panel>

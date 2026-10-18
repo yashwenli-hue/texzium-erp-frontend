@@ -83,9 +83,11 @@ export default function ProformaInvoicesPage() {
             title={forbidden ? "You don't have access to Proforma Invoices" : "Couldn't load proforma invoices"}
             body={forbidden ? "Viewing Proforma Invoices needs the proformas.view permission. Ask an administrator to grant it, then sign in again." : error.message || "Something went wrong reaching the RevenueOS backend. Please try again."}
             action={
-              <Button variant="ghost" onClick={refetch}>
-                Retry
-              </Button>
+              forbidden ? undefined : (
+                <Button variant="ghost" onClick={refetch}>
+                  Retry
+                </Button>
+              )
             }
           />
         </Panel>

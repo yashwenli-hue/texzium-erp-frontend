@@ -117,6 +117,7 @@ export default function OpportunitiesPage() {
   // A failed fetch must not read as "zero opportunities" — that's the
   // DataTable's own empty state below, reserved for a genuine zero-result response.
   if (error && opportunities.length === 0) {
+    const forbidden = (error as { status?: number }).status === 403;
     return (
       <div className="page">
         <PageHeader
@@ -127,12 +128,14 @@ export default function OpportunitiesPage() {
         <Panel title="Opportunities">
           <EmptyState
             icon="alert"
-            title="Couldn't load opportunities"
-            body={error.message || "Something went wrong reaching the RevenueOS backend. Please try again."}
+            title={forbidden ? "You don't have access to opportunities" : "Couldn't load opportunities"}
+            body={forbidden ? "Viewing opportunities needs the opportunities.view permission. Ask an administrator to grant it, then sign in again." : error.message || "Something went wrong reaching the RevenueOS backend. Please try again."}
             action={
-              <Button variant="ghost" onClick={refetch}>
-                Retry
-              </Button>
+              forbidden ? undefined : (
+                <Button variant="ghost" onClick={refetch}>
+                  Retry
+                </Button>
+              )
             }
           />
         </Panel>

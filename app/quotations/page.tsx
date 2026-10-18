@@ -91,9 +91,11 @@ export default function QuotationsPage() {
             title={forbidden ? "You don't have access to quotations" : "Couldn't load quotations"}
             body={forbidden ? "Viewing quotations needs the quotations.view permission. Ask an administrator to grant it, then sign in again." : error.message || "Something went wrong reaching the RevenueOS backend. Please try again."}
             action={
-              <Button variant="ghost" onClick={refetch}>
-                Retry
-              </Button>
+              forbidden ? undefined : (
+                <Button variant="ghost" onClick={refetch}>
+                  Retry
+                </Button>
+              )
             }
           />
         </Panel>

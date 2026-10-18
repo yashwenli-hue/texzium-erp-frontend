@@ -129,3 +129,12 @@ test("the dashboard and Follow-ups use real follow-ups, not the sample task list
     assert.match(src(p), /<PreviewNotice /, p);
   }
 });
+
+test("navigation hides pages the person cannot open, by the backend's own view codes", () => {
+  const perms: Record<string, string> = { "/leads": "leads.view", "/pipeline": "leads.view", "/opportunities": "opportunities.view", "/quotations": "quotations.view", "/proforma-invoices": "proformas.view", "/sales-orders": "salesorders.view", "/sales-invoices": "invoices.view", "/payments": "collections.view", "/customers": "customers.view" };
+  const items = NAV_SECTIONS.flatMap((s) => s.items);
+  for (const [href, code] of Object.entries(perms)) assert.equal(items.find((i) => i.href === href)?.permission, code, href);
+  const leadsOnly = visibleNavSections(NAV_SECTIONS, (p) => p === "leads.view").flatMap((s) => s.items).map((i) => i.href);
+  assert.ok(leadsOnly.includes("/leads") && !leadsOnly.includes("/quotations") && !leadsOnly.includes("/payments"));
+  assert.ok(leadsOnly.includes("/dashboard"));
+});

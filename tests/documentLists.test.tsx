@@ -43,3 +43,12 @@ test("a list card: title, who it is for, status, amount and facts; empty facts a
   assert.equal((list.match(/href="\/sales-orders\/a"/g) ?? []).length, 2);
   assert.match(list, /<caption class="sr-only">Sales orders<\/caption>/);
 });
+
+test("a list the person may not open says which permission it needs, and offers no pointless Retry", () => {
+  for (const p of ["app/opportunities/page.tsx", "app/sales-orders/page.tsx", "app/quotations/page.tsx", "app/proforma-invoices/page.tsx"]) {
+    const s = src(p);
+    assert.match(s, /const forbidden = \(error as \{ status\?: number \}\)\.status === 403;/, p);
+    assert.match(s, /You don't have access to/, p);
+    assert.match(s, /forbidden \? undefined : \(/, p);
+  }
+});
