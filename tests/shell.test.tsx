@@ -78,3 +78,9 @@ test("a refused sign-in says so; only a request made with a session reads as an 
   assert.equal(failure(401, undefined, false).message, "The email or password is incorrect, or this account can't sign in.");
   assert.equal(failure(401, undefined, true).message, "Your session has expired. Please sign in again.");
 });
+
+test("opening the drawer focuses a visible link (the hidden desktop collapse button is skipped)", () => {
+  const shell = readFileSync(new URL("../components/shell/AppShell.tsx", import.meta.url), "utf8");
+  assert.match(shell, /filter\(\(el\) => el\.offsetParent !== null\)/);
+  assert.match(shell, /visible\.find\(\(el\) => el\.getAttribute\("aria-current"\)\) \?\? visible\[0\]/);
+});

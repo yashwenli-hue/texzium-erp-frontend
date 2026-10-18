@@ -55,7 +55,9 @@ export function AppShell({ children }: { children: ReactNode }) {
     if (!nav) return;
     nav.inert = narrow && !mobileOpen;
     if (!narrow || !mobileOpen) return;
-    nav.querySelector<HTMLElement>(FOCUSABLE_SELECTOR)?.focus();
+    // The current page's link, or else the first visible one (the desktop collapse button is hidden here).
+    const visible = Array.from(nav.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter((el) => el.offsetParent !== null);
+    (visible.find((el) => el.getAttribute("aria-current")) ?? visible[0])?.focus();
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.stopPropagation();
