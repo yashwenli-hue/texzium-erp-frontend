@@ -75,9 +75,10 @@ export function opportunityAttention(ctx: OpportunityWorkspaceContext): Array<Ne
   }
 
   if (!o.customerId) {
+    // A blocker, not just a to-do: nothing commercial can happen until it is resolved, so it leads.
     items.push({
       key: "no-customer",
-      tone: "action",
+      tone: "bad",
       title: "Link a customer before quoting",
       detail: "A quotation is made for a customer and uses its GST registration. Linking never creates or merges a customer.",
       cta: cta("Link a customer", "link", ctx.linkState.enabled, ctx.linkState.reason),

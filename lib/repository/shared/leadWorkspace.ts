@@ -310,7 +310,7 @@ export function leadJourney(
     { key: "received", label: "Received", state: state("received") },
     { key: "presales", label: "Pre-sales", detail: rejected ? "Rejected" : lead.assignedToName && !qualified ? lead.assignedToName : undefined, state: state("presales") },
     { key: "qualified", label: "Qualified", state: state("qualified") },
-    { key: "opportunity", label: "Opportunity", detail: opportunity ? formatOpportunityStage(opportunity.stage) : undefined, state: state("opportunity"), href: opportunity ? `/opportunities/${opportunity.id}` : undefined },
+    { key: "opportunity", label: "Opportunity", detail: opportunity ? `Stage: ${formatOpportunityStage(opportunity.stage)}` : undefined, state: state("opportunity"), href: opportunity ? `/opportunities/${opportunity.id}` : undefined },
     { key: "quotation", label: "Quotation", detail: quotationCount > 0 ? `${quotationCount}` : undefined, state: state("quotation") },
   ];
 }

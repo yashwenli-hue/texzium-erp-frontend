@@ -104,6 +104,7 @@ test("journey: where the lead is, with the opportunity as a link", () => {
   const steps = leadJourney({ status: "SALES_ASSIGNED", assignedToName: "Sam" }, { id: "o1", title: "Loom", stage: "PROPOSAL" as never }, 0);
   assert.deepEqual(steps.map((s) => s.state), ["done", "done", "done", "current", "todo"]);
   assert.equal(steps[3].href, "/opportunities/o1");
+  assert.equal(steps[3].detail, "Stage: Proposal");
   const fresh = leadJourney({ status: "NEW", assignedToName: undefined }, undefined, 0);
   assert.deepEqual(fresh.map((s) => s.state), ["current", "todo", "todo", "todo", "todo"]);
   const rejected = leadJourney({ status: "REJECTED", assignedToName: undefined }, undefined, 0);
@@ -121,7 +122,8 @@ const octx = (over: Record<string, unknown> = {}) =>
   ({ opportunity: opp(), leadActive: true, quotations: [], timeline: [call("CONNECTED", 17)], may: { editStage: true, editOpportunity: true, createQuotation: true, logActivity: true }, linkState: { enabled: true }, now: NOW, ...over }) as never;
 
 test("opportunity: no customer blocks quoting; with a customer and no quotation, quote; otherwise the latest quotation's next step", () => {
-  const a = opportunityAttention(octx({ opportunity: opp({ customerId: undefined }) }));
+  // even on a quiet deal, the missing customer comes first: it blocks every commercial step
+  const a = opportunityAttention(octx({ opportunity: opp({ customerId: undefined }), timeline: [] }));
   assert.equal(a[0].key, "no-customer");
   assert.match(a[0].detail ?? "", /never creates or merges a customer/);
   assert.equal(opportunityAttention(octx())[0].key, "quote");
