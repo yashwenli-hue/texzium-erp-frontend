@@ -28,6 +28,7 @@ import { AssignLeadDialog } from "../../../components/forms/AssignLeadDialog";
 import { EditLeadDialog } from "../../../components/forms/EditLeadDialog";
 import { QualifyLeadDialog } from "../../../components/forms/QualifyLeadDialog";
 import { FollowupForm } from "../../../components/forms/FollowupForm";
+import { FollowupActions } from "../../../components/followups/FollowupActions";
 import { OpportunityForm } from "../../../components/forms/OpportunityForm";
 import { ShareContentDialog } from "../../../components/content/ShareContentDialog";
 import { ConfirmDialog } from "../../../components/ui/ConfirmDialog";
@@ -431,42 +432,8 @@ export default function LeadDetailPage() {
                         </span>
                       </div>
                       {f.remarks && <p>{f.remarks}</p>}
-                      {f.status === "PENDING" && hasPermission("leads.followups.create") && (
-                        <div style={{ display: "flex", gap: 12, marginTop: 6 }}>
-                          <a
-                            className="more"
-                            href="#"
-                            onClick={async (e) => {
-                              e.preventDefault();
-                              try {
-                                await completeFollowup(f.id);
-                                toast.success("Follow-up completed");
-                              } catch (err) {
-                                toast.error(err instanceof Error ? err.message : "Could not complete this follow-up. Please try again.");
-                              }
-                            }}
-                          >
-                            <Icon name="check" size={13} /> Complete
-                          </a>
-                          <a className="more" href="#" onClick={(e) => { e.preventDefault(); setFollowupDialog({ mode: "reschedule", target: f }); }}>
-                            <Icon name="clock" size={13} /> Reschedule
-                          </a>
-                          <a
-                            className="more"
-                            href="#"
-                            onClick={async (e) => {
-                              e.preventDefault();
-                              try {
-                                await cancelFollowup(f.id);
-                                toast.success("Follow-up cancelled");
-                              } catch (err) {
-                                toast.error(err instanceof Error ? err.message : "Could not cancel this follow-up. Please try again.");
-                              }
-                            }}
-                          >
-                            <Icon name="close" size={13} /> Cancel
-                          </a>
-                        </div>
+                      {f.status === "PENDING" && hasPermission("leads.followups.create") && !inactive && (
+                        <FollowupActions followup={f} onComplete={completeFollowup} onReschedule={rescheduleFollowup} onCancel={cancelFollowup} compact />
                       )}
                       {f.status === "COMPLETED" && f.completedByName && (
                         <p style={{ color: "var(--faint-text)", fontSize: 11.5 }}>Completed by {f.completedByName}</p>

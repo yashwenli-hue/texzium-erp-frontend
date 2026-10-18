@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { PageHeader } from "../../components/ui/PageHeader";
+import { PageHeader, PreviewNotice } from "../../components/ui/PageHeader";
 import { Panel } from "../../components/ui/Card";
 import { Button } from "../../components/ui/Button";
 import { Who } from "../../components/ui/Who";
@@ -90,13 +90,7 @@ export default function ContactsPage() {
         }
       />
 
-      {repo.kind === "real" && (
-        <p style={{ fontSize: 12.5, color: "var(--muted)", margin: "-8px 0 14px" }}>
-          Contacts has no backend module of its own yet — this section runs entirely on local,
-          in-browser demo data, even though the rest of RevenueOS is connected to the real backend.
-          Nothing created or edited here is saved anywhere permanent.
-        </p>
-      )}
+      {repo.kind === "real" && <PreviewNotice entered="Anything you add or change" />}
 
       <ChipGroup>
         <Chip label={`All ${allContacts.length}`} active={typeChip === "All"} onClick={() => { setTypeChip("All"); setPage(1); }} />

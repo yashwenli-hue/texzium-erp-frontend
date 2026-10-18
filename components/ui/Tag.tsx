@@ -281,15 +281,12 @@ export function Chip({
   active?: boolean;
   onClick?: () => void;
 }) {
+  // A chip that does something is a real toggle button: Enter and Space work, and whether it is on is announced.
+  if (!onClick) return <span className={`chip ${active ? "active" : ""}`}>{label}</span>;
   return (
-    <span
-      className={`chip ${active ? "active" : ""}`}
-      onClick={onClick}
-      role={onClick ? "button" : undefined}
-      tabIndex={onClick ? 0 : undefined}
-    >
+    <button type="button" className={`chip ${active ? "active" : ""}`} aria-pressed={!!active} onClick={onClick}>
       {label}
-    </span>
+    </button>
   );
 }
 

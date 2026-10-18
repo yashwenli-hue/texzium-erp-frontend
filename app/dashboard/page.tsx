@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "../../components/ui/PageHeader";
 import { StatCard, StatRow, Panel, Cols } from "../../components/ui/Card";
@@ -15,7 +16,8 @@ import { SourceBreakdown } from "../../components/ui/SourceBreakdown";
 import { LeadForm } from "../../components/forms/LeadForm";
 import { useLeads } from "../../lib/hooks/useLeads";
 import { useOpportunities } from "../../lib/hooks/useOpportunities";
-import { useTasks } from "../../lib/hooks/useTasks";
+import { useFollowupWorklist } from "../../lib/hooks/useFollowupWorklist";
+import { followupBucket, isActionable } from "../../lib/repository/shared/followupWorklist";
 import { useQuotations } from "../../lib/hooks/useQuotations";
 import { useCustomers } from "../../lib/hooks/useCustomers";
 import { useQuoteToCashSummary } from "../../lib/hooks/useQuoteToCashSummary";
@@ -24,7 +26,6 @@ import { useAuth } from "../../lib/auth/AuthContext";
 import { Opportunity, OpportunityStage, OPPORTUNITY_STEPS, formatOpportunityStage, isQualifiedLeadStatus } from "../../lib/types/domain";
 import { canMoveOpportunityStage, validateOpportunityStageMove } from "../../lib/repository/shared/opportunityStage";
 import { formatInr, formatRelative } from "../../lib/format";
-import { classifyFollowup } from "../../lib/followup";
 
 const SNAPSHOT_COLUMNS: KanbanColumnConfig<OpportunityStage>[] = OPPORTUNITY_STEPS.map((stage) => ({
   key: stage,
@@ -70,7 +71,7 @@ export default function DashboardPage() {
   const canEditStage = hasPermission("opportunities.edit");
   // The move waiting for its confirmation: every drop on the board asks first, and a cancelled one leaves the card where it was.
   const [pendingMove, setPendingMove] = useState<{ opportunity: Opportunity; from: OpportunityStage; to: OpportunityStage } | null>(null);
-  const { tasks } = useTasks();
+  const followups = useFollowupWorklist(hasPermission("leads.followups.view"));
   const { quotations } = useQuotations();
   const { customers } = useCustomers();
   const quoteToCash = useQuoteToCashSummary();
@@ -101,28 +102,25 @@ export default function DashboardPage() {
     ? Math.round((leads.filter((l) => isQualifiedLeadStatus(l.status)).length / leads.length) * 100)
     : 0;
 
-  // MOCK/UI-ONLY prioritization surface — follow-up urgency is derived from
-  // the generic mock Task list (see lib/followup.ts), not a real backend
-  // LeadFollowup/priority field. Unassigned leads and Draft quotations are
-  // computed straight from already-loaded mock data — nothing invented.
+  // What needs doing first: the person's real follow-ups (record-scoped by the backend), then
+  // new leads nobody owns yet, then quotations waiting for approval. Nothing here is invented.
   const allFocusItems = useMemo<FocusItem[]>(() => {
     const items: FocusItem[] = [];
+    const now = new Date();
 
-    for (const t of tasks) {
-      if (t.done || !t.dueAt) continue;
-      const urgency = classifyFollowup(t.dueAt);
-      const href = t.linkedType === "Lead" ? `/leads/${t.linkedId}` : `/customers/${t.linkedId}`;
-      const tone = urgency === "Overdue" ? "bad" : urgency === "Due Today" ? "warn" : "n";
-      const urgencyLabel = urgency === "Overdue" ? "Overdue" : urgency === "Due Today" ? "Due today" : "Upcoming";
+    for (const f of followups.items) {
+      if (!isActionable(f)) continue;
+      const bucket = followupBucket(f, now);
+      if (bucket === "CLOSED") continue;
       items.push({
-        id: `task-${t.id}`,
+        id: `followup-${f.id}`,
         icon: "clock",
-        tone,
-        urgencyLabel,
-        title: t.title,
-        company: t.linkedName,
-        time: formatRelative(t.dueAt),
-        href,
+        tone: bucket === "OVERDUE" ? "bad" : bucket === "TODAY" ? "warn" : "n",
+        urgencyLabel: bucket === "OVERDUE" ? "Overdue" : bucket === "TODAY" ? "Due today" : "Upcoming",
+        title: f.remarks ? `Follow up: ${f.remarks}` : "Follow-up due",
+        company: f.lead.companyName ? `${f.lead.customerName} · ${f.lead.companyName}` : f.lead.customerName,
+        time: formatRelative(f.followupDate),
+        href: `/leads/${f.lead.id}`,
       });
     }
 
@@ -157,7 +155,7 @@ export default function DashboardPage() {
 
     const priority: Record<string, number> = { Overdue: 0, "Due today": 1, "Needs action": 2, Upcoming: 3 };
     return items.sort((a, b) => (priority[a.urgencyLabel] ?? 4) - (priority[b.urgencyLabel] ?? 4));
-  }, [tasks, leads, quotations]);
+  }, [followups.items, leads, quotations]);
 
   const focusItems = focusExpanded ? allFocusItems : allFocusItems.slice(0, FOCUS_DEFAULT_COUNT);
 
@@ -229,12 +227,7 @@ export default function DashboardPage() {
           ) : (
             <div className="list-tight">
               {focusItems.map((item) => (
-                <div
-                  className="li"
-                  key={item.id}
-                  style={{ cursor: "pointer" }}
-                  onClick={() => router.push(item.href)}
-                >
+                <Link className="li li-link" key={item.id} href={item.href}>
                   <div className="ic" style={{ background: `var(--${item.tone === "n" ? "line-2" : item.tone + "-bg"})`, color: item.tone === "n" ? "var(--muted)" : `var(--${item.tone})` }}>
                     <Icon name={item.icon} size={16} />
                   </div>
@@ -247,7 +240,7 @@ export default function DashboardPage() {
                     <small>{item.time}</small>
                   </div>
                   <Icon name="arrow" size={14} className="li-arrow" />
-                </div>
+                </Link>
               ))}
             </div>
           )}

@@ -1,6 +1,7 @@
 import {
   Lead,
   LeadFollowup,
+  FollowupWorkItem,
   LeadFollowupStatus,
   LeadNoteEntry,
   LeadSourceRecord,
@@ -281,6 +282,26 @@ export function mapLeadFollowup(raw: BackendLeadFollowup): LeadFollowup {
     completedByName: raw.completedBy?.fullName ?? undefined,
     createdAt: raw.createdAt,
     updatedAt: raw.updatedAt,
+  };
+}
+
+/** GET /lead-followups embeds the whole lead row; the worklist keeps what it shows. */
+export interface BackendFollowupWithLead extends BackendLeadFollowup {
+  lead: BackendLead;
+}
+
+export function mapFollowupWorkItem(raw: BackendFollowupWithLead): FollowupWorkItem {
+  return {
+    ...mapLeadFollowup(raw),
+    lead: {
+      id: raw.lead.id,
+      customerName: raw.lead.customerName,
+      companyName: raw.lead.companyName ?? undefined,
+      phone: raw.lead.phone || undefined,
+      status: raw.lead.status as LeadStatus,
+      isActive: raw.lead.isActive ?? true,
+      assignedToId: raw.lead.assignedToId ?? null,
+    },
   };
 }
 

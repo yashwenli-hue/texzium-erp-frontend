@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { PageHeader } from "../../components/ui/PageHeader";
+import { PageHeader, PreviewNotice } from "../../components/ui/PageHeader";
 import { Panel } from "../../components/ui/Card";
 import { Button } from "../../components/ui/Button";
 import { ChipGroup, Chip } from "../../components/ui/Tag";
@@ -64,13 +64,7 @@ export default function ActivitiesPage() {
         }
       />
 
-      {repo.kind === "real" && (
-        <p style={{ fontSize: 12.5, color: "var(--muted)", margin: "-8px 0 14px" }}>
-          Activities has no backend module of its own yet — this section runs entirely on local,
-          in-browser demo data, even though the rest of RevenueOS is connected to the real backend.
-          Nothing logged here is saved anywhere permanent.
-        </p>
-      )}
+      {repo.kind === "real" && <PreviewNotice entered="Anything you log" />}
 
       <ChipGroup>
         <Chip label="All" active={typeChip === "All"} onClick={() => setTypeChip("All")} />

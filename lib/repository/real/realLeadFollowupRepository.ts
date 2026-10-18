@@ -1,14 +1,19 @@
 import { ID } from "../../types/common";
-import { LeadFollowup } from "../../types/domain";
+import { FollowupWorkItem, LeadFollowup } from "../../types/domain";
 import { CreateFollowupInput, ILeadFollowupRepository } from "../interfaces";
 import { apiFetch } from "../../api/httpClient";
-import { BackendLeadFollowup, mapLeadFollowup } from "./mappers";
+import { BackendFollowupWithLead, BackendLeadFollowup, mapFollowupWorkItem, mapLeadFollowup } from "./mappers";
 
 /** VERIFIED lead-followups routes — see docs/backend-ui-contract.md §5. */
 export class RealLeadFollowupRepository implements ILeadFollowupRepository {
   async listByLead(leadId: ID): Promise<LeadFollowup[]> {
     const rows = await apiFetch<BackendLeadFollowup[]>(`/lead-followups/${leadId}`);
     return rows.map(mapLeadFollowup);
+  }
+
+  async listAll(): Promise<FollowupWorkItem[]> {
+    const rows = await apiFetch<BackendFollowupWithLead[]>("/lead-followups");
+    return rows.map(mapFollowupWorkItem);
   }
 
   async create(input: CreateFollowupInput): Promise<LeadFollowup> {

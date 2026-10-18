@@ -59,14 +59,18 @@ export const NAV_SECTIONS: NavSection[] = [
     label: "Accounts",
     items: [
       { href: "/customers", label: "Customers", icon: "building", countKey: "customersCount" },
-      { href: "/contacts", label: "Contacts", icon: "users", countKey: "contactsCount" },
     ],
   },
   {
     label: "Activity",
+    items: [{ href: "/tasks", label: "Follow-ups", icon: "checksq", permission: "leads.followups.view" }],
+  },
+  {
+    // Screens with no backend of their own: they run on sample data and keep nothing (each says so).
+    label: "Previews",
     items: [
+      { href: "/contacts", label: "Contacts", icon: "users", countKey: "contactsCount" },
       { href: "/activities", label: "Activities", icon: "pulse" },
-      { href: "/tasks", label: "Tasks", icon: "checksq", countKey: "openTasksCount" },
       { href: "/notes", label: "Notes", icon: "notepad", countKey: "notesCount" },
     ],
   },
@@ -101,7 +105,7 @@ export const PAGE_META: Record<string, { title: string; subtitle: string }> = {
   customers: { title: "Customers", subtitle: "Converted accounts — lifetime value, order history and account health." },
   contacts: { title: "Contacts", subtitle: "Every individual you deal with, across leads and customer accounts." },
   activities: { title: "Activities", subtitle: "A unified log of every call, email, meeting and message across RevenueOS." },
-  tasks: { title: "Follow-ups / Tasks", subtitle: "What needs doing, grouped by urgency, so nothing slips through." },
+  tasks: { title: "Follow-ups", subtitle: "Every follow-up on your leads: what is late, what is due today and what comes next." },
   notes: { title: "Notes", subtitle: "Context and institutional memory attached to leads and accounts." },
   opportunities: { title: "Opportunities", subtitle: "Qualified, forecastable deals — value, probability and expected close." },
   quotations: { title: "Quotations", subtitle: "Every quote sent, its status, and how close it is to becoming revenue." },

@@ -208,6 +208,25 @@ export interface LeadFollowup {
   updatedAt: string;
 }
 
+/**
+ * VERIFIED (backend d9fc0c5): GET /lead-followups returns every follow-up the caller may see
+ * (leads.followups.view, record-scoped through its lead), oldest due date first, each with its
+ * lead row. Only the lead fields the worklist shows are kept.
+ */
+export interface FollowupLeadSummary {
+  id: ID;
+  customerName: string;
+  companyName?: string;
+  phone?: string;
+  status: LeadStatus;
+  isActive: boolean;
+  assignedToId?: ID | null;
+}
+
+export interface FollowupWorkItem extends LeadFollowup {
+  lead: FollowupLeadSummary;
+}
+
 // Minimal real-user shape needed to populate the Assign/Qualify dropdowns —
 // see AssignLeadDialog/QualifyLeadDialog. Sourced from GET /users (outside
 // the RevenueOS module; no RevenueOS-scoped assignable-user lookup is

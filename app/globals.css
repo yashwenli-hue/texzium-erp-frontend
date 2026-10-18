@@ -1331,7 +1331,7 @@ a.sc-link:hover .sc-summary{color:var(--m)}
 .details-contact{padding:0 19px 19px}
 .details-contact .qa-wrap{margin-top:0}
 .hist-filter{display:flex;gap:6px;flex-wrap:wrap;padding:4px 21px 10px}
-button.chip{font:inherit;cursor:pointer}
+button.chip{font-family:inherit;line-height:inherit;cursor:pointer}
 .activity-more{padding:6px 19px 16px}
 .of-for{margin:0 0 14px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface);font-size:13px}
 .of-for .k{font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;color:var(--c-sub);font-weight:700;margin-right:6px}
@@ -1650,3 +1650,43 @@ button.more{background:none;border:0;font:inherit;cursor:pointer;padding:0}
 .dup-head{margin:0;padding:10px 19px 2px;font-size:12.5px;font-weight:600;color:var(--text)}
 .dup-route{display:block;margin-top:2px;color:var(--text-2)}
 .dup-confirm{margin-top:8px}
+
+/* Follow-ups worklist (/tasks): late, today, upcoming; each row the lead, the time and its actions.
+   On a phone a row stacks and its actions become full-size touch targets. */
+.fu-summary{list-style:none;margin:0 0 16px;padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.fu-sum a{display:flex;flex-direction:column;gap:2px;padding:14px 16px;border:1px solid var(--line);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);text-decoration:none}
+.fu-sum a:hover{border-color:var(--m)}
+.fu-sum b{font-family:var(--display);font-size:22px;line-height:1.1}
+.fu-sum span{font-size:12.5px;color:var(--muted)}
+.fu-sum.fu-overdue b{color:var(--bad)}
+.fu-sum.fu-today b{color:var(--warn)}
+.fu-group{margin-top:18px}
+.fu-group h2{display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:700;margin:0 0 8px;color:var(--text)}
+.fu-group h2 svg{color:var(--muted)}
+.fu-count{font-weight:600;color:var(--faint-text)}
+.fu-empty{font-size:12.5px;color:var(--muted);padding:2px 0 4px}
+.fu-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.fu-row{display:grid;grid-template-columns:150px minmax(0,1fr) auto;gap:6px 16px;align-items:start;padding:13px 16px;border:1px solid var(--line);border-radius:var(--radius-sm);background:var(--surface)}
+.fu-row.fu-overdue{border-left:3px solid var(--bad)}
+.fu-row.fu-today{border-left:3px solid var(--warn)}
+.fu-when b{display:block;font-size:13px}
+.fu-row.fu-overdue .fu-when b{color:var(--bad)}
+.fu-when small{display:block;font-size:11.5px;color:var(--faint-text);margin-top:2px}
+.fu-lead{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:baseline}
+.fu-lead a{font-weight:600;font-size:13.5px;color:var(--text)}
+.fu-co{font-size:12px;color:var(--muted)}
+.fu-remarks{font-size:12.5px;color:var(--text-2);margin:3px 0 0;overflow-wrap:anywhere}
+.fu-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.fu-note{grid-column:2 / -1;font-size:12px;color:var(--muted);margin:0}
+.fu-actions{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end}
+.followups .disclosure{margin-top:18px}
+@media(max-width:640px){
+  .fu-summary{gap:6px}.fu-sum a{padding:10px 12px}.fu-sum b{font-size:18px}
+  .fu-row{grid-template-columns:minmax(0,1fr);padding:12px 14px}
+  .fu-note{grid-column:auto}
+  .fu-actions{justify-content:stretch}.fu-actions .btn{flex:1;justify-content:center;min-height:44px}
+}
+.preview-notice{display:flex;gap:10px;align-items:flex-start;margin:-6px 0 16px;padding:12px 16px;border:1px solid var(--warn);border-radius:var(--radius-sm);background:var(--warn-bg);color:var(--text);font-size:13px;line-height:1.55}
+.preview-notice svg{flex:none;color:var(--warn);margin-top:2px}
+.fu-actions.compact{justify-content:flex-start;margin-top:6px}
+.li-link{color:inherit;text-decoration:none}

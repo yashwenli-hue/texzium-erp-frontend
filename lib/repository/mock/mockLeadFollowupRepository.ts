@@ -1,5 +1,5 @@
 import { ID } from "../../types/common";
-import { LeadFollowup } from "../../types/domain";
+import { FollowupWorkItem, LeadFollowup } from "../../types/domain";
 import { CreateFollowupInput, ILeadFollowupRepository } from "../interfaces";
 import { db } from "./db";
 import { delay } from "./queryUtils";
@@ -19,6 +19,27 @@ export class MockLeadFollowupRepository implements ILeadFollowupRepository {
       .filter((f) => f.leadId === leadId)
       .sort((a, b) => (a.followupDate < b.followupDate ? -1 : 1));
     return delay(rows);
+  }
+
+  async listAll(): Promise<FollowupWorkItem[]> {
+    const rows: FollowupWorkItem[] = [];
+    for (const f of db.leadFollowups.getAll()) {
+      const lead = db.leads.getAll().find((l) => l.id === f.leadId);
+      if (!lead) continue;
+      rows.push({
+        ...f,
+        lead: {
+          id: lead.id,
+          customerName: lead.customerName,
+          companyName: lead.companyName,
+          phone: lead.phone,
+          status: lead.status,
+          isActive: lead.isActive,
+          assignedToId: lead.assignedToId ?? null,
+        },
+      });
+    }
+    return delay(rows.sort((a, b) => (a.followupDate < b.followupDate ? -1 : 1)));
   }
 
   async create(input: CreateFollowupInput): Promise<LeadFollowup> {

@@ -11,7 +11,7 @@ import type {
 } from "./shared/dataDeletion";
 import { ListQuery, Page, ID } from "../types/common";
 import type { DownloadedFile } from "../api/httpClient";
-import { ContentAccessUrl, ContentAsset, ContentAssetDetail, ContentListFilters, ContentShare, ContentShareInput, ContentShareResult, ContentUpdateInput, ContentUploadInput, DocumentProfile, DocumentProfileFields, Lead, LeadStatus, LeadSourceRecord, LeadTimelineEntry, LeadActivityType, LeadUIContext, LeadFollowup, AssignableUser, InventoryItemOption, GstRegistrationOption, Customer, Contact, Activity, ActivityType, Task, Note, Opportunity, OpportunityStage, Quotation, QuotationEvent, ProformaInvoice, ProformaEvent, SalesOrder, SalesOrderEvent, SalesOrderPaymentTerm, SalesOrderAdvanceReceipt, SalesOrderCommercialApproval, AdvanceReceiptOutcome, SalesInvoice, DispatchOrderOption, AccountsReceivable, RecordPaymentResult, PaymentCollection, PaymentCollectionDetail, InvoiceCollections, CustomerStatement, StatementPeriod, PaymentLinkResult, ReceiptVoucher, SalesRevenueSummary, CollectionsSummary, CollectionsAging, CollectionsEfficiency, CollectionsRecoveryRate, AppNotification, CustomerEvent, CustomerGstRegistration, CustomerDuplicateCheck, CustomerOverview, CallOutcome } from "../types/domain";
+import { ContentAccessUrl, ContentAsset, ContentAssetDetail, ContentListFilters, ContentShare, ContentShareInput, ContentShareResult, ContentUpdateInput, ContentUploadInput, DocumentProfile, DocumentProfileFields, Lead, LeadStatus, LeadSourceRecord, LeadTimelineEntry, LeadActivityType, LeadUIContext, LeadFollowup, FollowupWorkItem, AssignableUser, InventoryItemOption, GstRegistrationOption, Customer, Contact, Activity, ActivityType, Task, Note, Opportunity, OpportunityStage, Quotation, QuotationEvent, ProformaInvoice, ProformaEvent, SalesOrder, SalesOrderEvent, SalesOrderPaymentTerm, SalesOrderAdvanceReceipt, SalesOrderCommercialApproval, AdvanceReceiptOutcome, SalesInvoice, DispatchOrderOption, AccountsReceivable, RecordPaymentResult, PaymentCollection, PaymentCollectionDetail, InvoiceCollections, CustomerStatement, StatementPeriod, PaymentLinkResult, ReceiptVoucher, SalesRevenueSummary, CollectionsSummary, CollectionsAging, CollectionsEfficiency, CollectionsRecoveryRate, AppNotification, CustomerEvent, CustomerGstRegistration, CustomerDuplicateCheck, CustomerOverview, CallOutcome } from "../types/domain";
 import type { LeadSearchQuery, LeadSearchResult } from "./shared/leadSearch";
 import type { LeadDuplicateProbe, LeadDuplicateResult } from "./shared/leadDuplicates";
 import type { AccessAuditEntry, AccessPermission, AccessRole, AccessUser, AccessUserStatus, RolePermissionChange } from "./shared/access";
@@ -166,6 +166,8 @@ export interface CreateFollowupInput {
 
 export interface ILeadFollowupRepository {
   listByLead(leadId: ID): Promise<LeadFollowup[]>;
+  /** VERIFIED: GET /lead-followups (leads.followups.view) — every follow-up in the caller's record scope, with its lead. */
+  listAll(): Promise<FollowupWorkItem[]>;
   create(input: CreateFollowupInput): Promise<LeadFollowup>;
   /** VERIFIED: PATCH /:id/complete — completing user comes from the auth token, not the request body. */
   complete(id: ID): Promise<LeadFollowup>;

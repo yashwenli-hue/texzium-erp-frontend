@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { PageHeader } from "../../components/ui/PageHeader";
+import { PageHeader, PreviewNotice } from "../../components/ui/PageHeader";
 import { Button } from "../../components/ui/Button";
 import { ChipGroup, Chip } from "../../components/ui/Tag";
 import { Icon } from "../../components/ui/Icon";
@@ -38,13 +38,7 @@ export default function NotesPage() {
         }
       />
 
-      {repo.kind === "real" && (
-        <p style={{ fontSize: 12.5, color: "var(--muted)", margin: "-8px 0 14px" }}>
-          Notes has no backend module of its own yet — this section runs entirely on local,
-          in-browser demo data, even though the rest of RevenueOS is connected to the real backend.
-          Nothing created or edited here is saved anywhere permanent.
-        </p>
-      )}
+      {repo.kind === "real" && <PreviewNotice entered="Anything you add or change" />}
 
       <ChipGroup>
         <Chip label="All" active={filter === "All"} onClick={() => setFilter("All")} />

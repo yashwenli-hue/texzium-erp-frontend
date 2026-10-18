@@ -15,6 +15,7 @@ export function ConfirmDialog({
   title,
   body,
   confirmLabel,
+  dismissLabel = "Cancel",
   destructive,
   noteLabel,
   noteRequired,
@@ -25,6 +26,8 @@ export function ConfirmDialog({
   title: string;
   body: string;
   confirmLabel: string;
+  /** The button that closes without acting; say what it keeps when "Cancel" would be ambiguous (e.g. cancelling a follow-up). */
+  dismissLabel?: string;
   destructive?: boolean;
   noteLabel?: string;
   /** When true, `note` is required before onConfirm fires — e.g. the backend requires a rejection reason. */
@@ -68,7 +71,7 @@ export function ConfirmDialog({
       footer={
         <>
           <Button variant="ghost" onClick={onClose} disabled={submitting}>
-            Cancel
+            {dismissLabel}
           </Button>
           <Button
             variant="primary"
