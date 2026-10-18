@@ -216,3 +216,23 @@ test("a refused lead or opportunity page says which access it needs, without a p
     assert.match(s, /forbidden \? undefined : \(/, p);
   }
 });
+
+test("when the lead's deals can't be read, nothing suggests creating one (it could duplicate a deal)", () => {
+  const hidden = leadAttention(ctx({ lead: lead("SALES_ASSIGNED", { assignedToId: "u" }), dealsKnown: false }));
+  assert.ok(!keys(hidden).includes("convert"));
+  assert.ok(keys(hidden).includes("deals-hidden"));
+  const steps = leadJourney({ status: "SALES_ASSIGNED", assignedToName: "Sam" }, undefined, 0, false);
+  assert.equal(steps[3].detail, "Not visible to you");
+  const page = src("app/leads/[id]/page.tsx");
+  assert.ok(page.includes('!(k === "convert" && (primaryOpportunity || !dealsKnown))'));
+  assert.ok(page.includes("needs the opportunities.view permission. One may already exist."));
+});
+
+test("when a deal's quotations can't be read, no quotation is suggested", () => {
+  const items = opportunityAttention(octx({ quotationsKnown: false }));
+  assert.ok(!keys(items).includes("quote"));
+  assert.ok(keys(items).includes("quotes-hidden"));
+  const page = src("app/opportunities/[id]/page.tsx");
+  assert.ok(page.includes("mayQuote && quotationsKnown ?"));
+  assert.ok(page.includes("needs the quotations.view permission. One may already exist."));
+});

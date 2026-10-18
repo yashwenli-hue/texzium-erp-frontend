@@ -84,6 +84,11 @@ export interface LeadWorkspaceContext {
   potentialDuplicates: number;
   may: LeadPermissions;
   now: Date;
+  /**
+   * False when the lead's opportunities could not be read (the list needs opportunities.view). Then
+   * "no opportunity" is unknown, not true: nothing may suggest creating one, which could duplicate a deal.
+   */
+  dealsKnown?: boolean;
 }
 
 export interface LastCall {
@@ -227,7 +232,17 @@ export function leadAttention(ctx: LeadWorkspaceContext): Array<NextUpItem<LeadA
     }
   }
 
-  if (isQualifiedLeadStatus(lead.status) && !opp) {
+  const dealsKnown = ctx.dealsKnown !== false;
+  if (isQualifiedLeadStatus(lead.status) && !dealsKnown) {
+    items.push({
+      key: "deals-hidden",
+      tone: "info",
+      title: "This lead's deals aren't visible to you",
+      detail: "Seeing opportunities needs the opportunities.view permission. One may already exist, so check before creating another.",
+    });
+  }
+
+  if (isQualifiedLeadStatus(lead.status) && !opp && dealsKnown) {
     items.push({
       key: "convert",
       tone: "action",
@@ -297,7 +312,8 @@ export function leadActionStates(ctx: Pick<LeadWorkspaceContext, "lead" | "may">
 export function leadJourney(
   lead: Pick<Lead, "status" | "assignedToName">,
   opportunity: Pick<Opportunity, "id" | "title" | "stage"> | undefined,
-  quotationCount: number
+  quotationCount: number,
+  dealsKnown = true
 ): Array<{ key: JourneyStepKey; label: string; detail?: string; state: "done" | "current" | "todo" | "stopped"; href?: string }> {
   const rejected = lead.status === "REJECTED";
   const qualified = isQualifiedLeadStatus(lead.status) || ["PROPOSAL_SENT", "NEGOTIATION", "WON", "LOST"].includes(lead.status) || !!opportunity;
@@ -310,7 +326,7 @@ export function leadJourney(
     { key: "received", label: "Received", state: state("received") },
     { key: "presales", label: "Pre-sales", detail: rejected ? "Rejected" : lead.assignedToName && !qualified ? lead.assignedToName : undefined, state: state("presales") },
     { key: "qualified", label: "Qualified", state: state("qualified") },
-    { key: "opportunity", label: "Opportunity", detail: opportunity ? `Stage: ${formatOpportunityStage(opportunity.stage)}` : undefined, state: state("opportunity"), href: opportunity ? `/opportunities/${opportunity.id}` : undefined },
-    { key: "quotation", label: "Quotation", detail: quotationCount > 0 ? `${quotationCount}` : undefined, state: state("quotation") },
+    { key: "opportunity", label: "Opportunity", detail: !dealsKnown ? "Not visible to you" : opportunity ? `Stage: ${formatOpportunityStage(opportunity.stage)}` : undefined, state: state("opportunity"), href: opportunity ? `/opportunities/${opportunity.id}` : undefined },
+    { key: "quotation", label: "Quotation", detail: !dealsKnown ? "Not visible to you" : quotationCount > 0 ? `${quotationCount}` : undefined, state: state("quotation") },
   ];
 }

@@ -49,7 +49,9 @@ export default function OpportunityDetailPage() {
   const canEditStage = hasPermission("opportunities.edit");
   const id = params?.id;
   const { opportunity, lead, timeline, loading, error, updateStage, linkCustomer, refetch } = useOpportunityDetail(id);
-  const { quotations, proformas, orders, createQuotation, refetch: refetchQuotations } = useQuotationPipeline();
+  const { quotations, proformas, orders, createQuotation, refetch: refetchQuotations, error: quotationsError } = useQuotationPipeline();
+  // A refused quotation list is not an empty one: nothing suggests creating a quotation then.
+  const quotationsKnown = !quotationsError;
   const [pendingMove, setPendingMove] = useState<PendingMove | null>(null);
   const [showQuotationForm, setShowQuotationForm] = useState(false);
   const [showShare, setShowShare] = useState(false);
@@ -154,6 +156,7 @@ export default function OpportunityDetailPage() {
     may: { editStage: canEditStage, editOpportunity: hasPermission(OPPORTUNITY_EDIT_PERMISSION), createQuotation: hasPermission(QUOTATION_PERMISSIONS.create), logActivity: hasPermission("leads.edit") },
     linkState: customerActions.link,
     now: new Date(),
+    quotationsKnown,
   });
   const journey = lead ? leadJourney(lead, opportunity, relatedQuotes.length) : null;
   const closePassed = !isTerminal && !!opportunity.expectedCloseDate && new Date(opportunity.expectedCloseDate).getTime() < new Date().setHours(0, 0, 0, 0);
@@ -324,7 +327,7 @@ export default function OpportunityDetailPage() {
             title={`Quotations${relatedQuotes.length ? ` · ${relatedQuotes.length}` : ""}`}
             flush
             extraHead={
-              mayQuote ? (
+              mayQuote && quotationsKnown ? (
                 <span className="panel-acts">
                   <button type="button" className="more" onClick={() => setShowQuotationForm(true)}>
                     <Icon name="plus" size={14} /> Create quotation
@@ -333,7 +336,9 @@ export default function OpportunityDetailPage() {
               ) : undefined
             }
           >
-            {quotesWithNext.length === 0 ? (
+            {!quotationsKnown ? (
+              <p className="ws-empty">You can&apos;t see this deal&apos;s quotations: that needs the quotations.view permission. One may already exist.</p>
+            ) : quotesWithNext.length === 0 ? (
               <p className="ws-empty">
                 No quotations yet.{" "}
                 {!opportunity.customerId ? "Link a customer first." : mayQuote ? "Create one to start Quote-to-Cash." : "Someone with the quotations.create permission can create one."}

@@ -77,7 +77,9 @@ export default function LeadDetailPage() {
   const { notes, refetch: refetchNotes } = useNotesByRelated(id);
   const { followups, createFollowup, completeFollowup, rescheduleFollowup, cancelFollowup, refetch: refetchFollowups } = useLeadFollowups(id);
   const { quotations } = useQuotations();
-  const { opportunities, createOpportunity } = useOpportunities();
+  const { opportunities, createOpportunity, error: opportunitiesError } = useOpportunities();
+  // A refused opportunity list is not an empty one (see leadWorkspace: dealsKnown).
+  const dealsKnown = !opportunitiesError;
   const repo = useRepository();
   const { hasPermission } = useAuth();
   const isReal = repo.kind === "real";
@@ -197,9 +199,10 @@ export default function LeadDetailPage() {
     opportunities: relatedOpportunities,
     potentialDuplicates: duplicates.summary.potentialDuplicates,
     may,
+    dealsKnown,
     now: new Date(),
   });
-  const journey = leadJourney(lead, primaryOpportunity, relatedQuotes.length);
+  const journey = leadJourney(lead, primaryOpportunity, relatedQuotes.length, dealsKnown);
   const lastCall = lastCallOf(timeline);
   const pending = pendingFollowups(followups);
   const owner = lead.assignedToName
@@ -234,7 +237,7 @@ export default function LeadDetailPage() {
   };
   // Working the lead (calls, follow-ups) first; then the lifecycle decisions that apply to its status.
   const workActions = (["logCall", "logCnc", "followup"] as LeadActionKey[]).map((k) => asAction(k));
-  const lifecycleKeys = (["convert", "assign", "qualify", "status", "reopen", "reject"] as LeadActionKey[]).filter((k) => states[k].available && !(k === "convert" && primaryOpportunity));
+  const lifecycleKeys = (["convert", "assign", "qualify", "status", "reopen", "reject"] as LeadActionKey[]).filter((k) => states[k].available && !(k === "convert" && (primaryOpportunity || !dealsKnown)));
   const lifecycleActions = lifecycleKeys.map((k) => asAction(k, k === "convert" ? "primary" : undefined));
   const menuItems = (["edit", "unassign", "reactivate", "deactivate", "delete"] as LeadActionKey[])
     .filter((k) => states[k].available)
@@ -377,7 +380,11 @@ export default function LeadDetailPage() {
 
         <aside className="ws-side" aria-label="Lead details and related records">
           <Panel title="Deal" flush>
-            {relatedOpportunities.length === 0 ? (
+            {!dealsKnown ? (
+              <p className="ws-empty">
+                You can&apos;t see this lead&apos;s opportunities or quotations: that needs the opportunities.view permission. One may already exist.
+              </p>
+            ) : relatedOpportunities.length === 0 ? (
               <p className="ws-empty">
                 {isQualifiedLeadStatus(lead.status)
                   ? "Qualified. Create the opportunity to track value, probability and quotations."

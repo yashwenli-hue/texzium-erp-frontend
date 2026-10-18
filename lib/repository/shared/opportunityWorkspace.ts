@@ -24,6 +24,8 @@ export interface OpportunityWorkspaceContext {
   /** The customer-link action as the existing rules decide it. */
   linkState: { enabled: boolean; reason?: string };
   now: Date;
+  /** False when the quotation list could not be read (quotations.view): "no quotation" is then unknown, so none is suggested. */
+  quotationsKnown?: boolean;
 }
 
 const TONE_ORDER: Record<NextUpItem["tone"], number> = { bad: 0, warn: 1, action: 2, info: 3, good: 4 };
@@ -82,6 +84,13 @@ export function opportunityAttention(ctx: OpportunityWorkspaceContext): Array<Ne
       title: "Link a customer before quoting",
       detail: "A quotation is made for a customer and uses its GST registration. Linking never creates or merges a customer.",
       cta: cta("Link a customer", "link", ctx.linkState.enabled, ctx.linkState.reason),
+    });
+  } else if (ctx.quotationsKnown === false) {
+    items.push({
+      key: "quotes-hidden",
+      tone: "info",
+      title: "This deal's quotations aren't visible to you",
+      detail: "Seeing quotations needs the quotations.view permission. One may already exist, so check before creating another.",
     });
   } else if (ctx.quotations.length === 0) {
     items.push({
