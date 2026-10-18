@@ -267,6 +267,15 @@ svg.i18{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.6;st
 .contact-row-actions{display:flex;align-items:center;gap:6px}
 .avatar{width:34px;height:34px;border-radius:10px;background:var(--chip-ink);color:#fff;display:grid;place-items:center;font-family:var(--display);font-weight:700;font-size:12px;margin-left:4px}
 .mobile-toggle{display:none}
+/* Shell accessibility: a skip link that appears on keyboard focus, a real breadcrumb link,
+   a search button where the topbar search does not fit, and the drawer's tap-to-close scrim. */
+.skip-link{position:absolute;left:12px;top:-60px;z-index:200;padding:10px 14px;border-radius:10px;background:var(--surface);color:var(--text);font-weight:600;font-size:13.5px;box-shadow:var(--shadow-2, 0 8px 28px -10px rgba(10,10,12,.3));border:1px solid var(--line)}
+.skip-link:focus{top:10px}
+#stage:focus{outline:none}
+.crumb-link{color:inherit;text-decoration:none;border-radius:6px}
+.crumb-link:hover{color:var(--text);text-decoration:underline;text-underline-offset:3px}
+.search-btn{display:none}
+.rail-scrim{display:none}
 
 /* ---------- Page ---------- */
 .page{padding:28px;max-width:1400px;width:100%}
@@ -544,11 +553,14 @@ tbody tr.clickable:focus-visible{outline:2px solid var(--m);outline-offset:-2px;
 .result .body{flex:1;min-width:0}
 .result .body b{font-size:13px}
 .result .body small{display:block;color:var(--muted);font-size:12px;margin-top:2px}
+.result-link{color:inherit;text-decoration:none;transition:border-color .12s,background .12s}
+.result-link:hover{border-color:var(--m);background:var(--row-hover)}
 
 @media(max-width:1080px){.cols{grid-template-columns:1fr}.crm-grid{grid-template-columns:minmax(0,1fr)}.stat-row{grid-template-columns:repeat(2,1fr)}.tiles{grid-template-columns:1fr 1fr}.notes-grid{grid-template-columns:1fr 1fr}.kanban{grid-template-columns:repeat(3,1fr)}}
 @media(max-width:720px){
   .rail{position:fixed;left:0;top:0;z-index:60;width:250px;transform:translateX(-100%);transition:transform .22s}
-  .rail.show{transform:none;box-shadow:0 0 0 100vmax var(--scrim-rail)}
+  .rail.show{transform:none}
+  .rail-scrim{display:block;position:fixed;inset:0;z-index:59;background:var(--scrim-rail)}
   /* Mobile always shows the full drawer regardless of the desktop collapse preference. */
   .rail.collapsed{width:250px}
   .rail.collapsed .brand{justify-content:flex-start;padding:19px 18px 15px}
@@ -995,7 +1007,7 @@ a.doc-trail-node:hover{border-color:var(--m);background:var(--m-soft)}
 .topbar .search input{min-width:0;width:100%}
 .top-actions{flex:none}
 @media(max-width:1080px){.search kbd{display:none}}
-@media(max-width:860px){.topbar .search{display:none}}
+@media(max-width:860px){.topbar .search{display:none}.search-btn{display:grid}}
 @media(max-width:720px){
   .topbar{padding:0 14px;gap:10px}
   .crumb-root{display:none}

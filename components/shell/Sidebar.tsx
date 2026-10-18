@@ -24,11 +24,13 @@ interface TooltipState {
 const DEMO_ONLY_COUNT_KEYS: NavItem["countKey"][] = ["contactsCount", "openTasksCount", "notesCount"];
 
 export function Sidebar({
+  id,
   mobileOpen,
   onNavigate,
   collapsed,
   onToggleCollapsed,
 }: {
+  id?: string;
   mobileOpen: boolean;
   onNavigate: () => void;
   collapsed: boolean;
@@ -59,7 +61,7 @@ export function Sidebar({
   }
 
   return (
-    <aside className={`rail ${mobileOpen ? "show" : ""} ${collapsed ? "collapsed" : ""}`}>
+    <aside id={id} className={`rail ${mobileOpen ? "show" : ""} ${collapsed ? "collapsed" : ""}`} aria-label="Navigation">
       <button
         className="rail-toggle-btn"
         onClick={onToggleCollapsed}
@@ -76,10 +78,10 @@ export function Sidebar({
           <small>CRM · Texzium ERP</small>
         </div>
       </div>
-      <div className="rail-scroll">
+      <nav className="rail-scroll" aria-label="RevenueOS">
         {visibleNavSections(NAV_SECTIONS, hasPermission).map((section) => (
-          <div key={section.label}>
-            <div className="nav-label">{section.label}</div>
+          <div key={section.label} role="group" aria-labelledby={`nav-${section.label.replace(/\W+/g, "-")}`}>
+            <div className="nav-label" id={`nav-${section.label.replace(/\W+/g, "-")}`}>{section.label}</div>
             {section.items.map((item) => {
               const active = pathname === item.href || pathname?.startsWith(item.href + "/");
               const count = item.countKey ? counts[item.countKey] : undefined;
@@ -89,6 +91,8 @@ export function Sidebar({
                   key={item.href}
                   href={item.href}
                   className={`mod ${active ? "active" : ""}`}
+                  aria-current={pathname === item.href ? "page" : active ? "location" : undefined}
+                  aria-label={collapsed && !mobileOpen ? item.label : undefined}
                   onClick={onNavigate}
                   onMouseEnter={(e) => showTooltip(item.label, e)}
                   onMouseLeave={hideTooltip}
@@ -111,7 +115,7 @@ export function Sidebar({
             })}
           </div>
         ))}
-      </div>
+      </nav>
       {tooltip && (
         <div className="rail-tooltip" style={{ top: tooltip.top, left: tooltip.left }}>
           {tooltip.label}
