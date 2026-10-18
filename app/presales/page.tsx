@@ -1,11 +1,15 @@
 "use client";
 
+import { useEffect } from "react";
 import { PageHeader, PageHelp } from "../../components/ui/PageHeader";
+import { QueueBar } from "../../components/ui/QueueBar";
+import { FollowupTag } from "../../components/ui/FollowupTag";
 import { Panel } from "../../components/ui/Card";
 import { Icon } from "../../components/ui/Icon";
 import { Button, EmptyState, Pagination } from "../../components/ui/Button";
 import { Chip, ChipGroup } from "../../components/ui/Tag";
 import { initials } from "../../components/ui/Who";
+import { LoadingRegion } from "../../components/ui/LoadingRegion";
 import { ResponsiveList, ResponsiveColumn } from "../../components/ui/ResponsiveList";
 import { FilterBar, ActiveFilterChips, DateRangeFilter } from "../../components/ui/FilterButton";
 import { LastCallTag, LeadStatusCell, ListStatus, leadListSort } from "../../components/leads/LeadListParts";
@@ -16,6 +20,11 @@ import { formatRelative, formatDate } from "../../lib/format";
 import { formatLeadLocationShort } from "../../lib/geo/leadLocation";
 import { FilterMap } from "../../lib/types/common";
 import { DEFAULT_LEAD_LIST_VIEW, LeadFilterKey, PRESALES_VIEW_KEY, leadRowLabel } from "../../lib/repository/shared/leadList";
+import { PRESALES_QUEUES, activeQueue } from "../../lib/repository/shared/presalesQueues";
+import { usePresalesQueueCounts } from "../../lib/hooks/usePresalesQueueCounts";
+import { useAuth } from "../../lib/auth/AuthContext";
+import { nextPendingFollowup } from "../../lib/followup";
+import { rememberSequence } from "../../lib/ui/recordSequence";
 
 const PAGE_SIZE = 20;
 const FILTERS: readonly LeadFilterKey[] = ["presales", "assignment", "stage", "status", "sales", "lastCall", "followup", "source", "product"];
@@ -38,6 +47,21 @@ export default function PresalesPage() {
   const setFilters = (f: FilterMap) => change({ filters: f });
   const filterGroups = leadFilterGroups(result.facets, filters, FILTERS);
   const anyFilter = !!search.trim() || Object.keys(filters).length > 0 || !!dateRange.from || !!dateRange.to;
+  const { user } = useAuth();
+  const me = user?.id ?? null;
+  const queue = activeQueue(filters, me);
+  const counts = usePresalesQueueCounts(me, showDeactivated, loaded ? result.total : null);
+  const queues = PRESALES_QUEUES.filter((q) => q.filters(me) !== null).map((q) => ({ key: q.key, label: q.label, hint: q.hint, count: counts[q.key] }));
+  const listLabel = queue ? `Pre-Sales · ${queue.label}` : "Pre-Sales";
+  function chooseQueue(key: string) {
+    const q = PRESALES_QUEUES.find((x) => x.key === key);
+    const f = q?.filters(me);
+    if (f) setView((v) => ({ ...v, filters: f, page: 1 }));
+  }
+  // Opening a lead from here lets its page step through this queue.
+  useEffect(() => {
+    if (loaded) rememberSequence("lead", { ids: result.items.map((l) => l.id), from: "/presales", label: listLabel });
+  }, [loaded, result.items, listLabel]);
 
   const people = (l: Lead) =>
     l.presales && l.presales.length > 0 ? (
@@ -66,6 +90,7 @@ export default function PresalesPage() {
       ),
     },
     { key: "status", header: "Status", render: (l) => <LeadStatusCell lead={l} /> },
+    { key: "followup", header: "Follow-up", render: (l) => { const f = nextPendingFollowup(l.followups); return <FollowupTag urgency={f.urgency} dueAt={f.dueAt} />; } },
     { key: "presales", header: "Pre-sales", render: people },
     {
       key: "owner",
@@ -112,7 +137,7 @@ export default function PresalesPage() {
     <PageHeader
       eyebrow="RevenueOS · Pipeline · Pre-Sales"
       title="Pre-Sales"
-      subtitle="Leads by the pre-sales people who worked on them, their assignment and where they stand now."
+      subtitle="Work the queues: who needs an owner, a call or a follow-up, and what has gone to sales."
     />
   );
 
@@ -120,7 +145,9 @@ export default function PresalesPage() {
     return (
       <div className="page">
         {header}
-        <div className="skeleton" style={{ height: 300 }} aria-label="Loading leads" />
+        <LoadingRegion label="Loading the Pre-Sales queues">
+          <div className="skeleton" style={{ height: 300 }} />
+        </LoadingRegion>
       </div>
     );
   }
@@ -138,6 +165,7 @@ export default function PresalesPage() {
   return (
     <div className="page">
       {header}
+      <QueueBar items={queues} active={queue?.key} onSelect={chooseQueue} label="Pre-Sales work queues" />
       <div className="list-toolbar">
         <label className="list-search">
           <Icon name="search" size={16} />
@@ -159,7 +187,7 @@ export default function PresalesPage() {
       {error && <p className="form-error" role="alert">Couldn&apos;t refresh the list: {error.message}</p>}
 
       <div className="lead-list" style={{ marginTop: 14 }} aria-busy={loading}>
-        <Panel title={`Pre-Sales leads · ${result.total}`} flush>
+        <Panel title={`${queue ? queue.label : "Filtered leads"} · ${result.total}`} flush>
           <ResponsiveList
             rows={result.items}
             columns={columns}
@@ -169,8 +197,8 @@ export default function PresalesPage() {
             caption="Pre-Sales leads"
             testId="presales-list"
             emptyIcon="users"
-            emptyTitle={anyFilter ? "No leads match these filters" : "No leads yet"}
-            emptyBody={anyFilter ? "Try another pre-sales person or clear the filters." : "Leads appear here once they arrive."}
+            emptyTitle={queue && queue.key !== "all" ? `Nothing in "${queue.label}"` : anyFilter ? "No leads match these filters" : "No leads yet"}
+            emptyBody={queue && queue.key !== "all" ? "This queue is clear. Pick another queue above." : anyFilter ? "Try another pre-sales person or clear the filters." : "Leads appear here once they arrive."}
             sort={leadListSort(view, change)}
           />
           <Pagination page={view.page} pageSize={PAGE_SIZE} total={result.total} onPageChange={(p) => setView((v) => ({ ...v, page: p }))} />
