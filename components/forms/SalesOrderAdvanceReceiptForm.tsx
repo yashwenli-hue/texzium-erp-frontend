@@ -8,6 +8,7 @@ import { useToast } from "../ui/Toast";
 import { CreateAdvanceReceiptInput } from "../../lib/repository/interfaces";
 import { SALES_ORDER_PAYMENT_MODES, formatPaymentMode } from "../../lib/types/domain";
 import { SALES_ORDER_REFERENCE_MAX_LENGTH, SALES_ORDER_REMARKS_MAX_LENGTH } from "../../lib/repository/shared/salesOrderLifecycle";
+import { FormError } from "../ui/FormError";
 
 /**
  * Records an advance payment received for a Sales Order. It starts PENDING; a
@@ -92,7 +93,7 @@ export function SalesOrderAdvanceReceiptForm({
       />
       <TextField label="Reference No." value={referenceNo} onChange={(e) => setReferenceNo(e.target.value)} error={errors.referenceNo} placeholder="Optional — UTR, cheque number…" />
       <TextAreaField label="Remarks" value={remarks} onChange={(e) => setRemarks(e.target.value)} error={errors.remarks} placeholder="Optional" />
-      {errors.form && <p style={{ color: "var(--bad)", fontSize: 12.5 }}>{errors.form}</p>}
+      <FormError message={errors.form} />
     </Modal>
   );
 }

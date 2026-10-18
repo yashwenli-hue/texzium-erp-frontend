@@ -7,6 +7,7 @@ import { Button } from "../ui/Button";
 import { useToast } from "../ui/Toast";
 import { CreateSalesInvoiceInput } from "../../lib/repository/interfaces";
 import { DispatchOrderOption } from "../../lib/types/domain";
+import { FormError } from "../ui/FormError";
 
 // Today in India (IST, UTC+05:30), as "YYYY-MM-DD": the latest invoice date the backend accepts.
 const istToday = () => new Date(Date.now() + 330 * 60 * 1000).toISOString().slice(0, 10);
@@ -116,7 +117,7 @@ export function SalesInvoiceForm({
         order&apos;s quotation (GST is never added again), and an order is invoiced once. An invoice can&apos;t be dated
         before the last invoice in its number series.
       </p>
-      {errors.form && <p style={{ color: "var(--bad)", fontSize: 12.5 }}>{errors.form}</p>}
+      <FormError message={errors.form} />
     </Modal>
   );
 }

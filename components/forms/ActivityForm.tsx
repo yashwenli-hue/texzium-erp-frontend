@@ -7,6 +7,7 @@ import { Button } from "../ui/Button";
 import { useToast } from "../ui/Toast";
 import { CreateActivityInput } from "../../lib/repository/interfaces";
 import { ActivityType, RelatedRecordType } from "../../lib/types/domain";
+import { FormError } from "../ui/FormError";
 
 const TYPES: ActivityType[] = ["Call", "Email", "Meeting", "WhatsApp", "Quotation", "Note"];
 const LINK_TYPES: RelatedRecordType[] = ["Lead", "Customer"];
@@ -85,7 +86,7 @@ export function ActivityForm({
       )}
       <TextField label="Logged By" required value={ownerName} onChange={(e) => setOwnerName(e.target.value)} error={errors.ownerName} placeholder="e.g. Rohit M." />
       <TextAreaField label="Note" required rows={3} value={note} onChange={(e) => setNote(e.target.value)} error={errors.note} placeholder="What happened on this call/email/meeting?" />
-      {errors.form && <p style={{ color: "var(--bad)", fontSize: 12.5 }}>{errors.form}</p>}
+      <FormError message={errors.form} />
     </Modal>
   );
 }

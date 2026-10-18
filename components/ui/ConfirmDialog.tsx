@@ -4,6 +4,7 @@ import { ReactNode, useRef, useState } from "react";
 import { Modal } from "./Modal";
 import { Button } from "./Button";
 import { TextAreaField } from "./FormField";
+import { FormError } from "./FormError";
 
 /**
  * Gated, permission-sensitive actions (Qualify, Reject) go through an
@@ -95,7 +96,7 @@ export function ConfirmDialog({
           placeholder={noteRequired ? "Required — add context for the record" : "Optional — add context for the record"}
         />
       )}
-      {error && <p style={{ color: "var(--bad)", fontSize: 12.5 }}>{error}</p>}
+      <FormError message={error} />
     </Modal>
   );
 }

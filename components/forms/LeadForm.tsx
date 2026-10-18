@@ -13,6 +13,7 @@ import { LeadDuplicatesPanel } from "../ui/LeadDuplicatesPanel";
 import { useRepository } from "../../lib/repository/RepositoryProvider";
 import { LeadDuplicateResult, NO_DUPLICATES, probeIsWorthChecking } from "../../lib/repository/shared/leadDuplicates";
 import { DraftErrors, EMPTY_LOCATION_DRAFT, LocationDraft, createFieldsFromDraft, draftErrors } from "../../lib/geo/leadLocation";
+import { FormError } from "../ui/FormError";
 
 /**
  * Field-for-field mirror of the VERIFIED CreateLeadDto — no industry/deal-value/
@@ -183,7 +184,7 @@ export function LeadForm({
       </div>
       <TextAreaField label="Remarks" rows={3} value={remarks} onChange={(e) => setRemarks(e.target.value)} placeholder="Any context worth capturing now (optional)" />
 
-      {errors.form && <p style={{ color: "var(--bad)", fontSize: 12.5 }}>{errors.form}</p>}
+      <FormError message={errors.form} />
     </Modal>
   );
 }

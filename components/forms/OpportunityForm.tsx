@@ -11,6 +11,7 @@ import { useLeads } from "../../lib/hooks/useLeads";
 import { useCustomers } from "../../lib/hooks/useCustomers";
 import { isQualifiedLeadStatus } from "../../lib/types/domain";
 import { normalizeCustomerName } from "../../lib/repository/shared/customerLifecycle";
+import { FormError } from "../ui/FormError";
 
 /**
  * Field-for-field mirror of the VERIFIED CreateOpportunityDto: leadId,
@@ -155,7 +156,7 @@ export function OpportunityForm({
           )}
         </>
       )}
-      {errors.form && <p style={{ color: "var(--bad)", fontSize: 12.5 }}>{errors.form}</p>}
+      <FormError message={errors.form} />
     </Modal>
   );
 }

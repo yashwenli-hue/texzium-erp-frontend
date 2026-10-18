@@ -9,6 +9,7 @@ import { CreatePaymentTermInput } from "../../lib/repository/interfaces";
 import { SALES_ORDER_PAYMENT_TYPES, formatPaymentType } from "../../lib/types/domain";
 import { SALES_ORDER_REMARKS_MAX_LENGTH } from "../../lib/repository/shared/salesOrderLifecycle";
 import { formatInr } from "../../lib/format";
+import { FormError } from "../ui/FormError";
 
 /**
  * Payment terms for a Sales Order: payment type (FULL_ADVANCE, PARTIAL_ADVANCE
@@ -101,7 +102,7 @@ export function SalesOrderPaymentTermForm({
         <TextField label="Due Date" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} error={errors.dueDate} />
       </FieldRow>
       <TextAreaField label="Remarks" value={remarks} onChange={(e) => setRemarks(e.target.value)} error={errors.remarks} placeholder="Optional" />
-      {errors.form && <p style={{ color: "var(--bad)", fontSize: 12.5 }}>{errors.form}</p>}
+      <FormError message={errors.form} />
     </Modal>
   );
 }

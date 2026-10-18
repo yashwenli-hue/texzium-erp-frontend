@@ -7,6 +7,7 @@ import { Button } from "../ui/Button";
 import { useToast } from "../ui/Toast";
 import { CreateContactInput } from "../../lib/repository/interfaces";
 import { ContactType } from "../../lib/types/domain";
+import { FormError } from "../ui/FormError";
 
 const TYPES: ContactType[] = ["Decision Maker", "Champion", "Influencer"];
 
@@ -88,7 +89,7 @@ export function ContactForm({
         <TextField label="Phone" required value={phone} onChange={(e) => setPhone(e.target.value)} error={errors.phone} placeholder="+91 …" />
       </FieldRow>
       <TextField label="Owner" required value={ownerName} onChange={(e) => setOwnerName(e.target.value)} error={errors.ownerName} placeholder="e.g. Vikram J." />
-      {errors.form && <p style={{ color: "var(--bad)", fontSize: 12.5 }}>{errors.form}</p>}
+      <FormError message={errors.form} />
     </Modal>
   );
 }

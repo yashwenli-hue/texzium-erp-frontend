@@ -8,6 +8,7 @@ import { useToast } from "../ui/Toast";
 import { CreateSalesOrderInput } from "../../lib/repository/interfaces";
 import { useInventoryItems, useSellerGstRegistrations, useBuyerGstRegistrations } from "../../lib/hooks/useQuotationMasters";
 import { formatInr } from "../../lib/format";
+import { FormError } from "../ui/FormError";
 
 /**
  * Mirror of the VERIFIED CreateSalesOrderDto: proformaInvoiceId (fixed —
@@ -183,7 +184,7 @@ export function SalesOrderForm({
         If the selected item&apos;s available stock is short of the order quantity, the backend
         automatically raises a Purchase Requisition for the shortfall — there is no separate action for that here.
       </p>
-      {errors.form && <p style={{ color: "var(--bad)", fontSize: 12.5 }}>{errors.form}</p>}
+      <FormError message={errors.form} />
     </Modal>
   );
 }

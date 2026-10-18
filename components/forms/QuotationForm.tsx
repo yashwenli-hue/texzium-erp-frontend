@@ -13,6 +13,7 @@ import { useAsyncList } from "../../lib/hooks/useAsyncList";
 import { useRepository } from "../../lib/repository/RepositoryProvider";
 import { defaultRegistration, registrationLabel } from "../../lib/repository/shared/customerLifecycle";
 import { formatInr } from "../../lib/format";
+import { FormError } from "../ui/FormError";
 
 /**
  * The buyer is the opportunity's customer (it is never typed or chosen here): the
@@ -115,7 +116,11 @@ export function QuotationForm({
   }
 
   async function handleSubmit() {
-    if (!validate()) return;
+    if (!validate()) {
+      // Take the person to the first field that needs fixing, so the message next to it is read out.
+      requestAnimationFrame(() => document.querySelector<HTMLElement>('[role="dialog"] [aria-invalid="true"]')?.focus());
+      return;
+    }
     setSubmitting(true);
     try {
       await onSubmit({
@@ -267,7 +272,7 @@ export function QuotationForm({
           </p>
         </>
       )}
-      {errors.form && <p style={{ color: "var(--bad)", fontSize: 12.5 }}>{errors.form}</p>}
+      <FormError message={errors.form} />
     </Modal>
   );
 }

@@ -6,6 +6,7 @@ import { TextField, TextAreaField } from "../ui/FormField";
 import { Button } from "../ui/Button";
 import { useToast } from "../ui/Toast";
 import { toLocalDateTimeInput } from "../../lib/format";
+import { FormError } from "../ui/FormError";
 
 /**
  * Create or reschedule a LeadFollowup. VERIFIED CreateFollowupDto: leadId,
@@ -79,7 +80,7 @@ export function FollowupForm({
           placeholder="What needs to happen on this follow-up? (optional)"
         />
       )}
-      {error && <p style={{ color: "var(--bad)", fontSize: 12.5 }}>{error}</p>}
+      <FormError message={error} />
     </Modal>
   );
 }

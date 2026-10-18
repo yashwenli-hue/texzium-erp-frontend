@@ -9,6 +9,7 @@ import { CreateNoteInput } from "../../lib/repository/interfaces";
 import { RelatedRecordType } from "../../lib/types/domain";
 import { useLeads } from "../../lib/hooks/useLeads";
 import { useCustomers } from "../../lib/hooks/useCustomers";
+import { FormError } from "../ui/FormError";
 
 const LINK_TYPES: RelatedRecordType[] = ["Lead", "Customer"];
 
@@ -114,7 +115,7 @@ export function NoteForm({
         <input type="checkbox" checked={pinned} onChange={(e) => setPinned(e.target.checked)} style={{ width: "auto", accentColor: "var(--control-accent)" }} />
         Pin this note
       </label>
-      {errors.form && <p style={{ color: "var(--bad)", fontSize: 12.5 }}>{errors.form}</p>}
+      <FormError message={errors.form} />
     </Modal>
   );
 }

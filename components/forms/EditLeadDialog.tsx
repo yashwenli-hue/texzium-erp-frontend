@@ -12,6 +12,7 @@ import { Lead } from "../../lib/types/domain";
 import { LeadProductField } from "./LeadProductField";
 import { LeadLocationFields } from "./LeadLocationFields";
 import { DraftErrors, draftFromLead, planLocationEdit, sameDraft } from "../../lib/geo/leadLocation";
+import { FormError } from "../ui/FormError";
 
 /**
  * Mirrors the VERIFIED UpdateLeadDto for the "real" fields; product
@@ -141,7 +142,7 @@ export function EditLeadDialog({
         </>
       )}
 
-      {errors.form && <p style={{ color: "var(--bad)", fontSize: 12.5 }}>{errors.form}</p>}
+      <FormError message={errors.form} />
     </Modal>
   );
 }

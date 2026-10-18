@@ -7,6 +7,7 @@ import { Button } from "../ui/Button";
 import { useToast } from "../ui/Toast";
 import { CreateTaskInput } from "../../lib/repository/interfaces";
 import { TaskPriority, RelatedRecordType } from "../../lib/types/domain";
+import { FormError } from "../ui/FormError";
 
 const PRIORITIES: TaskPriority[] = ["High", "Medium", "Low"];
 const LINK_TYPES: RelatedRecordType[] = ["Lead", "Customer"];
@@ -92,7 +93,7 @@ export function TaskForm({
         </FieldRow>
       )}
       <TextField label="Assignee" required value={assigneeName} onChange={(e) => setAssigneeName(e.target.value)} error={errors.assigneeName} placeholder="e.g. Rohit M." />
-      {errors.form && <p style={{ color: "var(--bad)", fontSize: 12.5 }}>{errors.form}</p>}
+      <FormError message={errors.form} />
     </Modal>
   );
 }

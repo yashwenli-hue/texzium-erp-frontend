@@ -6,6 +6,7 @@ import { SelectField } from "../ui/FormField";
 import { Button } from "../ui/Button";
 import { useToast } from "../ui/Toast";
 import { peopleListProblem, useAssignableUsers } from "../../lib/hooks/useAssignableUsers";
+import { FormError } from "../ui/FormError";
 
 // Only active users are offered (the backend refuses inactive and suspended ones).
 // `excludeUserId` is the current pre-sales assignee: reassigning to them is refused.
@@ -75,7 +76,7 @@ export function AssignLeadDialog({
       ) : (
         noneOffered && <p style={{ color: "var(--muted)", fontSize: 12.5 }}>No other active user is available to take this lead.</p>
       )}
-      {error && <p style={{ color: "var(--bad)", fontSize: 12.5 }}>{error}</p>}
+      <FormError message={error} />
     </Modal>
   );
 }

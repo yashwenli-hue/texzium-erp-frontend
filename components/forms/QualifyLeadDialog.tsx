@@ -6,6 +6,7 @@ import { SelectField } from "../ui/FormField";
 import { Button } from "../ui/Button";
 import { useToast } from "../ui/Toast";
 import { peopleListProblem, useAssignableUsers } from "../../lib/hooks/useAssignableUsers";
+import { FormError } from "../ui/FormError";
 
 /**
  * VERIFIED: PATCH /lead-assignments/:id/qualify requires a salesUserId body
@@ -83,7 +84,7 @@ export function QualifyLeadDialog({
       ) : (
         noneOffered && <p style={{ color: "var(--muted)", fontSize: 12.5 }}>No active user is available to take this lead.</p>
       )}
-      {error && <p style={{ color: "var(--bad)", fontSize: 12.5 }}>{error}</p>}
+      <FormError message={error} />
     </Modal>
   );
 }
