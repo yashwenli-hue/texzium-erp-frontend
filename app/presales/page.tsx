@@ -183,7 +183,8 @@ export default function PresalesPage() {
         onChange={setFilters}
         trailing={<DateRangeFilter label="Received date" value={dateRange} onChange={(v) => change({ dateRange: v })} />}
       />
-      <ActiveFilterChips groups={filterGroups} value={filters} onChange={setFilters} />
+      {/* A named queue already says what it holds; its filter chips would only repeat it. */}
+      {(!queue || queue.key === "all") && <ActiveFilterChips groups={filterGroups} value={filters} onChange={setFilters} />}
       {error && <p className="form-error" role="alert">Couldn&apos;t refresh the list: {error.message}</p>}
 
       <div className="lead-list" style={{ marginTop: 14 }} aria-busy={loading}>

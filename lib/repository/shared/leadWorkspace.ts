@@ -108,6 +108,8 @@ export function pendingFollowups(followups: LeadFollowup[]): LeadFollowup[] {
 const TONE_ORDER: Record<NextUpItem["tone"], number> = { bad: 0, warn: 1, action: 2, info: 3, good: 4 };
 
 const INACTIVE = "Reactivate this lead first.";
+/** One wording for every action the person's role lacks, so the page lists them together on one line. */
+export const NOT_IN_ROLE = "Not part of your role. Ask an administrator if you need it.";
 
 /** Where the lead stands, in the order the sales journey goes. */
 export type JourneyStepKey = "received" | "presales" | "qualified" | "opportunity" | "quotation";
@@ -272,21 +274,21 @@ export function leadActionStates(ctx: Pick<LeadWorkspaceContext, "lead" | "may">
   };
   const canUnassign = lead.status === "PRE_SALES_ASSIGNED" && !!lead.assignedToId;
   return {
-    logCall: st("logCall", "Log call", "phone", true, may.edit, "Needs the leads.edit permission."),
-    logCnc: st("logCnc", "Log CNC", "phone", true, may.edit, "Needs the leads.edit permission."),
-    logActivity: st("logActivity", "Log activity", "plus", true, may.edit, "Needs the leads.edit permission."),
-    followup: st("followup", "Schedule follow-up", "cal", true, may.followupCreate, "Needs the leads.followups.create permission."),
-    assign: st("assign", lead.assignedToId ? "Reassign" : "Assign", "user", canAssignLeadFrom(lead.status), may.assign, "Needs the leads.assign permission."),
-    unassign: st("unassign", "Unassign", "user", canUnassign, may.assign, "Needs the leads.assign permission."),
-    qualify: st("qualify", "Qualify", "check", canQualifyLeadFrom(lead.status), may.qualify, "Needs the leads.qualify permission."),
-    reject: st("reject", "Reject", "close", canRejectLeadFrom(lead.status), may.reject, "Needs the leads.reject permission.", undefined, "danger"),
-    reopen: st("reopen", "Reopen", "restore", canReopenLeadFrom(lead.status), may.reopen, "Needs the leads.reopen permission."),
-    status: st("status", "Update status", "pulse", LEAD_STATUS_MOVE_TARGETS.some((t) => canMoveLeadStatus(lead.status, t)), may.statusUpdate, "Needs the leads.status.update permission."),
-    convert: st("convert", "Create opportunity", "brief", isQualifiedLeadStatus(lead.status), may.createOpportunity, "Needs the opportunities.create permission."),
-    edit: st("edit", "Edit details", "edit", true, may.edit, "Needs the leads.edit permission."),
+    logCall: st("logCall", "Log call", "phone", true, may.edit, NOT_IN_ROLE),
+    logCnc: st("logCnc", "Log CNC", "phone", true, may.edit, NOT_IN_ROLE),
+    logActivity: st("logActivity", "Log activity", "plus", true, may.edit, NOT_IN_ROLE),
+    followup: st("followup", "Schedule follow-up", "cal", true, may.followupCreate, NOT_IN_ROLE),
+    assign: st("assign", lead.assignedToId ? "Reassign" : "Assign", "user", canAssignLeadFrom(lead.status), may.assign, NOT_IN_ROLE),
+    unassign: st("unassign", "Unassign", "user", canUnassign, may.assign, NOT_IN_ROLE),
+    qualify: st("qualify", "Qualify", "check", canQualifyLeadFrom(lead.status), may.qualify, NOT_IN_ROLE),
+    reject: st("reject", "Reject", "close", canRejectLeadFrom(lead.status), may.reject, NOT_IN_ROLE, undefined, "danger"),
+    reopen: st("reopen", "Reopen", "restore", canReopenLeadFrom(lead.status), may.reopen, NOT_IN_ROLE),
+    status: st("status", "Update status", "pulse", LEAD_STATUS_MOVE_TARGETS.some((t) => canMoveLeadStatus(lead.status, t)), may.statusUpdate, NOT_IN_ROLE),
+    convert: st("convert", "Create opportunity", "brief", isQualifiedLeadStatus(lead.status), may.createOpportunity, NOT_IN_ROLE),
+    edit: st("edit", "Edit details", "edit", true, may.edit, NOT_IN_ROLE),
     share: st("share", "Share content", "layers", may.share, may.share, ""),
-    reactivate: st("reactivate", "Reactivate", "restore", inactive, may.deactivate, "Needs the leads.deactivate permission."),
-    deactivate: st("deactivate", "Deactivate", "alert", !inactive, may.deactivate, "Needs the leads.deactivate permission.", undefined, "danger"),
+    reactivate: st("reactivate", "Reactivate", "restore", inactive, may.deactivate, NOT_IN_ROLE),
+    deactivate: st("deactivate", "Deactivate", "alert", !inactive, may.deactivate, NOT_IN_ROLE, undefined, "danger"),
     delete: st("delete", "Move to Recycle Bin", "trash", may.delete, may.delete, "", undefined, "danger"),
   };
 }

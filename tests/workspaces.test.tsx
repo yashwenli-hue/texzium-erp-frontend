@@ -90,7 +90,9 @@ test("lead actions: only those the status allows are offered; unassign only from
   assert.equal(off.reactivate.available && off.reactivate.enabled, true);
   const noPerm = leadActionStates({ lead: lead("NEW"), may: NONE } as never);
   assert.equal(noPerm.qualify.enabled, false);
-  assert.match(noPerm.qualify.reason ?? "", /leads\.qualify/);
+  // every action the role lacks shares one wording, so the page groups them on one line
+  assert.equal(noPerm.qualify.reason, noPerm.reject.reason);
+  assert.match(noPerm.qualify.reason ?? "", /Not part of your role/);
 });
 
 test("the last call is the latest logged call, whatever order the history comes in", () => {
@@ -194,4 +196,12 @@ test("the lead and opportunity pages use the shared workspace: next up, journey,
   const oppPage = src("app/opportunities/[id]/page.tsx");
   for (const s of ["<NextUp items={attention}", '<RecordPager kind="opportunity"', "<OpportunityStageDialog", "<LinkCustomerDialog", 'testId="opportunity-stage-actions"']) assert.ok(oppPage.includes(s), s);
   for (const s of ["<QueueBar", "rememberSequence(\"lead\""]) assert.ok(src("app/presales/page.tsx").includes(s), s);
+});
+
+test("a people list the backend refused is reported as such, not as 'nobody available'", async () => {
+  const { peopleListProblem } = await import("../lib/hooks/useAssignableUsers");
+  assert.equal(peopleListProblem(null), null);
+  assert.match(peopleListProblem(Object.assign(new Error("x"), { status: 403 })) ?? "", /users\.view/);
+  assert.match(peopleListProblem(new Error("network")) ?? "", /Couldn't load/);
+  for (const p of ["components/forms/AssignLeadDialog.tsx", "components/forms/QualifyLeadDialog.tsx"]) assert.match(src(p), /listProblem \? \(/, p);
 });
