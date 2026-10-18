@@ -64,13 +64,18 @@ async function performRequest<T>(path: string, options: RequestOptions): Promise
     payload = undefined;
   }
 
-  if (!res.ok) throw failure(res.status, payload);
+  if (!res.ok) throw failure(res.status, payload, auth);
 
   return payload as T;
 }
 
-// The ApiError for a non-2xx response (a 401 also signs the user out).
-function failure(status: number, payload: unknown): ApiError {
+// The ApiError for a non-2xx response (a 401 also signs the user out). A 401 on a request made
+// without a session (signing in) is a refused sign-in, not an expired session: it says so and
+// signs nobody out.
+export function failure(status: number, payload: unknown, authenticated = true): ApiError {
+  if (status === 401 && !authenticated) {
+    return new ApiError("The email or password is incorrect, or this account can't sign in.", 401, payload);
+  }
   if (status === 401) {
     clearStoredToken();
     if (typeof window !== "undefined" && window.location.pathname !== "/login") {

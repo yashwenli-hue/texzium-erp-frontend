@@ -72,3 +72,9 @@ test("shell: a skip link to the focusable main region; the drawer scrim only exi
   assert.doesNotMatch(css, /\.rail\.show\{[^}]*box-shadow:0 0 0 100vmax/);
   assert.match(css, /\.rail-scrim\{display:block;position:fixed;inset:0/);
 });
+
+test("a refused sign-in says so; only a request made with a session reads as an expired session", async () => {
+  const { failure } = await import("../lib/api/httpClient");
+  assert.equal(failure(401, undefined, false).message, "The email or password is incorrect, or this account can't sign in.");
+  assert.equal(failure(401, undefined, true).message, "Your session has expired. Please sign in again.");
+});
