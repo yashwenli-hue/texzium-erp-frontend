@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { PageHeader, PageHelp } from "../../components/ui/PageHeader";
 import { Panel } from "../../components/ui/Card";
@@ -15,6 +15,7 @@ import { useAuth } from "../../lib/auth/AuthContext";
 import { FollowupWorkItem } from "../../lib/types/domain";
 import { FOLLOWUP_BUCKETS, FollowupBucket, filterWorklist, groupWorklist, isActionable } from "../../lib/repository/shared/followupWorklist";
 import { formatDateTime, formatRelative } from "../../lib/format";
+import { rememberSequence } from "../../lib/ui/recordSequence";
 
 const EMPTY_TEXT: Record<FollowupBucket, string> = {
   OVERDUE: "Nothing overdue.",
@@ -44,6 +45,11 @@ export default function FollowupsPage() {
   const groups = useMemo(() => groupWorklist(shown), [shown]);
   const pending = groups.OVERDUE.length + groups.TODAY.length + groups.UPCOMING.length;
   const anyFilter = !!search.trim() || mine || showInactive;
+  // Opening a lead from here lets its page step through the follow-ups due, most urgent first.
+  const leadIds = [...new Set([...groups.OVERDUE, ...groups.TODAY, ...groups.UPCOMING].map((f) => f.lead.id))].join(",");
+  useEffect(() => {
+    if (leadIds) rememberSequence("lead", { ids: leadIds.split(","), from: "/tasks", label: "Follow-ups" });
+  }, [leadIds]);
 
   const header = (
     <PageHeader

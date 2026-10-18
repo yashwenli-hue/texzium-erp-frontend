@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { PageHeader } from "../../components/ui/PageHeader";
 import { Panel } from "../../components/ui/Card";
@@ -24,6 +24,7 @@ import { formatRelative, formatDate } from "../../lib/format";
 import { nextPendingFollowup } from "../../lib/followup";
 import { formatLeadLocationShort } from "../../lib/geo/leadLocation";
 import { FilterMap } from "../../lib/types/common";
+import { rememberSequence } from "../../lib/ui/recordSequence";
 import { LEAD_LIST_VIEW_KEY, LeadFilterKey, leadRowLabel } from "../../lib/repository/shared/leadList";
 
 const PAGE_SIZE = 20;
@@ -43,6 +44,10 @@ export default function LeadsPage() {
   const setFilters = (f: FilterMap) => change({ filters: f });
   const filterGroups = leadFilterGroups(result.facets, filters, FILTERS);
   const anyFilter = !!search.trim() || Object.keys(filters).length > 0 || !!dateRange.from || !!dateRange.to;
+  // Opening a lead remembers this page of the list, so its page can step to the previous and next one.
+  useEffect(() => {
+    if (loaded) rememberSequence("lead", { ids: result.items.map((l) => l.id), from: "/leads", label: "Leads" });
+  }, [loaded, result.items]);
 
   async function createLead(input: CreateLeadInput) {
     const lead = await repo.leads.create(input);
