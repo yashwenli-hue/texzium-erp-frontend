@@ -39,9 +39,11 @@ export function formatRelative(iso: string): string {
   if (abs < MIN) return "just now";
   if (abs < HOUR) return fmt(Math.round(abs / MIN), "min");
   if (abs < DAY) return fmt(Math.round(abs / HOUR), "hr");
-  if (abs < DAY * 2 && !isFuture) return "Yesterday";
-  if (abs < DAY * 2 && isFuture) return "Tomorrow";
-  if (abs < WEEK) return fmt(Math.round(abs / DAY), "day");
+  // A day or more away: count calendar days, so "Tomorrow" is tomorrow's date, not anything
+  // within 48 hours (a follow-up the day after tomorrow at 11:30 is "in 2 days").
+  const days = Math.abs(Math.round((new Date(then).setHours(0, 0, 0, 0) - new Date(now).setHours(0, 0, 0, 0)) / DAY));
+  if (days <= 1) return isFuture ? "Tomorrow" : "Yesterday";
+  if (days < 7) return fmt(days, "day");
   return fmt(Math.round(abs / WEEK), "week");
 }
 
