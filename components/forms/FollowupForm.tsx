@@ -5,6 +5,7 @@ import { Modal } from "../ui/Modal";
 import { TextField, TextAreaField } from "../ui/FormField";
 import { Button } from "../ui/Button";
 import { useToast } from "../ui/Toast";
+import { toLocalDateTimeInput } from "../../lib/format";
 
 /**
  * Create or reschedule a LeadFollowup. VERIFIED CreateFollowupDto: leadId,
@@ -24,7 +25,7 @@ export function FollowupForm({
   onSubmit: (followupDate: string, remarks?: string) => Promise<unknown>;
 }) {
   const toast = useToast();
-  const [followupDate, setFollowupDate] = useState(initialDate ? initialDate.slice(0, 16) : "");
+  const [followupDate, setFollowupDate] = useState(initialDate ? toLocalDateTimeInput(initialDate) : "");
   const [remarks, setRemarks] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);

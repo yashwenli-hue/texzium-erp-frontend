@@ -67,3 +67,15 @@ export function isOverdue(iso: string | null): boolean {
   if (!iso) return false;
   return new Date(iso).getTime() < Date.now();
 }
+
+/**
+ * An instant as the value of a datetime-local input, in the browser's own time zone
+ * ("2026-10-18T16:10"). Cutting the ISO string instead would show UTC: 10:40 for a 4:10 pm
+ * follow-up in India, and saving that unchanged would move it.
+ */
+export function toLocalDateTimeInput(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
