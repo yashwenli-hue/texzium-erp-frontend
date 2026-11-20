@@ -21,6 +21,7 @@ import { useCustomers } from "../../lib/hooks/useCustomers";
 import { useQuoteToCashSummary } from "../../lib/hooks/useQuoteToCashSummary";
 import { useFinancialSummary } from "../../lib/hooks/useFinancialSummary";
 import { useAuth } from "../../lib/auth/AuthContext";
+import { PresalesDashboard } from "../../components/dashboard/PresalesDashboard";
 import { Opportunity, OpportunityStage, OPPORTUNITY_STEPS, formatOpportunityStage, isQualifiedLeadStatus } from "../../lib/types/domain";
 import { canMoveOpportunityStage, validateOpportunityStageMove } from "../../lib/repository/shared/opportunityStage";
 import { formatInr, formatRelative } from "../../lib/format";
@@ -61,7 +62,16 @@ function stageNote(stage: StageState): string | undefined {
   return stage.error ? "Unavailable" : undefined;
 }
 
+/**
+ * Each role's own dashboard: Pre-Sales sees only their own work (PresalesDashboard);
+ * every other role sees the team dashboard below.
+ */
 export default function DashboardPage() {
+  const { user } = useAuth();
+  return user?.role === "PRE_SALES" ? <PresalesDashboard /> : <TeamDashboard />;
+}
+
+function TeamDashboard() {
   const router = useRouter();
   const { leads, createLead } = useLeads();
   const { opportunities, updateStage } = useOpportunities();

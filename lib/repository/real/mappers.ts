@@ -152,6 +152,8 @@ export interface BackendLead {
   presales?: Array<{ id: string; fullName: string | null }>;
   salesOwner?: { id: string; fullName: string | null } | null;
   lastCallOutcome?: string | null;
+  /** GET /leads and GET /leads/:id include the lead's opportunities (plain rows). */
+  opportunities?: Array<Pick<BackendOpportunity, "id" | "title" | "status" | "expectedValue" | "probability" | "createdAt">>;
 }
 
 export interface BackendOpportunity {
@@ -313,6 +315,13 @@ export function mapLead(raw: BackendLead): Lead {
     ...(raw.lastCallOutcome !== undefined ? { lastCallOutcome: outcomeOfLastCall(raw.lastCallOutcome) } : {}),
     ...(raw.inventoryItem ? { product: mapLeadProduct(raw.inventoryItem) } : {}),
     followups: raw.followups?.map(mapLeadFollowup),
+    // A row with an unrecognised stage is left out here (the Opportunities page reports it);
+    // one bad row must not hide the whole lead list.
+    opportunities: raw.opportunities?.flatMap((o) =>
+      isOpportunityStage(o.status)
+        ? [{ id: o.id, title: o.title, stage: o.status, expectedValue: Number(o.expectedValue) || 0, probability: Number(o.probability) || 0, createdAt: o.createdAt }]
+        : []
+    ),
     notes: raw.notes?.map(mapLeadNote),
     timelines: raw.timelines?.map(mapLeadTimeline),
   };

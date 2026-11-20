@@ -196,6 +196,16 @@ export interface LeadUIContext {
 // See docs/backend-ui-contract.md §5.
 export type LeadFollowupStatus = "PENDING" | "COMPLETED" | "CANCELLED";
 
+/** An opportunity as it comes inside a lead: enough to place it on a pipeline. */
+export interface LeadOpportunity {
+  id: ID;
+  title: string;
+  stage: OpportunityStage;
+  expectedValue: number;
+  probability: number;
+  createdAt: string; // ISO 8601
+}
+
 export interface LeadFollowup {
   id: ID;
   leadId: ID;
@@ -302,6 +312,12 @@ export interface Lead {
   uiContext?: LeadUIContext;
   /** VERIFIED: both lead list and lead detail embed the followups relation. */
   followups?: LeadFollowup[];
+  /**
+   * VERIFIED (GET /leads and GET /leads/:id include opportunities): the deals opened
+   * from this lead, with their saved stage. Readable by anyone who can see the lead,
+   * including Pre-Sales (who cannot open the Opportunities list itself).
+   */
+  opportunities?: LeadOpportunity[];
   /** VERIFIED: lead detail embeds the LeadNote relation (imported requirement text). Read-only. */
   notes?: LeadNoteEntry[];
   /** VERIFIED: lead detail embeds the LeadTimeline relation, newest first. */

@@ -89,6 +89,15 @@ export const NAV_SECTIONS: NavSection[] = [
   },
 ];
 
+/**
+ * Roles with their own, shorter RevenueOS menu: only these pages are listed (each still
+ * subject to its permission). A role not named here sees the full menu. The menu is
+ * presentation only; what each person can read is decided by the backend.
+ */
+export const ROLE_NAV_HREFS: Record<string, string[]> = {
+  PRE_SALES: ["/dashboard", "/leads", "/activities", "/tasks", "/content", "/reports", "/notifications"],
+};
+
 export const PAGE_META: Record<string, { title: string; subtitle: string }> = {
   dashboard: {
     title: "Dashboard",

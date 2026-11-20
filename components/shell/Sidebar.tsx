@@ -36,7 +36,7 @@ export function Sidebar({
 }) {
   const pathname = usePathname();
   const counts = useLiveCounts();
-  const { hasPermission } = useAuth();
+  const { hasPermission, user } = useAuth();
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
 
   // Tooltip is position:fixed (not CSS-hover ::after) because the rail's
@@ -77,7 +77,7 @@ export function Sidebar({
         </div>
       </div>
       <div className="rail-scroll">
-        {visibleNavSections(NAV_SECTIONS, hasPermission).map((section) => (
+        {visibleNavSections(NAV_SECTIONS, hasPermission, user?.role).map((section) => (
           <div key={section.label}>
             <div className="nav-label">{section.label}</div>
             {section.items.map((item) => {
