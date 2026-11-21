@@ -33,6 +33,7 @@ const PIPELINE_COLUMNS: KanbanColumnConfig<OpportunityStage>[] = OPPORTUNITY_STE
 const FOCUS_LOOK: Record<FocusKind, { label: string; tone: "bad" | "warn" | "info" | "n"; icon: string }> = {
   overdue: { label: "Overdue", tone: "bad", icon: "clock" },
   today: { label: "Due today", tone: "warn", icon: "clock" },
+  qualify: { label: "Ready to qualify", tone: "info", icon: "check" },
   new: { label: "New lead", tone: "info", icon: "user" },
   decide: { label: "Decide", tone: "info", icon: "target" },
   tomorrow: { label: "Tomorrow", tone: "n", icon: "clock" },

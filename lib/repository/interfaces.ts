@@ -11,7 +11,7 @@ import type {
 } from "./shared/dataDeletion";
 import { ListQuery, Page, ID } from "../types/common";
 import type { DownloadedFile } from "../api/httpClient";
-import { ContentAccessUrl, ContentAsset, ContentAssetDetail, ContentListFilters, ContentShare, ContentShareInput, ContentShareResult, ContentUpdateInput, ContentUploadInput, DocumentProfile, DocumentProfileFields, Lead, LeadStatus, LeadSourceRecord, LeadTimelineEntry, LeadActivityType, LeadUIContext, LeadFollowup, AssignableUser, InventoryItemOption, GstRegistrationOption, Customer, Contact, Activity, ActivityType, Task, Note, Opportunity, OpportunityStage, Quotation, QuotationEvent, ProformaInvoice, ProformaEvent, SalesOrder, SalesOrderEvent, SalesOrderPaymentTerm, SalesOrderAdvanceReceipt, SalesOrderCommercialApproval, AdvanceReceiptOutcome, SalesInvoice, DispatchOrderOption, AccountsReceivable, RecordPaymentResult, PaymentCollection, PaymentCollectionDetail, InvoiceCollections, CustomerStatement, StatementPeriod, PaymentLinkResult, ReceiptVoucher, SalesRevenueSummary, CollectionsSummary, CollectionsAging, CollectionsEfficiency, CollectionsRecoveryRate, AppNotification, CustomerEvent, CustomerGstRegistration, CustomerDuplicateCheck, CustomerOverview, CallOutcome } from "../types/domain";
+import { ContentAccessUrl, ContentAsset, ContentAssetDetail, ContentListFilters, ContentShare, ContentShareInput, ContentShareResult, ContentUpdateInput, ContentUploadInput, DocumentProfile, DocumentProfileFields, Lead, LeadStatus, LeadSourceRecord, LeadTimelineEntry, LeadActivityType, LeadUIContext, LeadFollowup, AssignableUser, InventoryItemOption, GstRegistrationOption, Customer, Contact, Activity, ActivityType, Task, Note, Opportunity, OpportunityStage, Quotation, QuotationEvent, ProformaInvoice, ProformaEvent, SalesOrder, SalesOrderEvent, SalesOrderPaymentTerm, SalesOrderAdvanceReceipt, SalesOrderCommercialApproval, AdvanceReceiptOutcome, SalesInvoice, DispatchOrderOption, AccountsReceivable, RecordPaymentResult, PaymentCollection, PaymentCollectionDetail, InvoiceCollections, CustomerStatement, StatementPeriod, PaymentLinkResult, ReceiptVoucher, SalesRevenueSummary, CollectionsSummary, CollectionsAging, CollectionsEfficiency, CollectionsRecoveryRate, AppNotification, CustomerEvent, CustomerGstRegistration, CustomerDuplicateCheck, CustomerOverview, CallOutcome, BantAnswers, LeadBantView } from "../types/domain";
 import type { LeadSearchQuery, LeadSearchResult } from "./shared/leadSearch";
 import type { LeadDuplicateProbe, LeadDuplicateResult } from "./shared/leadDuplicates";
 import type { AccessAuditEntry, AccessPermission, AccessRole, AccessUser, AccessUserStatus, RolePermissionChange } from "./shared/access";
@@ -162,6 +162,16 @@ export interface CreateFollowupInput {
   leadId: ID;
   followupDate: string; // ISO 8601
   remarks?: string;
+}
+
+/** What PUT /leads/:id/bant accepts: any subset; null clears an answer or note. */
+export type SaveLeadBantInput = Partial<BantAnswers>;
+
+export interface ILeadBantRepository {
+  /** VERIFIED: GET /leads/:id/bant (leads.view, record-scoped). */
+  get(leadId: ID): Promise<LeadBantView>;
+  /** VERIFIED: PUT /leads/:id/bant (leads.edit, record-scoped). The server works out the score. */
+  save(leadId: ID, input: SaveLeadBantInput): Promise<LeadBantView>;
 }
 
 export interface ILeadFollowupRepository {
@@ -857,6 +867,7 @@ export interface RevenueOSRepository {
   leads: ILeadRepository;
   leadSources: ILeadSourceRepository;
   leadFollowups: ILeadFollowupRepository;
+  leadBant: ILeadBantRepository;
   users: IUserRepository;
   customers: ICustomerRepository;
   customerGst: IGstRegistrationRepository;

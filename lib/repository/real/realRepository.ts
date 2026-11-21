@@ -1,3 +1,4 @@
+import { RealLeadBantRepository } from "./realLeadBantRepository";
 import { RealAccessRepository } from "./realAccessRepository";
 import { RevenueOSRepository } from "../interfaces";
 import { RealContentRepository } from "./realContentRepository";
@@ -61,6 +62,7 @@ export function createRealRepository(): RevenueOSRepository {
     leads,
     leadSources: new RealLeadSourceRepository(),
     leadFollowups: new RealLeadFollowupRepository(),
+    leadBant: new RealLeadBantRepository(),
     users,
     opportunities,
     quotations,

@@ -27,6 +27,7 @@ import {
 import { AssignLeadDialog } from "../../../components/forms/AssignLeadDialog";
 import { EditLeadDialog } from "../../../components/forms/EditLeadDialog";
 import { QualifyLeadDialog } from "../../../components/forms/QualifyLeadDialog";
+import { LeadBantPanel } from "../../../components/leads/LeadBantPanel";
 import { FollowupForm } from "../../../components/forms/FollowupForm";
 import { OpportunityForm } from "../../../components/forms/OpportunityForm";
 import { ShareContentDialog } from "../../../components/content/ShareContentDialog";
@@ -156,6 +157,8 @@ export default function LeadDetailPage() {
   // these mirror it so the buttons and hints match (see canAssignLeadFrom & co.).
   const canAssign = canAssignLeadFrom(lead.status);
   const canQualify = canQualifyLeadFrom(lead.status);
+  // The backend qualifies a lead only once its BANT analysis is complete (409 otherwise).
+  const bantComplete = !!lead.bant?.completedAt;
   const canReject = canRejectLeadFrom(lead.status);
   // Only a pre-sales assignment that nothing has built on yet can be undone (the backend
   // refuses anything else with a 409).
@@ -282,8 +285,12 @@ export default function LeadDetailPage() {
                   variant="ghost"
                   icon="check"
                   onClick={() => setShowQualify(true)}
-                  disabled={inactive || !canQualify || !hasPermission("leads.qualify")}
-                  title={actionHint("qualify", "leads.qualify", "You don't have permission to qualify leads")}
+                  disabled={inactive || !canQualify || !hasPermission("leads.qualify") || !bantComplete}
+                  title={
+                    canQualify && !inactive && hasPermission("leads.qualify") && !bantComplete
+                      ? "Complete the BANT analysis below (Budget, Authority, Need, Timeline) to qualify this lead"
+                      : actionHint("qualify", "leads.qualify", "You don't have permission to qualify leads")
+                  }
                 >
                   Qualify
                 </Button>
@@ -411,6 +418,13 @@ export default function LeadDetailPage() {
               )}
             </div>
           </div>
+
+          <LeadBantPanel
+            leadId={lead.id}
+            canEdit={!inactive && hasPermission("leads.edit")}
+            readOnlyReason={inactive ? INACTIVE_HINT : "You don't have permission to edit this lead."}
+            onSaved={refetch}
+          />
 
           <Panel title="Follow-ups" flush>
             {followups.length === 0 ? (

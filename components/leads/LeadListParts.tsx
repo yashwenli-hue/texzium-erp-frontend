@@ -2,7 +2,7 @@
 
 import { LeadDeactivatedTag, LeadStatusTag } from "../ui/Tag";
 import { Icon } from "../ui/Icon";
-import type { Lead } from "../../lib/types/domain";
+import { BANT_GRADE_LABEL, bantGradeOf, type Lead } from "../../lib/types/domain";
 import type { LeadSortField, LeadListView } from "../../lib/repository/shared/leadList";
 import type { ListSort } from "../ui/ResponsiveList";
 
@@ -35,6 +35,24 @@ export function LeadStatusCell({ lead }: { lead: Lead }) {
       <LeadStatusTag status={lead.status} />
       {!lead.isActive && <LeadDeactivatedTag />}
     </div>
+  );
+}
+
+/** The lead's BANT score: graded once complete, "in progress" while a question is open. */
+export function BantCell({ lead }: { lead: Lead }) {
+  if (!lead.bant) return <span className="cell-none" title="No BANT analysis yet">—</span>;
+  if (!lead.bant.completedAt)
+    return (
+      <span className="tag n" title="BANT started: not every question is answered yet">
+        {lead.bant.score} · in progress
+      </span>
+    );
+  const grade = bantGradeOf(lead.bant.score);
+  const color = grade === "HOT" ? "g" : grade === "WARM" ? "w" : "b";
+  return (
+    <span className={`tag ${color}`} title={`BANT complete: ${lead.bant.score}/100`}>
+      {lead.bant.score} · {BANT_GRADE_LABEL[grade]}
+    </span>
   );
 }
 

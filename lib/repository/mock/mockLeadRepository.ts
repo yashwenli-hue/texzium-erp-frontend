@@ -1,3 +1,4 @@
+import { mockBantView, mockBants } from "./mockLeadBantRepository";
 import { ID, ListQuery, Page } from "../../types/common";
 import {
   Lead,
@@ -289,6 +290,9 @@ export class MockLeadRepository implements ILeadRepository {
     const lead = db.leads.getById(id);
     if (!lead) throw new Error(`Lead ${id} not found`);
     if (!canQualifyLeadFrom(lead.status)) throw new Error(leadActionBlockedReason("qualify", lead.status));
+    const bant = mockBantView(mockBants.get(id));
+    if (!bant.complete)
+      throw new Error(`Complete the BANT analysis (Budget, Authority, Need, Timeline) before qualifying this lead and handing it to Sales. Still to answer: ${bant.missing.join(", ")}.`);
     const salesUser = activeAssignee(salesUserId);
     const now = new Date().toISOString();
     const updated = db.leads.update(id, {

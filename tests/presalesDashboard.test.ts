@@ -58,6 +58,8 @@ const LEADS: Lead[] = [
   lead("later", { status: "CONTACTED", followups: [followup("f4", 20)] }),
   lead("done-call", { status: "CONTACTED", followups: [followup("f5", -1, "COMPLETED")] }),
   lead("under", { status: "UNDERQUALIFIED" }),
+  lead("ready", { status: "CONTACTED", bant: { score: 83, completedAt: at(-1) }, followups: [followup("f8", 30)] }),
+  lead("half-bant", { status: "CONTACTED", bant: { score: 30, completedAt: null }, followups: [followup("f9", 30)] }),
   lead("rejected", { status: "REJECTED" }),
   lead("to-sales", { status: "SALES_ASSIGNED", assignedToId: OTHER, opportunities: [deal("o1", "PROPOSAL", 400000)] }),
   lead("to-sales-2", { status: "SALES_ASSIGNED", assignedToId: OTHER }),
@@ -69,13 +71,13 @@ const LEADS: Lead[] = [
 test("only leads assigned to me and still in Pre-Sales are mine to work", () => {
   assert.deepEqual(
     myOpenLeads(LEADS, ME).map((l) => l.id),
-    ["new", "overdue", "today", "tomorrow", "later", "done-call", "under"]
+    ["new", "overdue", "today", "tomorrow", "later", "done-call", "under", "ready", "half-bant"]
   );
 });
 
 test("work status counts my open leads, my follow-ups and what I handed on", () => {
   assert.deepEqual(workStatus(LEADS, ME), {
-    open: 7,
+    open: 9,
     notContacted: 2, // "new" and "tomorrow" (not yet contacted)
     followupsToday: 1,
     followupsOverdue: 1, // the other person's and the deactivated lead's do not count
@@ -84,13 +86,14 @@ test("work status counts my open leads, my follow-ups and what I handed on", () 
   });
 });
 
-test("focus tasks: overdue, today, new leads, decisions, tomorrow, then the next week", () => {
+test("focus tasks: overdue, today, ready to qualify, new leads, decisions, tomorrow, then the next week", () => {
   const tasks = focusTasks(LEADS, ME, NOW);
   assert.deepEqual(
     tasks.map((t) => [t.kind, t.leadId]),
     [
       ["overdue", "overdue"],
       ["today", "today"],
+      ["qualify", "ready"], // BANT complete; a half-done BANT is not ready
       ["new", "new"],
       ["decide", "under"],
       ["tomorrow", "tomorrow"],
@@ -119,8 +122,8 @@ test("the pipeline is every opportunity opened from my leads, by stage", () => {
 
 test("lead-to-win conversion: handled, qualified to Sales, opportunity opened, won", () => {
   assert.deepEqual(leadToWinConversion(LEADS), [
-    { label: "Leads I handled", count: 12 }, // every lead but the deactivated one (a rejected lead still counts)
-    { label: "Qualified to Sales", count: 3, rate: 25 },
+    { label: "Leads I handled", count: 14 }, // every lead but the deactivated one (a rejected lead still counts)
+    { label: "Qualified to Sales", count: 3, rate: 21 },
     { label: "Opportunity opened", count: 2, rate: 67 },
     { label: "Won", count: 1, rate: 50 },
   ]);

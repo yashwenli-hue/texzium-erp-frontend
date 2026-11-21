@@ -13,7 +13,7 @@ import { initials } from "../../components/ui/Who";
 import { ResponsiveList, ResponsiveColumn } from "../../components/ui/ResponsiveList";
 import { FilterBar, ActiveFilterChips, DateRangeFilter } from "../../components/ui/FilterButton";
 import { LeadForm } from "../../components/forms/LeadForm";
-import { LastCallTag, LeadStatusCell, ListStatus, leadListSort } from "../../components/leads/LeadListParts";
+import { BantCell, LastCallTag, LeadStatusCell, ListStatus, leadListSort } from "../../components/leads/LeadListParts";
 import { leadFilterGroups } from "../../components/leads/leadFilters";
 import { useLeadListView } from "../../lib/hooks/useLeadListView";
 import { useRepository } from "../../lib/repository/RepositoryProvider";
@@ -72,6 +72,7 @@ export default function LeadsPage() {
       ),
     },
     { key: "status", header: "Status", render: (l) => <LeadStatusCell lead={l} /> },
+    { key: "bant", header: "BANT", render: (l) => <BantCell lead={l} /> },
     { key: "assignedToName", header: "Assigned To", render: (l) => (l.assignedToName ? <span className="cell-clip" title={l.assignedToName}>{l.assignedToName}</span> : none("Unassigned")) },
     { key: "followup", header: "Follow-up", render: (l) => <FollowupTag urgency={followupOf(l).urgency} dueAt={followupOf(l).dueAt} /> },
     { key: "lastCall", header: "Last call", render: (l) => <LastCallTag lead={l} /> },

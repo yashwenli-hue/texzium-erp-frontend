@@ -196,6 +196,63 @@ export interface LeadUIContext {
 // See docs/backend-ui-contract.md §5.
 export type LeadFollowupStatus = "PENDING" | "COMPLETED" | "CANCELLED";
 
+// ---------------------------------------------------------------------------
+// BANT analysis (Budget, Authority, Need, Timeline). VERIFIED against
+// GET/PUT /leads/:id/bant: the backend owns the questions, options, points and score;
+// the frontend only shows them. A lead is qualified only once its BANT is complete.
+// ---------------------------------------------------------------------------
+export type BantKey = "budget" | "authority" | "need" | "timeline";
+export const BANT_KEYS: BantKey[] = ["budget", "authority", "need", "timeline"];
+export type BantGrade = "HOT" | "WARM" | "COLD";
+
+export interface BantOption {
+  value: string;
+  label: string;
+  points: number;
+}
+
+export interface BantQuestion {
+  key: BantKey;
+  letter: "B" | "A" | "N" | "T";
+  title: string;
+  question: string;
+  options: BantOption[];
+}
+
+export interface BantAnswers {
+  budget: string | null;
+  authority: string | null;
+  need: string | null;
+  timeline: string | null;
+  budgetAmount: number | null;
+  budgetNote: string | null;
+  authorityNote: string | null;
+  needNote: string | null;
+  timelineNote: string | null;
+}
+
+export interface LeadBantView {
+  questions: BantQuestion[];
+  answers: BantAnswers;
+  score: number;
+  grade: BantGrade | null;
+  complete: boolean;
+  missing: string[];
+  completedAt: string | null;
+  updatedAt: string | null;
+}
+
+export interface LeadBantSummary {
+  score: number;
+  completedAt: string | null;
+}
+
+/** Hot, warm or cold, as the backend grades a complete BANT (75 and 50 are its thresholds). */
+export function bantGradeOf(score: number): BantGrade {
+  return score >= 75 ? "HOT" : score >= 50 ? "WARM" : "COLD";
+}
+export const BANT_GRADE_LABEL: Record<BantGrade, string> = { HOT: "Hot", WARM: "Warm", COLD: "Cold" };
+
 /** An opportunity as it comes inside a lead: enough to place it on a pipeline. */
 export interface LeadOpportunity {
   id: ID;
@@ -318,6 +375,12 @@ export interface Lead {
    * including Pre-Sales (who cannot open the Opportunities list itself).
    */
   opportunities?: LeadOpportunity[];
+  /**
+   * VERIFIED (GET /leads and GET /leads/:id include bant { score, completedAt }): the
+   * lead's BANT result. Absent when no BANT has been started; completedAt null while a
+   * question is unanswered. The full answers come from GET /leads/:id/bant.
+   */
+  bant?: LeadBantSummary;
   /** VERIFIED: lead detail embeds the LeadNote relation (imported requirement text). Read-only. */
   notes?: LeadNoteEntry[];
   /** VERIFIED: lead detail embeds the LeadTimeline relation, newest first. */

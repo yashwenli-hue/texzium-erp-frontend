@@ -52,7 +52,7 @@ export function workStatus(leads: Lead[], me: ID): WorkStatus {
   };
 }
 
-export type FocusKind = "overdue" | "today" | "new" | "decide" | "tomorrow" | "upcoming";
+export type FocusKind = "overdue" | "today" | "qualify" | "new" | "decide" | "tomorrow" | "upcoming";
 
 export interface FocusTask {
   id: string;
@@ -64,13 +64,14 @@ export interface FocusTask {
   at: string;
 }
 
-const FOCUS_ORDER: FocusKind[] = ["overdue", "today", "new", "decide", "tomorrow", "upcoming"];
+const FOCUS_ORDER: FocusKind[] = ["overdue", "today", "qualify", "new", "decide", "tomorrow", "upcoming"];
 const UPCOMING_DAYS = 7;
 
 /**
  * What this person should do next, most urgent first: their scheduled follow-ups
- * (overdue, today, tomorrow, the next week), new leads waiting for a first call, and
- * underqualified leads waiting for a decision. Only leads assigned to them count.
+ * (overdue, today, tomorrow, the next week), leads whose BANT is complete and can be
+ * qualified, new leads waiting for a first call, and underqualified leads waiting for
+ * a decision. Only leads assigned to them count.
  */
 export function focusTasks(leads: Lead[], me: ID, now: Date = new Date()): FocusTask[] {
   const horizon = now.getTime() + UPCOMING_DAYS * 86_400_000;
@@ -83,6 +84,8 @@ export function focusTasks(leads: Lead[], me: ID, now: Date = new Date()): Focus
         u === "Overdue" ? "overdue" : u === "Due Today" ? "today" : u === "Tomorrow" ? "tomorrow" : new Date(f.followupDate).getTime() <= horizon ? "upcoming" : null;
       if (kind) tasks.push({ id: `followup-${f.id}`, kind, title: f.remarks || "Follow-up call", leadId: l.id, leadName: leadName(l), at: f.followupDate });
     }
+    if (l.bant?.completedAt)
+      tasks.push({ id: `qualify-${l.id}`, kind: "qualify", title: `BANT complete (${l.bant.score}/100): qualify and hand to Sales`, leadId: l.id, leadName: leadName(l), at: l.bant.completedAt });
     if (open.length === 0 && NOT_CONTACTED.includes(l.status))
       tasks.push({ id: `new-${l.id}`, kind: "new", title: "New lead: make the first call", leadId: l.id, leadName: leadName(l), at: l.createdAt });
     if (open.length === 0 && l.status === "UNDERQUALIFIED")
