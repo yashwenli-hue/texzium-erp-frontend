@@ -28,6 +28,7 @@ import { AssignLeadDialog } from "../../../components/forms/AssignLeadDialog";
 import { EditLeadDialog } from "../../../components/forms/EditLeadDialog";
 import { QualifyLeadDialog } from "../../../components/forms/QualifyLeadDialog";
 import { LeadBantPanel } from "../../../components/leads/LeadBantPanel";
+import { LeadQuotationsPanel } from "../../../components/leads/LeadQuotationsPanel";
 import { FollowupForm } from "../../../components/forms/FollowupForm";
 import { OpportunityForm } from "../../../components/forms/OpportunityForm";
 import { ShareContentDialog } from "../../../components/content/ShareContentDialog";
@@ -46,10 +47,10 @@ import { useToast } from "../../../components/ui/Toast";
 import { DeleteRecordDialog } from "../../../components/governance/DeleteRecordDialog";
 import { DeletedRecordNotice } from "../../../components/governance/DeletedRecordNotice";
 import { initials } from "../../../components/ui/Who";
-import { formatInr, formatDateTime } from "../../../lib/format";
+import { formatInr, formatDate, formatDateTime } from "../../../lib/format";
 import { nextPendingFollowup } from "../../../lib/followup";
 import { formatLeadLocation, formatLeadLocationShort } from "../../../lib/geo/leadLocation";
-import { canAssignLeadFrom, canQualifyLeadFrom, canRejectLeadFrom, isQualifiedLeadStatus, leadActionBlockedReason, leadActivityMeta, LeadActivityType, LeadFollowup, Quotation, Opportunity, Note, canReopenLeadFrom, canMoveLeadStatus, LEAD_STATUS_MOVE_TARGETS, CallOutcome, formatLeadStatus } from "../../../lib/types/domain";
+import { canAssignLeadFrom, canQualifyLeadFrom, canRejectLeadFrom, isQualifiedLeadStatus, leadActionBlockedReason, leadActivityMeta, LeadActivityType, LeadFollowup, Quotation, Opportunity, Note, canReopenLeadFrom, canMoveLeadStatus, LEAD_STATUS_MOVE_TARGETS, CallOutcome, formatLeadStatus, LeadOpportunity } from "../../../lib/types/domain";
 
 const SUMMARY_TYPES: LeadActivityType[] = ["CALL", "MEETING", "EMAIL", "WHATSAPP"];
 
@@ -199,6 +200,16 @@ export default function LeadDetailPage() {
     { key: "title", header: "Opportunity", render: (o) => o.title },
     { key: "stage", header: "Stage", render: (o) => <OpportunityStageTag stage={o.stage} /> },
     { key: "expectedValue", header: "Value", render: (o) => formatInr(o.expectedValue) },
+  ];
+
+  // Without opportunities.view / quotations.view (Pre-Sales) the lead's own deals and a
+  // price-free quotation list are shown instead: what happened, never the money.
+  const canSeeOpportunities = hasPermission("opportunities.view");
+  const canSeeQuotations = hasPermission("quotations.view");
+  const leadDealColumns: Column<LeadOpportunity>[] = [
+    { key: "title", header: "Opportunity", render: (o) => o.title },
+    { key: "stage", header: "Stage", render: (o) => <OpportunityStageTag stage={o.stage} /> },
+    { key: "createdAt", header: "Opened", render: (o) => <span className="cell-nowrap">{formatDate(o.createdAt)}</span> },
   ];
 
   // Real notes are the read-only text imported with the lead (e.g. a webhook's
@@ -540,23 +551,36 @@ export default function LeadDetailPage() {
 
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <Panel title="Related Opportunities" flush>
-            <DataTable
-              columns={oppColumns}
-              rows={relatedOpportunities}
-              onRowClick={(o) => router.push(`/opportunities/${o.id}`)}
-              emptyTitle="No opportunities yet"
-              emptyBody="Qualify this lead, then convert it above."
-            />
+            {canSeeOpportunities ? (
+              <DataTable
+                columns={oppColumns}
+                rows={relatedOpportunities}
+                onRowClick={(o) => router.push(`/opportunities/${o.id}`)}
+                emptyTitle="No opportunities yet"
+                emptyBody="Qualify this lead, then convert it above."
+              />
+            ) : (
+              <DataTable
+                columns={leadDealColumns}
+                rows={lead.opportunities ?? []}
+                emptyTitle="No opportunities yet"
+                emptyBody="Sales opens the deal once the lead is qualified."
+              />
+            )}
           </Panel>
-          <Panel title="Related Quotations" flush>
-            <DataTable
-              columns={quoteColumns}
-              rows={relatedQuotes}
-              onRowClick={(q) => router.push(`/quotations/${q.id}`)}
-              emptyTitle="No quotations yet"
-              emptyBody="Create one from the Opportunity once it's ready."
-            />
-          </Panel>
+          {canSeeQuotations ? (
+            <Panel title="Related Quotations" flush>
+              <DataTable
+                columns={quoteColumns}
+                rows={relatedQuotes}
+                onRowClick={(q) => router.push(`/quotations/${q.id}`)}
+                emptyTitle="No quotations yet"
+                emptyBody="Create one from the Opportunity once it's ready."
+              />
+            </Panel>
+          ) : (
+            <LeadQuotationsPanel leadId={lead.id} />
+          )}
           <Panel
             title="Notes"
             extraHead={

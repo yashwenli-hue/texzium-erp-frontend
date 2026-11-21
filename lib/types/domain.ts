@@ -253,6 +253,28 @@ export function bantGradeOf(score: number): BantGrade {
 }
 export const BANT_GRADE_LABEL: Record<BantGrade, string> = { HOT: "Hot", WARM: "Warm", COLD: "Cold" };
 
+// ---------------------------------------------------------------------------
+// A lead's quotations WITHOUT prices. VERIFIED against GET /leads/:id/quotations
+// (leads.view, record-scoped): for people who may see the lead but not commercial
+// terms (Pre-Sales). The backend sends no amount, rate, tax or total.
+// ---------------------------------------------------------------------------
+export type QuotationProgress = "IN_PREPARATION" | "APPROVED" | "PROFORMA_ISSUED" | "CUSTOMER_ACCEPTED" | "ORDER_PLACED" | "REJECTED";
+
+export interface LeadQuotationSummary {
+  id: ID;
+  quotationCode: string | null;
+  quoteDate: string;
+  status: string;
+  progress: QuotationProgress;
+  progressLabel: string;
+  opportunity: { id: ID; title: string };
+  lines: Array<{ lineNumber: number; description: string; quantity: number }>;
+  proforma: { number: string | null; issueDate: string } | null;
+  order: { code: string | null; orderDate: string } | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 /** An opportunity as it comes inside a lead: enough to place it on a pipeline. */
 export interface LeadOpportunity {
   id: ID;

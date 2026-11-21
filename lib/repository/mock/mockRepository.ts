@@ -1,3 +1,4 @@
+import { MockLeadQuotationRepository } from "./mockLeadQuotationRepository";
 import { MockLeadBantRepository } from "./mockLeadBantRepository";
 import { MockAccessRepository } from "./mockAccessRepository";
 import { RevenueOSRepository } from "../interfaces";
@@ -48,6 +49,7 @@ export function createMockRepository(): RevenueOSRepository {
     leadSources: new MockLeadSourceRepository(),
     leadFollowups: new MockLeadFollowupRepository(),
     leadBant: new MockLeadBantRepository(),
+    leadQuotations: new MockLeadQuotationRepository(),
     users: new MockUserRepository(),
     customers: new MockCustomerRepository(),
     customerGst: new MockCustomerGstRepository(),
