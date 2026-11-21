@@ -11,7 +11,7 @@ import type {
 } from "./shared/dataDeletion";
 import { ListQuery, Page, ID } from "../types/common";
 import type { DownloadedFile } from "../api/httpClient";
-import { ContentAccessUrl, ContentAsset, ContentAssetDetail, ContentListFilters, ContentShare, ContentShareInput, ContentShareResult, ContentUpdateInput, ContentUploadInput, DocumentProfile, DocumentProfileFields, Lead, LeadStatus, LeadSourceRecord, LeadTimelineEntry, LeadActivityType, LeadUIContext, LeadFollowup, AssignableUser, InventoryItemOption, GstRegistrationOption, Customer, Contact, Activity, ActivityType, Task, Note, Opportunity, OpportunityStage, Quotation, QuotationEvent, ProformaInvoice, ProformaEvent, SalesOrder, SalesOrderEvent, SalesOrderPaymentTerm, SalesOrderAdvanceReceipt, SalesOrderCommercialApproval, AdvanceReceiptOutcome, SalesInvoice, DispatchOrderOption, AccountsReceivable, RecordPaymentResult, PaymentCollection, PaymentCollectionDetail, InvoiceCollections, CustomerStatement, StatementPeriod, PaymentLinkResult, ReceiptVoucher, SalesRevenueSummary, CollectionsSummary, CollectionsAging, CollectionsEfficiency, CollectionsRecoveryRate, AppNotification, CustomerEvent, CustomerGstRegistration, CustomerDuplicateCheck, CustomerOverview, CallOutcome, BantAnswers, LeadBantView, LeadQuotationSummary } from "../types/domain";
+import { ContentAccessUrl, ContentAsset, ContentAssetDetail, ContentListFilters, ContentShare, ContentShareInput, ContentShareResult, ContentUpdateInput, ContentUploadInput, DocumentProfile, DocumentProfileFields, Lead, LeadStatus, LeadSourceRecord, LeadTimelineEntry, LeadActivityType, LeadUIContext, LeadFollowup, AssignableUser, InventoryItemOption, GstRegistrationOption, Customer, Contact, Activity, ActivityType, Task, Note, Opportunity, OpportunityStage, Quotation, QuotationEvent, ProformaInvoice, ProformaEvent, SalesOrder, SalesOrderEvent, SalesOrderPaymentTerm, SalesOrderAdvanceReceipt, SalesOrderCommercialApproval, AdvanceReceiptOutcome, SalesInvoice, DispatchOrderOption, AccountsReceivable, RecordPaymentResult, PaymentCollection, PaymentCollectionDetail, InvoiceCollections, CustomerStatement, StatementPeriod, PaymentLinkResult, ReceiptVoucher, SalesRevenueSummary, CollectionsSummary, CollectionsAging, CollectionsEfficiency, CollectionsRecoveryRate, AppNotification, CustomerEvent, CustomerGstRegistration, CustomerDuplicateCheck, CustomerOverview, CallOutcome, BantAnswers, LeadBantView, LeadQuotationSummary, FollowupCalendarEntry } from "../types/domain";
 import type { LeadSearchQuery, LeadSearchResult } from "./shared/leadSearch";
 import type { LeadDuplicateProbe, LeadDuplicateResult } from "./shared/leadDuplicates";
 import type { AccessAuditEntry, AccessPermission, AccessRole, AccessUser, AccessUserStatus, RolePermissionChange } from "./shared/access";
@@ -188,6 +188,13 @@ export interface ILeadFollowupRepository {
   reschedule(id: ID, followupDate: string): Promise<LeadFollowup>;
   /** VERIFIED: PATCH /:id/cancel. */
   cancel(id: ID): Promise<LeadFollowup>;
+  /**
+   * VERIFIED: GET /lead-followups/mine?from&to — PENDING follow-ups of active leads the
+   * signed-in person owns now. `userId` is used by the mock only; the server takes it from the token.
+   */
+  listMine(userId: ID, from: string, to: string): Promise<FollowupCalendarEntry[]>;
+  /** VERIFIED: GET /lead-followups/calendar?from&to[&ownerId] — any status, within record scope; at most 62 days. */
+  calendar(from: string, to: string, ownerId?: ID): Promise<FollowupCalendarEntry[]>;
 }
 
 /**

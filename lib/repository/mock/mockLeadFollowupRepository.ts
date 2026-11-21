@@ -1,10 +1,39 @@
 import { ID } from "../../types/common";
-import { LeadFollowup } from "../../types/domain";
+import { FollowupCalendarEntry, LeadFollowup } from "../../types/domain";
 import { CreateFollowupInput, ILeadFollowupRepository } from "../interfaces";
 import { db } from "./db";
 import { delay } from "./queryUtils";
 import { mockId } from "./entityStore";
 import { assertMockLeadActive } from "./leadGuards";
+
+/** A mock follow-up in the calendar shape GET /lead-followups/calendar returns. */
+function calendarEntry(f: LeadFollowup): FollowupCalendarEntry | null {
+  const lead = db.leads.getById(f.leadId);
+  if (!lead) return null;
+  return {
+    id: f.id,
+    followupDate: f.followupDate,
+    remarks: f.remarks ?? null,
+    status: f.status,
+    completedAt: f.completedAt ?? null,
+    completedBy: f.completedByName ? { id: "", fullName: f.completedByName } : null,
+    lead: {
+      id: lead.id,
+      leadCode: null,
+      customerName: lead.customerName,
+      companyName: lead.companyName ?? null,
+      phone: lead.phone,
+      status: lead.status,
+      isActive: lead.isActive,
+      assignedTo: lead.assignedToId ? { id: lead.assignedToId, fullName: lead.assignedToName ?? "" } : null,
+    },
+  };
+}
+
+function inRange(f: LeadFollowup, from: string, to: string) {
+  const t = new Date(f.followupDate).getTime();
+  return t >= new Date(from).getTime() && t < new Date(to).getTime();
+}
 
 function syncLeadFollowups(leadId: ID) {
   const followups = db.leadFollowups.getAll().filter((f) => f.leadId === leadId);
@@ -82,5 +111,25 @@ export class MockLeadFollowupRepository implements ILeadFollowupRepository {
     syncLeadFollowups(existing.leadId);
     db.leadTimeline.add({ source: "SYSTEM", id: mockId("T"), leadId: existing.leadId, icon: "close", title: "Followup Cancelled", detail: "", actorName: "You", occurredAt: now });
     return delay(updated);
+  }
+
+  async listMine(userId: ID, from: string, to: string): Promise<FollowupCalendarEntry[]> {
+    const rows = db.leadFollowups
+      .getAll()
+      .filter((f) => f.status === "PENDING" && inRange(f, from, to))
+      .map(calendarEntry)
+      .filter((e): e is FollowupCalendarEntry => !!e && e.lead.isActive && e.lead.assignedTo?.id === userId)
+      .sort((a, b) => (a.followupDate < b.followupDate ? -1 : 1));
+    return delay(rows);
+  }
+
+  async calendar(from: string, to: string, ownerId?: ID): Promise<FollowupCalendarEntry[]> {
+    const rows = db.leadFollowups
+      .getAll()
+      .filter((f) => inRange(f, from, to))
+      .map(calendarEntry)
+      .filter((e): e is FollowupCalendarEntry => !!e && (!ownerId || e.lead.assignedTo?.id === ownerId))
+      .sort((a, b) => (a.followupDate < b.followupDate ? -1 : 1));
+    return delay(rows);
   }
 }

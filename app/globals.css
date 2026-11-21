@@ -1634,3 +1634,90 @@ button.more{background:none;border:0;font:inherit;cursor:pointer;padding:0}
 .dup-head{margin:0;padding:10px 19px 2px;font-size:12.5px;font-weight:600;color:var(--text)}
 .dup-route{display:block;margin-top:2px;color:var(--text-2)}
 .dup-confirm{margin-top:8px}
+
+/* Follow-up reminders (components/shell/FollowupReminderHost.tsx): top right, under the top bar. */
+.fu-remind{position:fixed;top:76px;right:20px;z-index:190;width:340px;max-width:calc(100vw - 32px);display:flex;flex-direction:column;gap:10px}
+.fu-card{background:var(--surface-2, var(--surface));border:1px solid var(--line);border-left:3px solid var(--info);border-radius:14px;padding:12px 14px;box-shadow:var(--shadow-2, 0 16px 40px -14px rgba(10,10,12,.28));animation:toastIn .18s ease-out}
+.fu-card[data-overdue]{border-left-color:var(--bad)}
+.fu-head{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:var(--info)}
+.fu-card[data-overdue] .fu-head{color:var(--bad)}
+.fu-ic{display:grid;place-items:center}
+.fu-when{flex:1;min-width:0}
+.fu-time{color:var(--muted);font-weight:500}
+.fu-x{width:26px;height:26px;display:grid;place-items:center;border-radius:8px;border:0;background:transparent;color:var(--muted);cursor:pointer}
+.fu-x:hover,.fu-x:focus-visible{background:var(--surface-inset);color:var(--text)}
+.fu-who{margin-top:6px;font-size:14px;font-weight:700;color:var(--text);overflow-wrap:anywhere}
+.fu-note{margin-top:3px;font-size:12.5px;color:var(--text-2);line-height:1.45;overflow-wrap:anywhere}
+.fu-phone{margin-top:6px;font-size:12.5px}
+.fu-phone a{display:inline-flex;align-items:center;gap:5px;color:var(--text-2);text-decoration:none}
+.fu-phone a:hover{color:var(--text);text-decoration:underline}
+.fu-actions{margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.fu-btn{height:30px;padding:0 11px;font-size:12.5px}
+.fu-snooze{position:relative}
+.fu-menu{position:absolute;right:0;top:calc(100% + 4px);z-index:2;min-width:170px;background:var(--surface-2, var(--surface));border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow-2, 0 16px 40px -14px rgba(10,10,12,.28));padding:4px}
+.fu-menu button{display:block;width:100%;text-align:left;border:0;background:transparent;padding:8px 10px;border-radius:7px;font-size:12.5px;color:var(--text);cursor:pointer}
+.fu-menu button:hover,.fu-menu button:focus-visible{background:var(--surface-inset)}
+.fu-more{align-self:flex-end;font-size:12px;font-weight:600;color:var(--text-2);background:var(--surface-2, var(--surface));border:1px solid var(--line);border-radius:999px;padding:6px 12px;text-decoration:none;box-shadow:var(--shadow)}
+.fu-alerts{background:var(--info-bg);color:var(--text);border-radius:12px;padding:10px 12px;font-size:12.5px;line-height:1.45;display:flex;flex-direction:column;gap:8px}
+.fu-alerts-act{display:flex;gap:6px}
+@media(max-width:640px){.fu-remind{top:auto;bottom:max(16px,env(safe-area-inset-bottom));right:16px;left:16px;width:auto;max-width:none}}
+
+/* Follow-up calendar (app/followups/page.tsx). */
+.fc-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:6px}
+.fc-nav{display:flex;align-items:center;gap:8px}
+.fc-title{font-size:18px;font-weight:700;margin:0;min-width:170px;text-align:center;color:var(--text)}
+.fc-arrow{width:34px;height:34px;display:grid;place-items:center;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--text);cursor:pointer}
+.fc-arrow:hover,.fc-arrow:focus-visible{background:var(--surface-inset)}
+.fc-next svg{transform:rotate(180deg)}
+.fc-tools{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.fc-tools .chips{margin:0}
+.fc-select{height:34px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--text);padding:0 10px;font:inherit;font-size:13px}
+.fc-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));overflow:hidden;margin:12px 0 16px;padding:0}
+.fc-wd{padding:9px 10px;font-size:11.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid var(--line)}
+.fc-day{position:relative;min-height:104px;padding:7px 8px;border:0;border-right:1px solid var(--line-2);border-bottom:1px solid var(--line-2);background:transparent;text-align:left;display:flex;flex-direction:column;gap:4px;cursor:pointer;font:inherit;color:var(--text)}
+.fc-day:nth-child(7n+7){border-right:0}
+.fc-day:hover{background:var(--surface-inset)}
+.fc-day[data-outside]{color:var(--faint-text, var(--muted))}
+.fc-day[data-outside] .fc-items{opacity:.6}
+.fc-day[data-selected]{background:var(--info-bg)}
+.fc-num{font-size:12.5px;font-weight:600;width:24px;height:24px;display:grid;place-items:center;border-radius:50%}
+.fc-day[data-today] .fc-num{background:var(--good-strong);color:#fff}
+.fc-items{display:flex;flex-direction:column;gap:3px;min-width:0}
+.fc-item{font-size:11.5px;line-height:1.3;padding:2px 6px;border-radius:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:var(--info-bg);color:var(--info)}
+.fc-item[data-state="overdue"]{background:var(--bad-bg);color:var(--bad)}
+.fc-item[data-state="done"]{background:var(--good-bg);color:var(--good)}
+.fc-item[data-state="cancelled"]{background:var(--surface-inset);color:var(--muted);text-decoration:line-through}
+.fc-item-time{font-weight:600}
+.fc-item-more{font-size:11px;color:var(--muted);padding-left:6px}
+.fc-dots{display:none}
+.fc-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.fc-row{display:flex;gap:12px;align-items:flex-start;padding:11px 0;border-top:1px solid var(--line-2)}
+.fc-row:first-child{border-top:0}
+.fc-row-time{flex:none;width:68px;font-size:12.5px;font-weight:600;color:var(--text-2);padding-top:1px}
+.fc-row-main{flex:1;min-width:0}
+.fc-row-who{font-weight:700;font-size:13.5px;color:var(--text);text-decoration:none;overflow-wrap:anywhere}
+.fc-row-who:hover{text-decoration:underline}
+.fc-row[data-state="cancelled"] .fc-row-who{text-decoration:line-through;color:var(--muted)}
+.fc-row-note{font-size:12.5px;color:var(--text-2);margin-top:2px;overflow-wrap:anywhere}
+.fc-row-meta{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:center;margin-top:6px;font-size:12px;color:var(--muted)}
+.fc-row-meta span,.fc-row-meta a{display:inline-flex;align-items:center;gap:4px}
+.fc-row-meta a{color:var(--muted);text-decoration:none}
+.fc-row-meta a:hover{color:var(--text);text-decoration:underline}
+.fc-badge{font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;background:var(--info-bg);color:var(--info)}
+.fc-badge[data-state="overdue"]{background:var(--bad-bg);color:var(--bad)}
+.fc-badge[data-state="done"]{background:var(--good-bg);color:var(--good)}
+.fc-badge[data-state="cancelled"]{background:var(--surface-inset);color:var(--muted)}
+.fc-done{flex:none;height:30px;padding:0 11px;font-size:12.5px}
+.fc-agenda-day+.fc-agenda-day{margin-top:14px}
+.fc-agenda-title{font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin:0 0 4px}
+.fc-agenda-title[data-today]{color:var(--good-strong)}
+@media(max-width:900px){.fc-day{min-height:84px}.fc-item-time{display:none}}
+@media(max-width:720px){
+  .fc-title{min-width:0;font-size:16px}
+  .fc-day{min-height:52px;align-items:center;padding:6px 2px}
+  .fc-items{display:none}
+  .fc-dots{display:grid;place-items:center;min-width:18px;height:18px;padding:0 5px;border-radius:999px;font-size:10.5px;font-weight:700;background:var(--info-bg);color:var(--info)}
+  .fc-wd{text-align:center;padding:8px 2px}
+  .fc-row-time{width:56px}
+  .fc-row{flex-wrap:wrap}
+}

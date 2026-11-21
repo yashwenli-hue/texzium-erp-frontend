@@ -10,12 +10,13 @@ const PRE_SALES_CODES = new Set([
 const labels = (role: string | undefined, has: (p: string) => boolean) =>
   visibleNavSections(NAV_SECTIONS, has, role).flatMap((s) => s.items.map((i) => i.label));
 
-test("Pre-Sales sees exactly its seven RevenueOS menu items, in menu order", () => {
+test("Pre-Sales sees exactly its RevenueOS menu items, in menu order", () => {
   assert.deepEqual(labels("PRE_SALES", (p) => PRE_SALES_CODES.has(p)), [
     "Dashboard",
     "Leads",
     "Activities",
     "Tasks",
+    "Follow-up Calendar",
     "Content Library",
     "Reports",
     "Notifications",

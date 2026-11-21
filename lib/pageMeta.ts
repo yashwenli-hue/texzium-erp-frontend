@@ -67,6 +67,7 @@ export const NAV_SECTIONS: NavSection[] = [
     items: [
       { href: "/activities", label: "Activities", icon: "pulse" },
       { href: "/tasks", label: "Tasks", icon: "checksq", countKey: "openTasksCount" },
+      { href: "/followups", label: "Follow-up Calendar", icon: "cal", permission: "leads.followups.view" },
       { href: "/notes", label: "Notes", icon: "notepad", countKey: "notesCount" },
     ],
   },
@@ -95,7 +96,7 @@ export const NAV_SECTIONS: NavSection[] = [
  * presentation only; what each person can read is decided by the backend.
  */
 export const ROLE_NAV_HREFS: Record<string, string[]> = {
-  PRE_SALES: ["/dashboard", "/leads", "/activities", "/tasks", "/content", "/reports", "/notifications"],
+  PRE_SALES: ["/dashboard", "/leads", "/activities", "/tasks", "/followups", "/content", "/reports", "/notifications"],
 };
 
 export const PAGE_META: Record<string, { title: string; subtitle: string }> = {
@@ -110,6 +111,7 @@ export const PAGE_META: Record<string, { title: string; subtitle: string }> = {
   customers: { title: "Customers", subtitle: "Converted accounts — lifetime value, order history and account health." },
   contacts: { title: "Contacts", subtitle: "Every individual you deal with, across leads and customer accounts." },
   activities: { title: "Activities", subtitle: "A unified log of every call, email, meeting and message across RevenueOS." },
+  followups: { title: "Follow-up Calendar", subtitle: "Every follow-up by day, and what is overdue." },
   tasks: { title: "Follow-ups / Tasks", subtitle: "What needs doing, grouped by urgency, so nothing slips through." },
   notes: { title: "Notes", subtitle: "Context and institutional memory attached to leads and accounts." },
   opportunities: { title: "Opportunities", subtitle: "Qualified, forecastable deals — value, probability and expected close." },

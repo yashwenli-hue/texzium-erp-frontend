@@ -3,6 +3,7 @@
 import { ReactNode, useEffect, useState } from "react";
 import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
+import { FollowupReminderHost } from "./FollowupReminderHost";
 
 const COLLAPSE_KEY = "revenueos.railCollapsed";
 
@@ -46,6 +47,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <Topbar onMenuClick={() => setMobileOpen((o) => !o)} />
         <main id="stage">{children}</main>
       </div>
+      <FollowupReminderHost />
     </div>
   );
 }

@@ -297,6 +297,27 @@ export interface LeadFollowup {
   updatedAt: string;
 }
 
+// VERIFIED: GET /lead-followups/mine and /lead-followups/calendar (leads.followups.view).
+// One follow-up with its lead and the lead's current owner, as the backend sends it.
+export interface FollowupCalendarEntry {
+  id: ID;
+  followupDate: string;
+  remarks: string | null;
+  status: LeadFollowupStatus;
+  completedAt: string | null;
+  completedBy: { id: ID; fullName: string } | null;
+  lead: {
+    id: ID;
+    leadCode: string | null;
+    customerName: string;
+    companyName: string | null;
+    phone: string;
+    status: string;
+    isActive: boolean;
+    assignedTo: { id: ID; fullName: string } | null;
+  };
+}
+
 // Minimal real-user shape needed to populate the Assign/Qualify dropdowns —
 // see AssignLeadDialog/QualifyLeadDialog. Sourced from GET /users (outside
 // the RevenueOS module; no RevenueOS-scoped assignable-user lookup is
